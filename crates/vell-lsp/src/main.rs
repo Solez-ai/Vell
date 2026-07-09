@@ -1424,6 +1424,9 @@ impl LanguageServer for Backend {
                     first_trigger_character: "}".to_string(),
                     more_trigger_character: Some(vec!["\n".to_string()]),
                 }),
+                inlay_hint_provider: Some(OneOf::Left(true)),
+                linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(true)),
+                call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
                 ..ServerCapabilities::default()
             },
             ..InitializeResult::default()
@@ -2391,9 +2394,267 @@ impl LanguageServer for Backend {
             }
         }
     }
+
+    /// Provide inlay hints showing type information for @var declarations.
+    async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
+        let docs = self.documents.read().await;
+        let Some(vd) = docs.get(&params.text_document.uri) else {
+            return Ok(None);
+        };
+        let Some(ref doc) = vd.parsed else {
+            return Ok(None);
+        };
+
+        let source = &vd.source;
+        let range = params.range;
+        let mut hints = Vec::new();
+
+        for node in &doc.children {
+            if let Node::VarDeclaration { name, span, value, .. } = node {
+                let node_range = Self::span_to_range(source, span);
+                // Only show hints for declarations in the requested range
+                if node_range.start >= range.start && node_range.end <= range.end {
+                    let type_label = match value {
+                        serde_json::Value::String(_) => ": string",
+                        serde_json::Value::Number(n) if n.is_f64() => ": number",
+                        serde_json::Value::Bool(_) => ": boolean",
+                        serde_json::Value::Array(_) => ": array",
+                        serde_json::Value::Object(_) => ": object",
+                        serde_json::Value::Null => ": null",
+                        _ => ": unknown",
+                    };
+                    // Position the hint right after the variable name
+                    let name_end_offset = span.start + 5 + name.len(); // "@var " = 5
+                    let hint_pos = Self::byte_to_position(source, name_end_offset);
+                    hints.push(InlayHint {
+                        position: hint_pos,
+                        label: InlayHintLabel::String(type_label.to_string()),
+                        kind: Some(InlayHintKind::TYPE),
+                        padding_left: Some(true),
+                        padding_right: Some(false),
+                        tooltip: Some(InlayHintTooltip::String(format!(
+                            "@var {} has type {}", name, type_label
+                        ))),
+                        text_edits: None,
+                        data: None,
+                    });
+                }
+            }
+        }
+
+        if hints.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(hints))
+        }
+    }
+
+    /// Provide linked editing ranges for @for loop variable names.
+    async fn linked_editing_range(
+        &self,
+        params: LinkedEditingRangeParams,
+    ) -> Result<Option<LinkedEditingRanges>> {
+        let docs = self.documents.read().await;
+        let Some(vd) = docs.get(&params.text_document_position_params.text_document.uri) else {
+            return Ok(None);
+        };
+        let Some(ref doc) = vd.parsed else {
+            return Ok(None);
+        };
+
+        let source = &vd.source;
+        let pos = params.text_document_position_params.position;
+
+        // Look for @for loops where the cursor is on the variable name
+        for node in &doc.children {
+            if let Node::ForLoop { variable, span, children, .. } = node {
+                let node_range = Self::span_to_range(source, span);
+                if node_range.start <= pos && pos <= node_range.end {
+                    // Find the variable name span in the source
+                    // @for {variable} in @{items} {
+                    let node_text = &source[span.start..span.end];
+                    if let Some(in_pos) = node_text.find(" in ") {
+                        let var_name_start = span.start + 5; // after "@for "
+                        let var_name_end = var_name_start + variable.len();
+                        let var_range = Self::span_to_range(source, &vell_core::Span::new(var_name_start, var_name_end));
+
+                        // Only respond if cursor is on the variable declaration
+                        if var_range.start <= pos && pos <= var_range.end {
+                            let mut ranges = vec![var_range];
+
+                            // Find all @{variable} references inside the loop body
+                            for child in children {
+                                Self::collect_var_refs_for_loop(child, variable, source, &mut ranges);
+                            }
+
+                            return Ok(Some(LinkedEditingRanges {
+                                ranges,
+                                word_pattern: Some("[a-zA-Z_][a-zA-Z0-9_]*".to_string()),
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Provide call hierarchy items for @[Directive] calls.
+    async fn prepare_call_hierarchy(
+        &self,
+        params: CallHierarchyPrepareParams,
+    ) -> Result<Option<Vec<CallHierarchyItem>>> {
+        let docs = self.documents.read().await;
+        let Some(vd) = docs.get(&params.text_document_position_params.text_document.uri) else {
+            return Ok(None);
+        };
+        let Some(ref doc) = vd.parsed else {
+            return Ok(None);
+        };
+
+        let source = &vd.source;
+        let pos = params.text_document_position_params.position;
+        let uri = params.text_document_position_params.text_document.uri;
+
+        // Check if cursor is on a directive @[Name]
+        for node in &doc.children {
+            if let Node::Directive { name, span, .. }
+            | Node::Extension { name, span, .. } = node
+            {
+                let node_range = Self::span_to_range(source, span);
+                if node_range.start <= pos && pos <= node_range.end {
+                    let item = CallHierarchyItem {
+                        name: format!("@[{}]", name),
+                        kind: SymbolKind::FUNCTION,
+                        tags: None,
+                        detail: Some(builtin_directive_description(name).to_string()),
+                        uri: uri.clone(),
+                        range: node_range,
+                        selection_range: node_range,
+                        data: None,
+                    };
+                    return Ok(Some(vec![item]));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn incoming_calls(
+        &self,
+        params: CallHierarchyIncomingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyIncomingCall>>> {
+        let docs = self.documents.read().await;
+        let _item = params.item;
+
+        // Incoming calls are not currently tracked across documents.
+        // This could be extended to search all open documents for references
+        // to the directive.
+        Ok(None)
+    }
+
+    async fn outgoing_calls(
+        &self,
+        params: CallHierarchyOutgoingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>> {
+        let docs = self.documents.read().await;
+        let _item = params.item;
+
+        // Outgoing calls are not currently tracked.
+        // This could be extended to show which directives are called from
+        // the selected directive's body.
+        Ok(None)
+    }
 }
 
 impl Backend {
+    fn collect_var_refs_for_loop(node: &Node, variable: &str, source: &str, ranges: &mut Vec<Range>) {
+        match node {
+            Node::Paragraph { children, .. }
+            | Node::Heading { children, .. } => {
+                for child in children {
+                    Self::collect_var_refs_for_loop_inline(child, variable, source, ranges);
+                }
+            }
+            Node::Blockquote { children, .. } | Node::ForLoop { children, .. } => {
+                for child in children {
+                    Self::collect_var_refs_for_loop(child, variable, source, ranges);
+                }
+            }
+            Node::IfBlock { consequent, alternate, .. } => {
+                for child in consequent {
+                    Self::collect_var_refs_for_loop(child, variable, source, ranges);
+                }
+                if let Some(alt) = alternate {
+                    for child in alt {
+                        Self::collect_var_refs_for_loop(child, variable, source, ranges);
+                    }
+                }
+            }
+            Node::Directive { children, .. } | Node::Extension { children, .. } => {
+                for child in children {
+                    Self::collect_var_refs_for_loop(child, variable, source, ranges);
+                }
+            }
+            Node::List { items, .. } => {
+                for item in items {
+                    for child in &item.children {
+                        Self::collect_var_refs_for_loop(child, variable, source, ranges);
+                    }
+                }
+            }
+            Node::DefinitionList { items, .. } => {
+                for item in items {
+                    for child in &item.definition {
+                        Self::collect_var_refs_for_loop(child, variable, source, ranges);
+                    }
+                }
+            }
+            Node::Table { headers, rows, .. } => {
+                for cell in headers {
+                    for child in &cell.children {
+                        Self::collect_var_refs_for_loop_inline(child, variable, source, ranges);
+                    }
+                }
+                for row in rows {
+                    for cell in row {
+                        for child in &cell.children {
+                            Self::collect_var_refs_for_loop_inline(child, variable, source, ranges);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_var_refs_for_loop_inline(node: &InlineNode, variable: &str, source: &str, ranges: &mut Vec<Range>) {
+        if let InlineNode::VarInterpolation { name, span, .. } = node {
+            if name == variable {
+                ranges.push(Self::span_to_range(source, span));
+            }
+        }
+        // Recurse into child inlines
+        match node {
+            InlineNode::Bold { children, .. }
+            | InlineNode::Italic { children, .. }
+            | InlineNode::Underline { children, .. }
+            | InlineNode::Strikethrough { children, .. }
+            | InlineNode::Superscript { children, .. }
+            | InlineNode::Subscript { children, .. }
+            | InlineNode::Link { children, .. }
+            | InlineNode::LinkRef { children, .. } => {
+                for child in children {
+                    Self::collect_var_refs_for_loop_inline(child, variable, source, ranges);
+                }
+            }
+            _ => {}
+        }
+    }
+
+        /// Maps a ParseErrorKind to a numeric LSP diagnostic code.
         /// Maps a ParseErrorKind to a numeric LSP diagnostic code.
     fn diagnostic_code(kind: &vell_core::ParseErrorKind) -> i32 {
         match kind {
