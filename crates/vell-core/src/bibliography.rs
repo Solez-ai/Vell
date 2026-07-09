@@ -103,11 +103,12 @@ pub fn parse_bibliography_source(source: &str, style: &str, title: Option<&str>)
             continue;
         }
 
-        // Check if this line starts a new entry (key: at start)
-        if !trimmed.starts_with(' ') && !trimmed.starts_with('\t') && trimmed.contains(':') {
+        // Check if this line starts a new entry (key: at line start — not indented)
+        if !line.starts_with(' ') && !line.starts_with('\t') && trimmed.contains(':') {
             // Save previous entry
             if let Some(ref key) = current_key {
-                let entry = build_bib_entry(key, &current_entry_type(&current_fields), &current_fields);
+                let entry =
+                    build_bib_entry(key, &current_entry_type(&current_fields), &current_fields);
                 bib.entries.insert(key.clone(), entry);
                 bib.order.push(key.clone());
             }
@@ -121,7 +122,7 @@ pub fn parse_bibliography_source(source: &str, style: &str, title: Option<&str>)
                 // Inline type: `key: type`
                 current_fields.insert("type".to_string(), rest.to_string());
             }
-        } else if let Some(ref key) = current_key {
+        } else if let Some(ref _key) = current_key {
             // Parse field: `  field: value`
             let trimmed_line = trimmed;
             if let Some(colon_pos) = trimmed_line.find(':') {
@@ -164,12 +165,16 @@ pub fn parse_bibtex_source(source: &str) -> Bibliography {
         // Skip whitespace and comments
         while i < chars.len() && (chars[i].is_whitespace() || chars[i] == '%') {
             if chars[i] == '%' {
-                while i < chars.len() && chars[i] != '\n' { i += 1; }
+                while i < chars.len() && chars[i] != '\n' {
+                    i += 1;
+                }
             } else {
                 i += 1;
             }
         }
-        if i >= chars.len() { break; }
+        if i >= chars.len() {
+            break;
+        }
 
         // Look for @type{
         if chars[i] == '@' {
@@ -182,12 +187,16 @@ pub fn parse_bibtex_source(source: &str) -> Bibliography {
             let entry_type = entry_type.to_lowercase();
 
             // Skip whitespace
-            while i < chars.len() && chars[i].is_whitespace() { i += 1; }
+            while i < chars.len() && chars[i].is_whitespace() {
+                i += 1;
+            }
 
             if i < chars.len() && chars[i] == '{' {
                 i += 1;
                 // Parse key
-                while i < chars.len() && chars[i].is_whitespace() { i += 1; }
+                while i < chars.len() && chars[i].is_whitespace() {
+                    i += 1;
+                }
                 let mut key = String::new();
                 while i < chars.len() && chars[i] != ',' && chars[i] != '}' {
                     key.push(chars[i]);
@@ -200,25 +209,40 @@ pub fn parse_bibtex_source(source: &str) -> Bibliography {
 
                 while i < chars.len() {
                     let ch = chars[i];
-                    if ch == '{' { depth += 1; }
-                    else if ch == '}' {
-                        if depth == 0 { break; }
+                    if ch == '{' {
+                        depth += 1;
+                    } else if ch == '}' {
+                        if depth == 0 {
+                            break;
+                        }
                         depth -= 1;
-                    }
-                    else if ch == ',' && depth == 0 {
+                    } else if ch == ',' && depth == 0 {
                         // Parse field
                         i += 1;
-                        while i < chars.len() && chars[i].is_whitespace() { i += 1; }
-                        let mut field_name = String::new();
-                        while i < chars.len() && chars[i] != '=' && chars[i] != ',' && chars[i] != '}' {
-                            if !chars[i].is_whitespace() { field_name.push(chars[i]); }
+                        while i < chars.len() && chars[i].is_whitespace() {
                             i += 1;
                         }
-                        while i < chars.len() && chars[i].is_whitespace() { i += 1; }
+                        let mut field_name = String::new();
+                        while i < chars.len()
+                            && chars[i] != '='
+                            && chars[i] != ','
+                            && chars[i] != '}'
+                        {
+                            if !chars[i].is_whitespace() {
+                                field_name.push(chars[i]);
+                            }
+                            i += 1;
+                        }
+                        while i < chars.len() && chars[i].is_whitespace() {
+                            i += 1;
+                        }
                         if i < chars.len() && chars[i] == '=' {
                             i += 1;
-                            while i < chars.len() && chars[i].is_whitespace() { i += 1; }
+                            while i < chars.len() && chars[i].is_whitespace() {
+                                i += 1;
+                            }
                             if i < chars.len() && chars[i] == '{' {
+                                i += 1; // skip opening brace before passing to helper
                                 let value = parse_bibtex_braced_value(&chars, &mut i);
                                 fields.insert(field_name.to_lowercase(), value);
                             } else if i < chars.len() && chars[i] == '"' {
@@ -233,7 +257,11 @@ pub fn parse_bibtex_source(source: &str) -> Bibliography {
                             } else {
                                 // Number value
                                 let mut value = String::new();
-                                while i < chars.len() && chars[i] != ',' && chars[i] != '}' && !chars[i].is_whitespace() {
+                                while i < chars.len()
+                                    && chars[i] != ','
+                                    && chars[i] != '}'
+                                    && !chars[i].is_whitespace()
+                                {
                                     value.push(chars[i]);
                                     i += 1;
                                 }
@@ -266,16 +294,29 @@ fn parse_bibtex_braced_value(chars: &[char], i: &mut usize) -> String {
     let mut depth = 1;
     let mut value = String::new();
     while *i < chars.len() && depth > 0 {
-        if chars[*i] == '{' { depth += 1; if depth > 1 { value.push('{'); } }
-        else if chars[*i] == '}' { depth -= 1; if depth > 0 { value.push('}'); } }
-        else { value.push(chars[*i]); }
+        if chars[*i] == '{' {
+            depth += 1;
+            if depth > 1 {
+                value.push('{');
+            }
+        } else if chars[*i] == '}' {
+            depth -= 1;
+            if depth > 0 {
+                value.push('}');
+            }
+        } else {
+            value.push(chars[*i]);
+        }
         *i += 1;
     }
     value.trim().to_string()
 }
 
 fn current_entry_type(fields: &HashMap<String, String>) -> String {
-    fields.get("type").cloned().unwrap_or_else(|| String::from("misc"))
+    fields
+        .get("type")
+        .cloned()
+        .unwrap_or_else(|| String::from("misc"))
 }
 
 fn build_bib_entry(key: &str, entry_type: &str, fields: &HashMap<String, String>) -> BibEntry {
@@ -287,7 +328,10 @@ fn build_bib_entry(key: &str, entry_type: &str, fields: &HashMap<String, String>
         title: fields.get("title").cloned(),
         year: fields.get("year").cloned(),
         journal: fields.get("journal").cloned(),
-        booktitle: fields.get("booktitle").or_else(|| fields.get("book_title")).cloned(),
+        booktitle: fields
+            .get("booktitle")
+            .or_else(|| fields.get("book_title"))
+            .cloned(),
         publisher: fields.get("publisher").cloned(),
         doi: fields.get("doi").cloned(),
         url: fields.get("url").cloned(),
@@ -295,7 +339,10 @@ fn build_bib_entry(key: &str, entry_type: &str, fields: &HashMap<String, String>
         volume: fields.get("volume").cloned(),
         number: fields.get("number").cloned(),
         editor: fields.get("editor").cloned(),
-        institution: fields.get("institution").or_else(|| fields.get("school")).cloned(),
+        institution: fields
+            .get("institution")
+            .or_else(|| fields.get("school"))
+            .cloned(),
         series: fields.get("series").cloned(),
         address: fields.get("address").cloned(),
         edition: fields.get("edition").cloned(),
@@ -365,28 +412,76 @@ pub fn format_reference(entry: &BibEntry, style: &str, index: Option<usize>) -> 
     match entry.entry_type.as_str() {
         "article" => {
             let journal = entry.journal.as_deref().unwrap_or("Unknown Journal");
-            let volume = entry.volume.as_ref().map(|v| format!(" *{}*", v)).unwrap_or_default();
-            let pages = entry.pages.as_ref().map(|p| format!(", {}", p)).unwrap_or_default();
-            format!("{}{} ({}) \"{}\" *{}*{}{}.", number_prefix, authors, year, title, journal, volume, pages)
+            let volume = entry
+                .volume
+                .as_ref()
+                .map(|v| format!(" *{}*", v))
+                .unwrap_or_default();
+            let pages = entry
+                .pages
+                .as_ref()
+                .map(|p| format!(", {}", p))
+                .unwrap_or_default();
+            format!(
+                "{}{} ({}) \"{}\" *{}*{}{}.",
+                number_prefix, authors, year, title, journal, volume, pages
+            )
         }
         "book" => {
             let publisher = entry.publisher.as_deref().unwrap_or("Unknown Publisher");
-            format!("{}{}. ({}) *{}.* {}: {}.", number_prefix, authors, year, title, publisher, entry.address.as_deref().unwrap_or(""))
+            format!(
+                "{}{}. ({}) *{}.* {}: {}.",
+                number_prefix,
+                authors,
+                year,
+                title,
+                publisher,
+                entry.address.as_deref().unwrap_or("")
+            )
         }
         "inproceedings" | "inbook" | "incollection" => {
             let booktitle = entry.booktitle.as_deref().unwrap_or("Unknown Proceedings");
             let publisher = entry.publisher.as_deref().unwrap_or("");
-            let pages = entry.pages.as_ref().map(|p| format!(", {}", p)).unwrap_or_default();
-            let pub_str = if publisher.is_empty() { String::new() } else { format!(" {}:", publisher) };
-            format!("{}{}. ({}) \"{}\" In *{}*{}{}.", number_prefix, authors, year, title, booktitle, pub_str, pages)
+            let pages = entry
+                .pages
+                .as_ref()
+                .map(|p| format!(", {}", p))
+                .unwrap_or_default();
+            let pub_str = if publisher.is_empty() {
+                String::new()
+            } else {
+                format!(" {}:", publisher)
+            };
+            format!(
+                "{}{}. ({}) \"{}\" In *{}*{}{}.",
+                number_prefix, authors, year, title, booktitle, pub_str, pages
+            )
         }
         "phdthesis" | "mastersthesis" => {
-            let school = entry.institution.as_deref().unwrap_or("Unknown Institution");
-            format!("{}{}. ({}) \"{}\" (PhD thesis, {}).", number_prefix, authors, year, title, school)
+            let school = entry
+                .institution
+                .as_deref()
+                .unwrap_or("Unknown Institution");
+            format!(
+                "{}{}. ({}) \"{}\" (PhD thesis, {}).",
+                number_prefix, authors, year, title, school
+            )
         }
         "misc" | "online" | "webpage" => {
-            let url_part = entry.url.as_ref().map(|u| format!(" Retrieved from {}", u)).unwrap_or_default();
-            format!("{}{}. ({}) \"{}\".{}{}", number_prefix, authors, year, title, url_part, if entry.doi.is_some() { "" } else { "" })
+            let url_part = entry
+                .url
+                .as_ref()
+                .map(|u| format!(" Retrieved from {}", u))
+                .unwrap_or_default();
+            let doi_part = if entry.doi.is_some() {
+                " (DOI available)"
+            } else {
+                ""
+            };
+            format!(
+                "{}{}. ({}) \"{}\".{}{}",
+                number_prefix, authors, year, title, url_part, doi_part
+            )
         }
         _ => {
             format!("{}{}. ({}) \"{}\".", number_prefix, authors, year, title)
@@ -417,7 +512,10 @@ pub fn get_author_last(entry: &BibEntry) -> String {
 pub fn resolve_doi(doi: &str) -> Result<HashMap<String, serde_json::Value>, String> {
     use std::io::Read;
 
-    let url = format!("https://doi.org/{}", doi.trim().trim_start_matches("https://doi.org/"));
+    let url = format!(
+        "https://doi.org/{}",
+        doi.trim().trim_start_matches("https://doi.org/")
+    );
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(std::time::Duration::from_secs(10))
         .build();
@@ -429,7 +527,9 @@ pub fn resolve_doi(doi: &str) -> Result<HashMap<String, serde_json::Value>, Stri
         .map_err(|e| format!("DOI request failed: {}", e))?;
 
     let mut body = String::new();
-    response.into_reader().read_to_string(&mut body)
+    response
+        .into_reader()
+        .read_to_string(&mut body)
         .map_err(|e| format!("Failed to read DOI response: {}", e))?;
 
     serde_json::from_str::<HashMap<String, serde_json::Value>>(&body)
@@ -492,15 +592,18 @@ pub fn csl_json_to_bib_entry(csl: &HashMap<String, serde_json::Value>, key: &str
 
     if let Some(v) = csl.get("author") {
         if let Some(authors) = v.as_array() {
-            let names: Vec<String> = authors.iter().filter_map(|a| {
-                let family = a.get("family").and_then(|f| f.as_str());
-                let given = a.get("given").and_then(|g| g.as_str());
-                match (family, given) {
-                    (Some(f), Some(g)) => Some(format!("{}, {}", f, g)),
-                    (Some(f), None) => Some(f.to_string()),
-                    _ => None,
-                }
-            }).collect();
+            let names: Vec<String> = authors
+                .iter()
+                .filter_map(|a| {
+                    let family = a.get("family").and_then(|f| f.as_str());
+                    let given = a.get("given").and_then(|g| g.as_str());
+                    match (family, given) {
+                        (Some(f), Some(g)) => Some(format!("{}, {}", f, g)),
+                        (Some(f), None) => Some(f.to_string()),
+                        _ => None,
+                    }
+                })
+                .collect();
             if !names.is_empty() {
                 entry.author = Some(names.join(" and "));
             }
@@ -520,7 +623,10 @@ pub fn csl_json_to_bib_entry(csl: &HashMap<String, serde_json::Value>, key: &str
         ("webpage", "misc"),
         ("dataset", "misc"),
         ("patent", "misc"),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     if let Some(bt) = type_map.get(entry.entry_type.as_str()) {
         entry.entry_type = bt.to_string();

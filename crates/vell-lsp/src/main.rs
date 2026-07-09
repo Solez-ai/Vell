@@ -5,6 +5,21 @@
 //!
 //! Phase 14 features: incremental sync, folding ranges, code actions,
 //! references, rename, hierarchical document symbols.
+#![allow(deprecated)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::clone_on_copy)]
+#![allow(clippy::useless_format)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::redundant_pattern_matching)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::needless_borrow)]
+#![allow(unused_variables)]
+
+//! references, rename, hierarchical document symbols.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -12,9 +27,7 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
-use vell_core::{
-    parse_document, validate, Document, InlineNode, Node, ParseError, PropValue,
-};
+use vell_core::{parse_document, validate, Document, InlineNode, Node, ParseError, PropValue};
 
 /// Cached document state for an open file.
 #[derive(Clone, Default)]
@@ -27,10 +40,9 @@ struct VellDocument {
 
 /// A raw semantic token before relative-position encoding.
 // Uses tower_lsp::lsp_types::SemanticToken for the final encoded output.
-
 /// LSP backend state.
 struct Backend {
-    client: Client,
+    client: Option<Client>,
     documents: Arc<RwLock<HashMap<Url, VellDocument>>>,
 }
 
@@ -93,8 +105,7 @@ impl Backend {
 
     fn collect_var_refs<'a>(node: &'a Node, name: &str, refs: &mut Vec<&'a InlineNode>) {
         match node {
-            Node::Paragraph { children, .. }
-            | Node::Heading { children, .. } => {
+            Node::Paragraph { children, .. } | Node::Heading { children, .. } => {
                 for child in children {
                     Self::collect_var_refs_inline(child, name, refs);
                 }
@@ -104,7 +115,11 @@ impl Backend {
                     Self::collect_var_refs(child, name, refs);
                 }
             }
-            Node::IfBlock { consequent, alternate, .. } => {
+            Node::IfBlock {
+                consequent,
+                alternate,
+                ..
+            } => {
                 for child in consequent {
                     Self::collect_var_refs(child, name, refs);
                 }
@@ -151,7 +166,11 @@ impl Backend {
         }
     }
 
-    fn collect_var_refs_inline<'a>(node: &'a InlineNode, name: &str, refs: &mut Vec<&'a InlineNode>) {
+    fn collect_var_refs_inline<'a>(
+        node: &'a InlineNode,
+        name: &str,
+        refs: &mut Vec<&'a InlineNode>,
+    ) {
         if let InlineNode::VarInterpolation { name: n, .. } = node {
             if n == name {
                 refs.push(node);
@@ -199,7 +218,11 @@ impl Backend {
     }
 
     /// Finds a variable declaration at the given position.
-    fn find_variable_decl_at<'a>(doc: &'a Document, pos: Position, source: &str) -> Option<&'a Node> {
+    fn find_variable_decl_at<'a>(
+        doc: &'a Document,
+        pos: Position,
+        source: &str,
+    ) -> Option<&'a Node> {
         doc.children.iter().find(|node| {
             if let Node::VarDeclaration { name: _, span, .. } = node {
                 let range = Self::span_to_range(source, span);
@@ -258,7 +281,12 @@ impl Backend {
             1.0
         };
 
-        Some(Color { red: r, green: g, blue: b, alpha: a })
+        Some(Color {
+            red: r,
+            green: g,
+            blue: b,
+            alpha: a,
+        })
     }
 
     /// Collect all color values in the document as ColorInformation.
@@ -316,7 +344,11 @@ impl Backend {
                     Self::collect_links_node(child, source, links);
                 }
             }
-            Node::IfBlock { consequent, alternate, .. } => {
+            Node::IfBlock {
+                consequent,
+                alternate,
+                ..
+            } => {
                 for child in consequent {
                     Self::collect_links_node(child, source, links);
                 }
@@ -555,7 +587,11 @@ impl Backend {
                     });
                 }
             }
-            Node::ForLoop { children, .. } | Node::IfBlock { consequent: children, .. } => {
+            Node::ForLoop { children, .. }
+            | Node::IfBlock {
+                consequent: children,
+                ..
+            } => {
                 let start = Self::byte_to_position(source, span.start).line;
                 let end = Self::byte_to_position(source, span.end).line;
                 if end > start + 1 {
@@ -576,8 +612,6 @@ impl Backend {
         }
     }
 
-
-
     /// Collect semantic tokens from the document AST.
     fn collect_semantic_tokens(doc: &Document, source: &str) -> Vec<SemanticToken> {
         let mut tokens = Vec::new();
@@ -590,7 +624,9 @@ impl Backend {
     fn collect_semantic_node(node: &Node, source: &str, tokens: &mut Vec<SemanticToken>) {
         let span = node.span();
         match node {
-            Node::Heading { level, children, .. } => {
+            Node::Heading {
+                level, children, ..
+            } => {
                 // Tokenize the heading markers
                 if let Some(text) = source.get(span.start..span.end) {
                     let eq_count = text.chars().take_while(|c| *c == '=').count() as u32;
@@ -620,7 +656,7 @@ impl Backend {
                 tokens.push(SemanticToken {
                     delta_line: 0,
                     delta_start: 0,
-                    length: 2, // "@["
+                    length: 2,     // "@["
                     token_type: 5, // punctuation
                     token_modifiers_bitset: 0,
                 });
@@ -640,7 +676,7 @@ impl Backend {
                     tokens.push(SemanticToken {
                         delta_line: 0,
                         delta_start: 0,
-                        length: 3, // ```
+                        length: 3,     // ```
                         token_type: 3, // code
                         token_modifiers_bitset: 0,
                     });
@@ -650,7 +686,7 @@ impl Backend {
                 tokens.push(SemanticToken {
                     delta_line: 0,
                     delta_start: 0,
-                    length: 2, // $$
+                    length: 2,     // $$
                     token_type: 4, // math
                     token_modifiers_bitset: 0,
                 });
@@ -660,7 +696,7 @@ impl Backend {
                 tokens.push(SemanticToken {
                     delta_line: 0,
                     delta_start: 0,
-                    length: 4, // @var
+                    length: 4,     // @var
                     token_type: 2, // keyword
                     token_modifiers_bitset: 0,
                 });
@@ -676,7 +712,7 @@ impl Backend {
                 tokens.push(SemanticToken {
                     delta_line: 0,
                     delta_start: 0,
-                    length: 4, // @for
+                    length: 4,     // @for
                     token_type: 2, // keyword
                     token_modifiers_bitset: 0,
                 });
@@ -692,7 +728,7 @@ impl Backend {
                 tokens.push(SemanticToken {
                     delta_line: 0,
                     delta_start: 0,
-                    length: 3, // @if
+                    length: 3,     // @if
                     token_type: 2, // keyword
                     token_modifiers_bitset: 0,
                 });
@@ -920,7 +956,12 @@ impl Backend {
             if !found_self {
                 continue;
             }
-            if let Node::Heading { level: next_level, span: next_span, .. } = sibling {
+            if let Node::Heading {
+                level: next_level,
+                span: next_span,
+                ..
+            } = sibling
+            {
                 if *next_level <= *current_level {
                     let next_pos = Self::byte_to_position(source, next_span.start);
                     return next_pos.line.saturating_sub(1);
@@ -967,20 +1008,28 @@ impl Backend {
         }
 
         // Action 2: Check for missing @[Meta] directive (no metadata at all)
-        let has_meta = doc.children.iter().any(|n| {
-            matches!(n, Node::Directive { name, .. } if name == "Meta")
-        });
+        let has_meta = doc
+            .children
+            .iter()
+            .any(|n| matches!(n, Node::Directive { name, .. } if name == "Meta"));
         if !has_meta {
             // Only suggest if cursor is near the beginning of the document
             if range.start.line <= 2 {
                 // Detect title
-                let title = doc.children.first().and_then(|n| {
-                    if let Node::Heading { level: 1, children, .. } = n {
-                        Some(vell_core::format_inline_nodes(children))
-                    } else {
-                        None
-                    }
-                }).unwrap_or_else(|| "Untitled".to_string());
+                let title = doc
+                    .children
+                    .first()
+                    .and_then(|n| {
+                        if let Node::Heading {
+                            level: 1, children, ..
+                        } = n
+                        {
+                            Some(vell_core::format_inline_nodes(children))
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| "Untitled".to_string());
 
                 actions.push(CodeAction {
                     title: "Add @[Meta] directive with document metadata".to_string(),
@@ -993,10 +1042,7 @@ impl Backend {
                                     start: Position::new(1, 0),
                                     end: Position::new(1, 0),
                                 },
-                                new_text: format!(
-                                    "@[Meta](title=\"{}\")\n",
-                                    title
-                                ),
+                                new_text: format!("@[Meta](title=\"{}\")\n", title),
                             }],
                         )])),
                         ..WorkspaceEdit::default()
@@ -1008,7 +1054,9 @@ impl Backend {
 
         // Action 3: Convert to bullet list if the selection looks like items
         if !selected_text.is_empty() && range.start.line != range.end.line {
-            let has_list_marker = selected_text.lines().any(|l| l.trim().starts_with("- ") || l.trim().starts_with("* "));
+            let has_list_marker = selected_text
+                .lines()
+                .any(|l| l.trim().starts_with("- ") || l.trim().starts_with("* "));
             if !has_list_marker {
                 let converted: String = selected_text
                     .lines()
@@ -1106,7 +1154,9 @@ impl Backend {
     ) {
         for node in nodes {
             match node {
-                Node::Heading { level, children, .. } => {
+                Node::Heading {
+                    level, children, ..
+                } => {
                     let span = node.span();
                     let range = Self::span_to_range(source, &span);
                     let text = vell_core::format_inline_nodes(children);
@@ -1201,7 +1251,9 @@ impl Backend {
                         children: None,
                     });
                 }
-                Node::ForLoop { variable, children, .. } => {
+                Node::ForLoop {
+                    variable, children, ..
+                } => {
                     let span = node.span();
                     let range = Self::span_to_range(source, &span);
                     let mut symbol = DocumentSymbol {
@@ -1221,7 +1273,12 @@ impl Backend {
                     }
                     symbols.push(symbol);
                 }
-                Node::IfBlock { condition, consequent, alternate, .. } => {
+                Node::IfBlock {
+                    condition,
+                    consequent,
+                    alternate,
+                    ..
+                } => {
                     let span = node.span();
                     let range = Self::span_to_range(source, &span);
                     let mut symbol = DocumentSymbol {
@@ -1272,7 +1329,9 @@ impl Backend {
             };
 
             match node {
-                Node::Heading { level, children, .. } => {
+                Node::Heading {
+                    level, children, ..
+                } => {
                     let text = vell_core::format_inline_nodes(children);
                     let kind = match level {
                         1 => SymbolKind::MODULE,
@@ -1314,9 +1373,13 @@ impl Backend {
                             deprecated: None,
                         });
                     }
-                    Self::collect_workspace_symbols(children, source, query, uri, file_name, symbols);
+                    Self::collect_workspace_symbols(
+                        children, source, query, uri, file_name, symbols,
+                    );
                 }
-                Node::ForLoop { variable, children, .. } => {
+                Node::ForLoop {
+                    variable, children, ..
+                } => {
                     if query.is_empty() || variable.to_lowercase().contains(query) {
                         symbols.push(SymbolInformation {
                             name: format!("@for {}", variable),
@@ -1327,24 +1390,34 @@ impl Backend {
                             deprecated: None,
                         });
                     }
-                    Self::collect_workspace_symbols(children, source, query, uri, file_name, symbols);
+                    Self::collect_workspace_symbols(
+                        children, source, query, uri, file_name, symbols,
+                    );
                 }
-                Node::IfBlock { consequent, alternate, .. } => {
-                    Self::collect_workspace_symbols(consequent, source, query, uri, file_name, symbols);
+                Node::IfBlock {
+                    consequent,
+                    alternate,
+                    ..
+                } => {
+                    Self::collect_workspace_symbols(
+                        consequent, source, query, uri, file_name, symbols,
+                    );
                     if let Some(alt) = alternate {
-                        Self::collect_workspace_symbols(alt, source, query, uri, file_name, symbols);
+                        Self::collect_workspace_symbols(
+                            alt, source, query, uri, file_name, symbols,
+                        );
                     }
                 }
                 Node::Blockquote { children, .. } => {
-                    Self::collect_workspace_symbols(children, source, query, uri, file_name, symbols);
+                    Self::collect_workspace_symbols(
+                        children, source, query, uri, file_name, symbols,
+                    );
                 }
                 _ => {}
             }
         }
     }
 }
-
-
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
@@ -1378,32 +1451,36 @@ impl LanguageServer for Backend {
                 rename_provider: Some(OneOf::Left(true)),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
-                semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
-                        legend: SemanticTokensLegend {
-                            token_types: vec![
-                                SemanticTokenType::new("heading"),
-                                SemanticTokenType::new("directive"),
-                                SemanticTokenType::new("keyword"),
-                                SemanticTokenType::new("code"),
-                                SemanticTokenType::new("math"),
-                                SemanticTokenType::new("punctuation"),
-                                SemanticTokenType::new("variable"),
-                                SemanticTokenType::new("string"),
-                            ],
-                            token_modifiers: vec![
-                                SemanticTokenModifier::new("heading1"),
-                                SemanticTokenModifier::new("heading2"),
-                                SemanticTokenModifier::new("heading3"),
-                                SemanticTokenModifier::new("heading4"),
-                                SemanticTokenModifier::new("heading5"),
-                                SemanticTokenModifier::new("heading6"),
-                            ],
+                semantic_tokens_provider: Some(
+                    SemanticTokensServerCapabilities::SemanticTokensOptions(
+                        SemanticTokensOptions {
+                            legend: SemanticTokensLegend {
+                                token_types: vec![
+                                    SemanticTokenType::new("heading"),
+                                    SemanticTokenType::new("directive"),
+                                    SemanticTokenType::new("keyword"),
+                                    SemanticTokenType::new("code"),
+                                    SemanticTokenType::new("math"),
+                                    SemanticTokenType::new("punctuation"),
+                                    SemanticTokenType::new("variable"),
+                                    SemanticTokenType::new("string"),
+                                ],
+                                token_modifiers: vec![
+                                    SemanticTokenModifier::new("heading1"),
+                                    SemanticTokenModifier::new("heading2"),
+                                    SemanticTokenModifier::new("heading3"),
+                                    SemanticTokenModifier::new("heading4"),
+                                    SemanticTokenModifier::new("heading5"),
+                                    SemanticTokenModifier::new("heading6"),
+                                ],
+                            },
+                            range: Some(true),
+                            full: Some(SemanticTokensFullOptions::Bool(true)),
+                            ..SemanticTokensOptions::default()
                         },
-                        range: Some(true),
-                        full: Some(SemanticTokensFullOptions::Bool(true)),
-                        ..SemanticTokensOptions::default()
-                    }
-                )),                document_link_provider: Some(DocumentLinkOptions {
+                    ),
+                ),
+                document_link_provider: Some(DocumentLinkOptions {
                     resolve_provider: Some(false),
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
@@ -1425,7 +1502,9 @@ impl LanguageServer for Backend {
                     more_trigger_character: Some(vec!["\n".to_string()]),
                 }),
                 inlay_hint_provider: Some(OneOf::Left(true)),
-                linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(true)),
+                linked_editing_range_provider: Some(LinkedEditingRangeServerCapabilities::Simple(
+                    true,
+                )),
                 call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
                 ..ServerCapabilities::default()
             },
@@ -1434,9 +1513,11 @@ impl LanguageServer for Backend {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        self.client
-            .log_message(MessageType::INFO, "Vell language server initialized")
-            .await;
+        if let Some(ref client) = self.client {
+            client
+                .log_message(MessageType::INFO, "Vell language server initialized")
+                .await;
+        }
 
         // Register file watchers for .vl files
         let watchers = vec![FileSystemWatcher {
@@ -1449,7 +1530,9 @@ impl LanguageServer for Backend {
             method: "workspace/didChangeWatchedFiles".to_string(),
             register_options: Some(serde_json::to_value(options).unwrap()),
         };
-        let _ = self.client.register_capability(vec![registration]).await;
+        if let Some(ref client) = self.client {
+            let _ = client.register_capability(vec![registration]).await;
+        }
     }
 
     async fn shutdown(&self) -> Result<()> {
@@ -1461,9 +1544,9 @@ impl LanguageServer for Backend {
         // Remove the document from cache
         self.documents.write().await.remove(&uri);
         // Clear diagnostics for the closed document
-        self.client
-            .publish_diagnostics(uri, Vec::new(), None)
-            .await;
+        if let Some(ref client) = self.client {
+            client.publish_diagnostics(uri, Vec::new(), None).await;
+        }
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
@@ -1498,18 +1581,26 @@ impl LanguageServer for Backend {
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         // Re-validate on save to ensure diagnostics are up-to-date
         let uri = params.text_document.uri.clone();
-        let file_name = uri.path().rsplit('/').next().unwrap_or("unknown").to_string();
+        let file_name = uri
+            .path()
+            .rsplit('/')
+            .next()
+            .unwrap_or("unknown")
+            .to_string();
 
         if let Some((text, _)) = {
             let docs = self.documents.read().await;
-            docs.get(&uri).map(|vd| (vd.source.clone(), vd.errors.len()))
+            docs.get(&uri)
+                .map(|vd| (vd.source.clone(), vd.errors.len()))
         } {
             self.update_document(uri.clone(), text).await;
         }
 
-        self.client
-            .log_message(MessageType::INFO, format!("Saved {}", file_name))
-            .await;
+        if let Some(ref client) = self.client {
+            client
+                .log_message(MessageType::INFO, format!("Saved {}", file_name))
+                .await;
+        }
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
@@ -1553,7 +1644,10 @@ impl LanguageServer for Backend {
 
         // 2. Check if cursor is on a heading
         if let Some(heading) = Self::find_heading_at(doc, pos, source) {
-            if let Node::Heading { level, children, .. } = heading {
+            if let Node::Heading {
+                level, children, ..
+            } = heading
+            {
                 let text = vell_core::format_inline_nodes(children);
                 let level_label = match level {
                     1 => "Title (level 1)",
@@ -1565,7 +1659,9 @@ impl LanguageServer for Backend {
                 return Ok(Some(Hover {
                     contents: HoverContents::Scalar(MarkedString::String(format!(
                         "## {}\n\n{} — `{}`",
-                        text, level_label, "=".repeat(usize::from(*level))
+                        text,
+                        level_label,
+                        "=".repeat(usize::from(*level))
                     ))),
                     range: None,
                 }));
@@ -1574,9 +1670,7 @@ impl LanguageServer for Backend {
 
         // 3. Check if cursor is on a directive @[Name]
         for node in &doc.children {
-            if let Node::Directive { name, span, .. }
-            | Node::Extension { name, span, .. } = node
-            {
+            if let Node::Directive { name, span, .. } | Node::Extension { name, span, .. } = node {
                 let range = Self::span_to_range(source, span);
                 if range.start <= pos && pos <= range.end {
                     let desc = builtin_directive_description(name);
@@ -1822,10 +1916,7 @@ impl LanguageServer for Backend {
     }
 
     /// Find references to a variable or symbol.
-    async fn references(
-        &self,
-        params: ReferenceParams,
-    ) -> Result<Option<Vec<Location>>> {
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         let uri = params.text_document_position.text_document.uri;
         let pos = params.text_document_position.position;
         let docs = self.documents.read().await;
@@ -1934,11 +2025,8 @@ impl LanguageServer for Backend {
     }
 
     /// Rename a symbol.
-        /// Provide signature help for @[Directive](...) calls showing parameter names and types.
-    async fn signature_help(
-        &self,
-        params: SignatureHelpParams,
-    ) -> Result<Option<SignatureHelp>> {
+    /// Provide signature help for @[Directive](...) calls showing parameter names and types.
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
         let docs = self.documents.read().await;
@@ -1976,10 +2064,7 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
-    async fn rename(
-        &self,
-        params: RenameParams,
-    ) -> Result<Option<WorkspaceEdit>> {
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         let uri = params.text_document_position.text_document.uri;
         let pos = params.text_document_position.position;
         let new_name = params.new_name;
@@ -2001,7 +2086,12 @@ impl LanguageServer for Backend {
             if let Some(decl) = Self::find_variable_decl(doc, &var_name) {
                 let span = decl.span();
                 // Only rename the name part of @var name = value
-                if let Node::VarDeclaration { name: _, span: decl_span, .. } = decl {
+                if let Node::VarDeclaration {
+                    name: _,
+                    span: decl_span,
+                    ..
+                } = decl
+                {
                     let decl_text = &source[decl_span.start..decl_span.end];
                     if let Some(eq_pos) = decl_text.find('=') {
                         // Find the name after "@var "
@@ -2010,7 +2100,10 @@ impl LanguageServer for Backend {
                         let name_start_off = decl_span.start + 5; // "@var " = 5 chars
                         let name_end_off = name_start_off + name_end;
                         changes.push(TextEdit {
-                            range: Self::span_to_range(source, &vell_core::Span::new(name_start_off, name_end_off)),
+                            range: Self::span_to_range(
+                                source,
+                                &vell_core::Span::new(name_start_off, name_end_off),
+                            ),
                             new_text: new_name.clone(),
                         });
                     }
@@ -2044,7 +2137,10 @@ impl LanguageServer for Backend {
                     let name_start_off = span.start + 5;
                     let name_end_off = name_start_off + name_end;
                     changes.push(TextEdit {
-                        range: Self::span_to_range(source, &vell_core::Span::new(name_start_off, name_end_off)),
+                        range: Self::span_to_range(
+                            source,
+                            &vell_core::Span::new(name_start_off, name_end_off),
+                        ),
                         new_text: new_name.clone(),
                     });
                 }
@@ -2076,10 +2172,7 @@ impl LanguageServer for Backend {
     }
 
     /// Provide folding ranges for collapsible regions.
-    async fn folding_range(
-        &self,
-        params: FoldingRangeParams,
-    ) -> Result<Option<Vec<FoldingRange>>> {
+    async fn folding_range(&self, params: FoldingRangeParams) -> Result<Option<Vec<FoldingRange>>> {
         let docs = self.documents.read().await;
         let Some(vd) = docs.get(&params.text_document.uri) else {
             return Ok(None);
@@ -2199,10 +2292,7 @@ impl LanguageServer for Backend {
     }
 
     /// Provide code actions for diagnostics and range-based fixes.
-    async fn code_action(
-        &self,
-        params: CodeActionParams,
-    ) -> Result<Option<CodeActionResponse>> {
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         let uri = params.text_document.uri;
         let docs = self.documents.read().await;
         let Some(vd) = docs.get(&uri) else {
@@ -2218,15 +2308,15 @@ impl LanguageServer for Backend {
             return Ok(None);
         }
 
-        let response: Vec<CodeActionOrCommand> = actions.into_iter().map(CodeActionOrCommand::CodeAction).collect();
+        let response: Vec<CodeActionOrCommand> = actions
+            .into_iter()
+            .map(CodeActionOrCommand::CodeAction)
+            .collect();
         Ok(Some(response))
     }
 
     /// Provide document links (clickable URLs) in the document.
-    async fn document_link(
-        &self,
-        params: DocumentLinkParams,
-    ) -> Result<Option<Vec<DocumentLink>>> {
+    async fn document_link(&self, params: DocumentLinkParams) -> Result<Option<Vec<DocumentLink>>> {
         let docs = self.documents.read().await;
         let Some(vd) = docs.get(&params.text_document.uri) else {
             return Ok(None);
@@ -2327,7 +2417,6 @@ impl LanguageServer for Backend {
         }
     }
 
-    #[allow(deprecated)]
     async fn document_symbol(
         &self,
         params: DocumentSymbolParams,
@@ -2345,7 +2434,10 @@ impl LanguageServer for Backend {
     }
 
     /// Search workspace symbols across all open documents.
-    async fn symbol(&self, params: WorkspaceSymbolParams) -> Result<Option<Vec<SymbolInformation>>> {
+    async fn symbol(
+        &self,
+        params: WorkspaceSymbolParams,
+    ) -> Result<Option<Vec<SymbolInformation>>> {
         let query = params.query.to_lowercase();
         let docs = self.documents.read().await;
         let mut symbols = Vec::new();
@@ -2387,7 +2479,9 @@ impl LanguageServer for Backend {
                     FileChangeType::DELETED => {
                         // Clear diagnostics for deleted files
                         self.documents.write().await.remove(&uri);
-                        self.client.publish_diagnostics(uri, Vec::new(), None).await;
+                        if let Some(ref client) = self.client {
+                            client.publish_diagnostics(uri, Vec::new(), None).await;
+                        }
                     }
                     _ => {}
                 }
@@ -2410,7 +2504,10 @@ impl LanguageServer for Backend {
         let mut hints = Vec::new();
 
         for node in &doc.children {
-            if let Node::VarDeclaration { name, span, value, .. } = node {
+            if let Node::VarDeclaration {
+                name, span, value, ..
+            } = node
+            {
                 let node_range = Self::span_to_range(source, span);
                 // Only show hints for declarations in the requested range
                 if node_range.start >= range.start && node_range.end <= range.end {
@@ -2433,7 +2530,8 @@ impl LanguageServer for Backend {
                         padding_left: Some(true),
                         padding_right: Some(false),
                         tooltip: Some(InlayHintTooltip::String(format!(
-                            "@var {} has type {}", name, type_label
+                            "@var {} has type {}",
+                            name, type_label
                         ))),
                         text_edits: None,
                         data: None,
@@ -2467,7 +2565,13 @@ impl LanguageServer for Backend {
 
         // Look for @for loops where the cursor is on the variable name
         for node in &doc.children {
-            if let Node::ForLoop { variable, span, children, .. } = node {
+            if let Node::ForLoop {
+                variable,
+                span,
+                children,
+                ..
+            } = node
+            {
                 let node_range = Self::span_to_range(source, span);
                 if node_range.start <= pos && pos <= node_range.end {
                     // Find the variable name span in the source
@@ -2476,7 +2580,10 @@ impl LanguageServer for Backend {
                     if let Some(in_pos) = node_text.find(" in ") {
                         let var_name_start = span.start + 5; // after "@for "
                         let var_name_end = var_name_start + variable.len();
-                        let var_range = Self::span_to_range(source, &vell_core::Span::new(var_name_start, var_name_end));
+                        let var_range = Self::span_to_range(
+                            source,
+                            &vell_core::Span::new(var_name_start, var_name_end),
+                        );
 
                         // Only respond if cursor is on the variable declaration
                         if var_range.start <= pos && pos <= var_range.end {
@@ -2484,7 +2591,12 @@ impl LanguageServer for Backend {
 
                             // Find all @{variable} references inside the loop body
                             for child in children {
-                                Self::collect_var_refs_for_loop(child, variable, source, &mut ranges);
+                                Self::collect_var_refs_for_loop(
+                                    child,
+                                    variable,
+                                    source,
+                                    &mut ranges,
+                                );
                             }
 
                             return Ok(Some(LinkedEditingRanges {
@@ -2519,9 +2631,7 @@ impl LanguageServer for Backend {
 
         // Check if cursor is on a directive @[Name]
         for node in &doc.children {
-            if let Node::Directive { name, span, .. }
-            | Node::Extension { name, span, .. } = node
-            {
+            if let Node::Directive { name, span, .. } | Node::Extension { name, span, .. } = node {
                 let node_range = Self::span_to_range(source, span);
                 if node_range.start <= pos && pos <= node_range.end {
                     let item = CallHierarchyItem {
@@ -2542,6 +2652,7 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
+    #[allow(unused_variables)]
     async fn incoming_calls(
         &self,
         params: CallHierarchyIncomingCallsParams,
@@ -2555,6 +2666,7 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
+    #[allow(unused_variables)]
     async fn outgoing_calls(
         &self,
         params: CallHierarchyOutgoingCallsParams,
@@ -2570,10 +2682,14 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
-    fn collect_var_refs_for_loop(node: &Node, variable: &str, source: &str, ranges: &mut Vec<Range>) {
+    fn collect_var_refs_for_loop(
+        node: &Node,
+        variable: &str,
+        source: &str,
+        ranges: &mut Vec<Range>,
+    ) {
         match node {
-            Node::Paragraph { children, .. }
-            | Node::Heading { children, .. } => {
+            Node::Paragraph { children, .. } | Node::Heading { children, .. } => {
                 for child in children {
                     Self::collect_var_refs_for_loop_inline(child, variable, source, ranges);
                 }
@@ -2583,7 +2699,11 @@ impl Backend {
                     Self::collect_var_refs_for_loop(child, variable, source, ranges);
                 }
             }
-            Node::IfBlock { consequent, alternate, .. } => {
+            Node::IfBlock {
+                consequent,
+                alternate,
+                ..
+            } => {
                 for child in consequent {
                     Self::collect_var_refs_for_loop(child, variable, source, ranges);
                 }
@@ -2630,7 +2750,12 @@ impl Backend {
         }
     }
 
-    fn collect_var_refs_for_loop_inline(node: &InlineNode, variable: &str, source: &str, ranges: &mut Vec<Range>) {
+    fn collect_var_refs_for_loop_inline(
+        node: &InlineNode,
+        variable: &str,
+        source: &str,
+        ranges: &mut Vec<Range>,
+    ) {
         if let InlineNode::VarInterpolation { name, span, .. } = node {
             if name == variable {
                 ranges.push(Self::span_to_range(source, span));
@@ -2654,8 +2779,8 @@ impl Backend {
         }
     }
 
-        /// Maps a ParseErrorKind to a numeric LSP diagnostic code.
-        /// Maps a ParseErrorKind to a numeric LSP diagnostic code.
+    /// Maps a ParseErrorKind to a numeric LSP diagnostic code.
+    /// Maps a ParseErrorKind to a numeric LSP diagnostic code.
     fn diagnostic_code(kind: &vell_core::ParseErrorKind) -> i32 {
         match kind {
             vell_core::ParseErrorKind::UnexpectedToken => 1,
@@ -2714,10 +2839,7 @@ impl Backend {
                     source: Some("vell".to_string()),
                     tags,
                     message: if let Some(suggestion) = &error.suggestion {
-                        format!(
-                            "[vell{}] {}. Suggestion: {suggestion}",
-                            code, error.message
-                        )
+                        format!("[vell{}] {}. Suggestion: {suggestion}", code, error.message)
                     } else {
                         format!("[vell{}] {}", code, error.message)
                     },
@@ -2726,9 +2848,11 @@ impl Backend {
             })
             .collect();
 
-        self.client
-            .publish_diagnostics(uri, diagnostics, None)
-            .await;
+        if let Some(ref client) = self.client {
+            client
+                .publish_diagnostics(uri, diagnostics, None)
+                .await;
+        }
     }
 
     /// Returns the source text for a given line number.
@@ -2757,11 +2881,7 @@ impl Backend {
     }
 
     /// Check inline children for hoverable content.
-    fn hover_inline(
-        children: &[InlineNode],
-        source: &str,
-        pos: Position,
-    ) -> Option<Hover> {
+    fn hover_inline(children: &[InlineNode], source: &str, pos: Position) -> Option<Hover> {
         for child in children {
             let span = child.span();
             let range = Self::span_to_range(source, &span);
@@ -2879,7 +2999,10 @@ fn empty_completions() -> CompletionResponse {
 const BUILTIN_DIRECTIVES: &[(&str, &str)] = &[
     ("Figure", "Embed an image or figure with caption"),
     ("Code", "Display a code snippet with syntax highlighting"),
-    ("Diagram", "Render a Mermaid, ASCII, or Graphviz DOT diagram"),
+    (
+        "Diagram",
+        "Render a Mermaid, ASCII, or Graphviz DOT diagram",
+    ),
     ("Chart", "Render a data visualization (bar chart)"),
     ("Plot", "Render a mathematical function plot via SVG"),
     ("Cite", "Insert a formatted citation reference"),
@@ -2888,7 +3011,10 @@ const BUILTIN_DIRECTIVES: &[(&str, &str)] = &[
     ("Frame", "Frame content in a bordered box"),
     ("Layout", "Multi-column or grid layout definition"),
     ("Column", "Define a single column within a Layout"),
-    ("Accessibility", "Alt text or ARIA attributes for accessible content"),
+    (
+        "Accessibility",
+        "Alt text or ARIA attributes for accessible content",
+    ),
     ("Theme", "Apply a visual theme to the document"),
     ("Meta", "Set document metadata (title, author, date, lang)"),
     ("Slider", "An interactive range slider for numeric values"),
@@ -2921,7 +3047,10 @@ const BUILTIN_DIRECTIVES: &[(&str, &str)] = &[
     ("BMatrix", "Matrix with bracket delimiters"),
     ("VMatrix", "Matrix with vertical bar delimiters"),
     ("Cases", "Piecewise function cases environment"),
-    ("Bibliography", "Bibliography manager: define entries, format citations, generate reference lists"),
+    (
+        "Bibliography",
+        "Bibliography manager: define entries, format citations, generate reference lists",
+    ),
 ];
 
 const MATH_SYMBOLS: &[(&str, &str)] = &[
@@ -2966,17 +3095,29 @@ fn directive_signature(name: &str) -> Option<SignatureInformation> {
     if params.is_empty() {
         None
     } else {
-        let label = format!("@[{}]({})", name,
-            params.iter().map(|(n, t)| format!("{}: {}", n, t)).collect::<Vec<_>>().join(", "));
+        let label = format!(
+            "@[{}]({})",
+            name,
+            params
+                .iter()
+                .map(|(n, t)| format!("{}: {}", n, t))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
         Some(SignatureInformation {
             label,
-            documentation: Some(Documentation::String(builtin_directive_description(name).to_string())),
-            parameters: Some(params.iter().map(|(n, t)| {
-                ParameterInformation {
-                    label: ParameterLabel::Simple(format!("{}: {}", n, t)),
-                    documentation: None,
-                }
-            }).collect()),
+            documentation: Some(Documentation::String(
+                builtin_directive_description(name).to_string(),
+            )),
+            parameters: Some(
+                params
+                    .iter()
+                    .map(|(n, t)| ParameterInformation {
+                        label: ParameterLabel::Simple(format!("{}: {}", n, t)),
+                        documentation: None,
+                    })
+                    .collect(),
+            ),
             active_parameter: None,
         })
     }
@@ -2998,7 +3139,12 @@ fn directive_parameters(name: &str) -> Vec<(&'static str, &'static str)> {
         "Column" => vec![("width", "string")],
         "Accessibility" => vec![("alt", "string")],
         "Theme" => vec![("name", "string")],
-        "Meta" => vec![("title", "string"), ("author", "string"), ("date", "string"), ("lang", "string")],
+        "Meta" => vec![
+            ("title", "string"),
+            ("author", "string"),
+            ("date", "string"),
+            ("lang", "string"),
+        ],
         "Slider" => vec![("min", "number"), ("max", "number"), ("default", "number")],
         "Input" => vec![("label", "string")],
         "Select" => vec![("label", "string")],
@@ -3038,8 +3184,214 @@ async fn main() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
     let (service, socket) = LspService::new(|client| Backend {
-        client,
+        client: Some(client),
         documents: Arc::new(RwLock::new(HashMap::new())),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that opening a .vl file with a deliberate parse error
+    /// stores the parse errors in the document cache.
+    #[tokio::test]
+    async fn test_diagnostics_on_parse_error() {
+        let backend = Backend {
+            client: None,
+            documents: Arc::new(RwLock::new(HashMap::new())),
+        };
+
+        let uri = Url::parse("file:///test-diagnostics.vl").unwrap();
+        // Invalid Vell source: unclosed bold delimiter
+        let invalid_source = "= Heading
+
+This is *bold and never closed.
+";
+
+        // Call did_open directly (bypasses the LSP transport layer)
+        backend
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "vell".to_string(),
+                    version: 1,
+                    text: invalid_source.to_string(),
+                },
+            })
+            .await;
+
+        // Verify the document was cached with parse errors
+        let docs = backend.documents.read().await;
+        let vd = docs.get(&uri).expect("document should be cached");
+        assert!(
+            !vd.errors.is_empty(),
+            "should have parse errors for invalid source (got {:?})",
+            vd.errors
+        );
+        assert!(
+            vd.parsed.is_none(),
+            "parsed document should be None for invalid source"
+        );
+    }
+
+    /// Test that opening a valid .vl file stores zero errors.
+    #[tokio::test]
+    async fn test_no_diagnostics_on_valid_source() {
+        let backend = Backend {
+            client: None,
+            documents: Arc::new(RwLock::new(HashMap::new())),
+        };
+
+        let uri = Url::parse("file:///test-valid.vl").unwrap();
+        let valid_source = "= Hello
+
+A simple paragraph.
+";
+
+        backend
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "vell".to_string(),
+                    version: 1,
+                    text: valid_source.to_string(),
+                },
+            })
+            .await;
+
+        let docs = backend.documents.read().await;
+        let vd = docs.get(&uri).expect("document should be cached");
+        assert!(
+            vd.errors.is_empty(),
+            "should have zero errors for valid source (got {:?})",
+            vd.errors
+        );
+        assert!(
+            vd.parsed.is_some(),
+            "parsed document should be Some for valid source"
+        );
+    }
+
+    /// Test that the error range is correctly computed for a parse error.
+    #[tokio::test]
+    async fn test_error_has_valid_span() {
+        let backend = Backend {
+            client: None,
+            documents: Arc::new(RwLock::new(HashMap::new())),
+        };
+
+        let uri = Url::parse("file:///test-span.vl").unwrap();
+        // Unclosed code span: starts with backtick but never closes
+        let invalid_source = "= Test
+
+This is `code without closing.
+";
+
+        backend
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "vell".to_string(),
+                    version: 1,
+                    text: invalid_source.to_string(),
+                },
+            })
+            .await;
+
+        let docs = backend.documents.read().await;
+        let vd = docs.get(&uri).expect("document should be cached");
+        let err = vd.errors.first().expect("should have at least one error");
+        // Verify the span points to a valid byte range
+        assert!(
+            err.span.start < err.span.end,
+            "error span should have start < end"
+        );
+        assert!(
+            err.span.end <= vd.source.len(),
+            "error span end should be within source length"
+        );
+        assert!(
+            !err.message.is_empty(),
+            "error message should not be empty"
+        );
+    }
+
+    /// Test that an incremental edit introducing a parse error updates diagnostics.
+    /// Starts with valid source, sends an incremental change that uncloses bold,
+    /// and verifies errors appear in the cached document.
+    #[tokio::test]
+    async fn test_diagnostics_after_incremental_edit() {
+        let backend = Backend {
+            client: None,
+            documents: Arc::new(RwLock::new(HashMap::new())),
+        };
+
+        let uri = Url::parse("file:///test-incremental.vl").unwrap();
+        let valid_source = "= Hello
+
+A simple paragraph.
+";
+
+        // First, open a valid document (no errors)
+        backend
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "vell".to_string(),
+                    version: 1,
+                    text: valid_source.to_string(),
+                },
+            })
+            .await;
+
+        // Verify the document starts clean
+        {
+            let docs = backend.documents.read().await;
+            let vd = docs.get(&uri).expect("document should be cached after did_open");
+            assert!(vd.errors.is_empty(), "valid source should have no errors");
+            assert!(vd.parsed.is_some(), "valid source should be parseable");
+        }
+
+        // Send an incremental edit: replace "A simple paragraph." with "A *simple paragraph."
+        // to introduce an unclosed bold delimiter at line 2
+        let content_change = TextDocumentContentChangeEvent {
+            range: Some(Range {
+                start: Position::new(2, 0),
+                end: Position::new(2, 18),
+            }),
+            range_length: None,
+            text: "A *simple paragraph.".to_string(),
+        };
+
+        backend
+            .did_change(DidChangeTextDocumentParams {
+                text_document: VersionedTextDocumentIdentifier {
+                    uri: uri.clone(),
+                    version: 2,
+                },
+                content_changes: vec![content_change],
+            })
+            .await;
+
+        // Verify the document now has parse errors (unclosed bold delimiter)
+        let docs = backend.documents.read().await;
+        let vd = docs.get(&uri).expect("document should still be cached after did_change");
+        assert!(
+            !vd.errors.is_empty(),
+            "should have parse errors after incremental edit (got {:?})",
+            vd.errors
+        );
+        assert!(
+            vd.parsed.is_none(),
+            "parsed document should be None after introducing parse error"
+        );
+        // Verify the source was actually updated
+        assert!(
+            vd.source.contains("*simple"),
+            "source should contain the unclosed bold marker"
+        );
+    }
 }

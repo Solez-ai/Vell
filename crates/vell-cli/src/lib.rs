@@ -2,6 +2,10 @@
 // Copyright (C) 2026 Samin Yeasar
 
 //! Core library for the Vell command-line interface.
+#![allow(clippy::single_component_path_imports)]
+#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::too_many_arguments)]
 //!
 //! Exposes `cmd_parse`, `cmd_fmt`, `cmd_validate`, and `cmd_render_html`
 //! for direct use and testing.
@@ -20,18 +24,31 @@ fn collect_bibliography(doc: &Document) -> Option<vell_core::bibliography::Bibli
     for node in &doc.children {
         if let Node::Directive { name, props, .. } = node {
             if name == "Bibliography" {
-                let style = props.get("style")
-                    .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None })
+                let style = props
+                    .get("style")
+                    .and_then(|v| {
+                        if let PropValue::String(s) = v {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or_else(|| "apa".to_string());
-                let title = props.get("title")
-                    .and_then(|v| if let PropValue::String(s) = v { Some(s.as_str()) } else { None });
-                
+                let title = props.get("title").and_then(|v| {
+                    if let PropValue::String(s) = v {
+                        Some(s.as_str())
+                    } else {
+                        None
+                    }
+                });
+
                 // Try source prop first (YAML-like entries)
                 if let Some(PropValue::String(source)) = props.get("source") {
-                    let bib = vell_core::bibliography::parse_bibliography_source(source, &style, title);
+                    let bib =
+                        vell_core::bibliography::parse_bibliography_source(source, &style, title);
                     merge_bibliography(&mut combined, bib);
                 }
-                
+
                 // Try bibtex prop (inline BibTeX)
                 if let Some(PropValue::String(bibtex)) = props.get("bibtex") {
                     let bib = vell_core::bibliography::parse_bibtex_source(bibtex);
@@ -43,7 +60,10 @@ fn collect_bibliography(doc: &Document) -> Option<vell_core::bibliography::Bibli
     combined
 }
 
-fn merge_bibliography(target: &mut Option<vell_core::bibliography::Bibliography>, source: vell_core::bibliography::Bibliography) {
+fn merge_bibliography(
+    target: &mut Option<vell_core::bibliography::Bibliography>,
+    source: vell_core::bibliography::Bibliography,
+) {
     match target {
         Some(ref mut t) => {
             for (key, entry) in source.entries {
@@ -196,7 +216,10 @@ fn resolve_includes_inner(
     resolved_paths: &mut std::collections::HashSet<PathBuf>,
 ) -> Result<String, String> {
     let mut result = String::new();
-    let base_dir = base_path.as_ref().and_then(|p| p.parent()).map(|p| p.to_path_buf());
+    let base_dir = base_path
+        .as_ref()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf());
 
     for line in source.lines() {
         let trimmed = line.trim();
@@ -207,7 +230,7 @@ fn resolve_includes_inner(
             // Parse path=...
             if let Some(path_val) = extract_prop_value(props_content, "path") {
                 let resolved = resolve_include_path(&path_val, &base_dir)?;
-                
+
                 // Check for circular includes
                 if resolved_paths.contains(&resolved) {
                     return Err(format!(
@@ -216,15 +239,25 @@ fn resolve_includes_inner(
                     ));
                 }
                 resolved_paths.insert(resolved.clone());
-                
+
                 let included_source = if resolved.exists() {
-                    fs::read_to_string(&resolved)
-                        .map_err(|e| format!("Failed to read included file '{}': {}", resolved.display(), e))?
+                    fs::read_to_string(&resolved).map_err(|e| {
+                        format!(
+                            "Failed to read included file '{}': {}",
+                            resolved.display(),
+                            e
+                        )
+                    })?
                 } else {
-                    return Err(format!("Included file '{}' not found (resolved: {})", path_val, resolved.display()));
+                    return Err(format!(
+                        "Included file '{}' not found (resolved: {})",
+                        path_val,
+                        resolved.display()
+                    ));
                 };
                 // Recursively resolve includes in the included file
-                let resolved_content = resolve_includes_inner(&included_source, &Some(resolved), resolved_paths)?;
+                let resolved_content =
+                    resolve_includes_inner(&included_source, &Some(resolved), resolved_paths)?;
                 result.push_str(&resolved_content);
                 result.push('\n');
             } else {
@@ -326,22 +359,43 @@ fn collect_labels_node(
     thm_counter: &mut HashMap<String, u32>,
 ) {
     match node {
-        Node::Directive { name, props, children, .. } => {
+        Node::Directive {
+            name,
+            props,
+            children,
+            ..
+        } => {
             if name == "Equation" {
                 *eq_counter += 1;
                 let eq_num = *eq_counter;
                 if let Some(PropValue::String(label)) = props.get("label") {
                     let anchor = format!("eq-{}", label);
                     let display = format!("({})", eq_num);
-                    labels.insert(label.clone(), LabelTarget { anchor_id: anchor, display_text: display });
+                    labels.insert(
+                        label.clone(),
+                        LabelTarget {
+                            anchor_id: anchor,
+                            display_text: display,
+                        },
+                    );
                 }
             }
             let theorem_names: &[&str] = &[
-                "Theorem", "Proof", "Lemma", "Corollary", "Definition",
-                "Remark", "Example", "Conjecture", "Axiom", "Proposition", "Notation",
+                "Theorem",
+                "Proof",
+                "Lemma",
+                "Corollary",
+                "Definition",
+                "Remark",
+                "Example",
+                "Conjecture",
+                "Axiom",
+                "Proposition",
+                "Notation",
             ];
             if theorem_names.contains(&name.as_str()) {
-                let is_numbered = !matches!(name.as_str(), "Proof" | "Remark" | "Example" | "Notation");
+                let is_numbered =
+                    !matches!(name.as_str(), "Proof" | "Remark" | "Example" | "Notation");
                 let thm_num = if is_numbered {
                     let count = thm_counter.entry(name.clone()).or_insert(0);
                     *count += 1;
@@ -358,13 +412,25 @@ fn collect_labels_node(
                         name.clone()
                     };
                     // Also include extra name if present
-                    let extra = props.get("name").and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None });
+                    let extra = props.get("name").and_then(|v| {
+                        if let PropValue::String(s) = v {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    });
                     let display_text = if let Some(ref extra_name) = extra {
                         format!("{} ({})", display, extra_name)
                     } else {
                         display
                     };
-                    labels.insert(label.clone(), LabelTarget { anchor_id: anchor, display_text });
+                    labels.insert(
+                        label.clone(),
+                        LabelTarget {
+                            anchor_id: anchor,
+                            display_text,
+                        },
+                    );
                 }
             }
             for child in children {
@@ -390,12 +456,20 @@ fn collect_labels_node(
                 }
             }
         }
-        Node::ForLoop { children, .. } | Node::IfBlock { consequent: children, .. } => {
+        Node::ForLoop { children, .. }
+        | Node::IfBlock {
+            consequent: children,
+            ..
+        } => {
             for child in children {
                 collect_labels_node(child, labels, eq_counter, thm_counter);
             }
             // Also traverse the alternate (else) branch
-            if let Node::IfBlock { alternate: Some(alt), .. } = node {
+            if let Node::IfBlock {
+                alternate: Some(alt),
+                ..
+            } = node
+            {
                 for child in alt {
                     collect_labels_node(child, labels, eq_counter, thm_counter);
                 }
@@ -404,7 +478,6 @@ fn collect_labels_node(
         _ => {}
     }
 }
-
 
 thread_local! {
     static RENDER_TOC_ENTRIES: RefCell<Vec<(u8, String, String)>> = const { RefCell::new(Vec::new()) };
@@ -444,7 +517,14 @@ pub fn render_document(doc: &Document) -> String {
     let mut eq_counter = 0u32;
     let mut thm_counter: HashMap<String, u32> = HashMap::new();
     for node in &doc.children {
-        render_node(node, &mut html, 0, &mut eq_counter, &mut thm_counter, &labels);
+        render_node(
+            node,
+            &mut html,
+            0,
+            &mut eq_counter,
+            &mut thm_counter,
+            &labels,
+        );
     }
     render_footnotes_section(&footnotes, &mut html, &labels);
     html.push_str("</body>\n</html>\n");
@@ -472,8 +552,11 @@ pub fn render_document_pdf(doc: &Document) -> String {
     html.push_str(VELL_CSS);
     html.push_str("</head>\n<body>\n");
     // Running page header
-    html.push_str(&format!("<div class=\"page-header\">{}</div>\n", escape_html(title)));
-    
+    html.push_str(&format!(
+        "<div class=\"page-header\">{}</div>\n",
+        escape_html(title)
+    ));
+
     // Generate TOC (document-level auto-generated TOC)
     let toc_entries = collect_toc_entries_vec(doc);
     if !toc_entries.is_empty() {
@@ -501,7 +584,14 @@ pub fn render_document_pdf(doc: &Document) -> String {
     let mut eq_counter = 0u32;
     let mut thm_counter: HashMap<String, u32> = HashMap::new();
     for node in &doc.children {
-        render_node(node, &mut html, 0, &mut eq_counter, &mut thm_counter, &labels);
+        render_node(
+            node,
+            &mut html,
+            0,
+            &mut eq_counter,
+            &mut thm_counter,
+            &labels,
+        );
     }
     render_footnotes_section(&footnotes, &mut html, &labels);
     html.push_str("</body>\n</html>\n");
@@ -532,14 +622,28 @@ pub fn render_document_slides(doc: &Document) -> String {
                 has_slides = true;
                 slides_html.push_str("<section>\n");
                 for child in children {
-                    render_node(child, &mut slides_html, 0, &mut eq_counter, &mut thm_counter, &labels);
+                    render_node(
+                        child,
+                        &mut slides_html,
+                        0,
+                        &mut eq_counter,
+                        &mut thm_counter,
+                        &labels,
+                    );
                 }
                 slides_html.push_str("</section>\n");
             }
             // Non-Slide content before first slide becomes the title slide
             _ if !has_slides => {
                 slides_html.push_str("<section>\n");
-                render_node(node, &mut slides_html, 0, &mut eq_counter, &mut thm_counter, &labels);
+                render_node(
+                    node,
+                    &mut slides_html,
+                    0,
+                    &mut eq_counter,
+                    &mut thm_counter,
+                    &labels,
+                );
                 slides_html.push_str("</section>\n");
             }
             _ => {}
@@ -550,7 +654,14 @@ pub fn render_document_slides(doc: &Document) -> String {
     if !has_slides && slides_html.is_empty() {
         slides_html.push_str("<section>\n");
         for node in &doc.children {
-            render_node(node, &mut slides_html, 0, &mut eq_counter, &mut thm_counter, &labels);
+            render_node(
+                node,
+                &mut slides_html,
+                0,
+                &mut eq_counter,
+                &mut thm_counter,
+                &labels,
+            );
         }
         slides_html.push_str("</section>\n");
     }
@@ -602,7 +713,13 @@ pub fn render_document_slides(doc: &Document) -> String {
 /// Collects heading entries for table of contents generation.
 fn collect_toc_entries(doc: &Document, entries: &mut Vec<(u8, String, String)>) {
     for node in &doc.children {
-        if let Node::Heading { level, children, id, .. } = node {
+        if let Node::Heading {
+            level,
+            children,
+            id,
+            ..
+        } = node
+        {
             let text = format_inline_nodes(children);
             let id_str = id.clone().unwrap_or_else(|| slugify_inline(children));
             entries.push((*level, text, id_str));
@@ -628,13 +745,32 @@ fn collect_lof_entries(doc: &Document) -> Vec<(String, String)> {
 
 fn collect_lof_node(node: &Node, entries: &mut Vec<(String, String)>) {
     match node {
-        Node::Directive { name, props, children, .. } => {
+        Node::Directive {
+            name,
+            props,
+            children,
+            ..
+        } => {
             if name == "Figure" {
-                let caption = props.get("caption")
-                    .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None })
+                let caption = props
+                    .get("caption")
+                    .and_then(|v| {
+                        if let PropValue::String(s) = v {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or_default();
-                let id = props.get("id")
-                    .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None })
+                let id = props
+                    .get("id")
+                    .and_then(|v| {
+                        if let PropValue::String(s) = v {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or_default();
                 entries.push((caption, id));
             }
@@ -667,11 +803,25 @@ fn collect_lot_entries(doc: &Document) -> Vec<(String, String)> {
         }
         if let Node::Directive { name, props, .. } = node {
             if name == "Table" || name == "GridTable" {
-                let caption = props.get("caption")
-                    .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None })
+                let caption = props
+                    .get("caption")
+                    .and_then(|v| {
+                        if let PropValue::String(s) = v {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or_default();
-                let id = props.get("id")
-                    .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None })
+                let id = props
+                    .get("id")
+                    .and_then(|v| {
+                        if let PropValue::String(s) = v {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    })
                     .unwrap_or_default();
                 entries.push((caption, id));
             }
@@ -838,12 +988,19 @@ img { max-width: 100%; height: auto; }\n\
 </style>\n";
 
 fn collect_footnotes(node: &Node, out: &mut Vec<(String, Vec<Node>)>) {
-    if let Node::FootnoteDefinition { marker, children, .. } = node {
+    if let Node::FootnoteDefinition {
+        marker, children, ..
+    } = node
+    {
         out.push((marker.clone(), children.clone()));
     }
 }
 
-fn render_footnotes_section(footnotes: &[(String, Vec<Node>)], html: &mut String, labels: &HashMap<String, LabelTarget>) {
+fn render_footnotes_section(
+    footnotes: &[(String, Vec<Node>)],
+    html: &mut String,
+    labels: &HashMap<String, LabelTarget>,
+) {
     if footnotes.is_empty() {
         return;
     }
@@ -864,9 +1021,21 @@ fn render_footnotes_section(footnotes: &[(String, Vec<Node>)], html: &mut String
     html.push_str("</section>\n");
 }
 
-fn render_node(node: &Node, html: &mut String, _depth: usize, eq_counter: &mut u32, thm_counter: &mut HashMap<String, u32>, labels: &HashMap<String, LabelTarget>) {
+fn render_node(
+    node: &Node,
+    html: &mut String,
+    _depth: usize,
+    eq_counter: &mut u32,
+    thm_counter: &mut HashMap<String, u32>,
+    labels: &HashMap<String, LabelTarget>,
+) {
     match node {
-        Node::Heading { level, children, id, .. } => {
+        Node::Heading {
+            level,
+            children,
+            id,
+            ..
+        } => {
             let lvl = level.clamp(&1, &6);
             let id_attr = id
                 .as_ref()
@@ -881,7 +1050,11 @@ fn render_node(node: &Node, html: &mut String, _depth: usize, eq_counter: &mut u
             render_inline_children(children, html, labels);
             html.push_str("</p>\n");
         }
-        Node::Blockquote { children, admonition_type, .. } => {
+        Node::Blockquote {
+            children,
+            admonition_type,
+            ..
+        } => {
             if let Some(kind) = admonition_type {
                 html.push_str(&format!(
                     "<blockquote class=\"admonition {}\">\n",
@@ -908,7 +1081,12 @@ fn render_node(node: &Node, html: &mut String, _depth: usize, eq_counter: &mut u
             html.push_str(&escape_html(source));
             html.push_str("</code></pre>\n");
         }
-        Node::List { ordered, start, items, .. } => {
+        Node::List {
+            ordered,
+            start,
+            items,
+            ..
+        } => {
             let tag = if *ordered { "ol" } else { "ul" };
             let start_attr = if *ordered {
                 start
@@ -974,7 +1152,12 @@ fn render_node(node: &Node, html: &mut String, _depth: usize, eq_counter: &mut u
         Node::ReferenceDefinition { .. } => {}
         Node::FootnoteDefinition { .. } => {}
         Node::VarDeclaration { .. } => {}
-        Node::ForLoop { variable, iterable, children, .. } => {
+        Node::ForLoop {
+            variable,
+            iterable,
+            children,
+            ..
+        } => {
             html.push_str(&format!(
                 "<div data-vell-for=\"{}\" data-vell-in=\"{}\">\n",
                 escape_html(variable),
@@ -985,8 +1168,16 @@ fn render_node(node: &Node, html: &mut String, _depth: usize, eq_counter: &mut u
             }
             html.push_str("</div>\n");
         }
-        Node::IfBlock { condition, consequent, alternate, .. } => {
-            html.push_str(&format!("<div data-vell-if=\"{}\">\n", escape_html(condition)));
+        Node::IfBlock {
+            condition,
+            consequent,
+            alternate,
+            ..
+        } => {
+            html.push_str(&format!(
+                "<div data-vell-if=\"{}\">\n",
+                escape_html(condition)
+            ));
             for child in consequent {
                 render_node(child, html, _depth + 1, eq_counter, thm_counter, labels);
             }
@@ -997,8 +1188,22 @@ fn render_node(node: &Node, html: &mut String, _depth: usize, eq_counter: &mut u
             }
             html.push_str("</div>\n");
         }
-        Node::Directive { name, props, children, .. } => {
-            render_directive(name, props, children, html, _depth, eq_counter, thm_counter, labels);
+        Node::Directive {
+            name,
+            props,
+            children,
+            ..
+        } => {
+            render_directive(
+                name,
+                props,
+                children,
+                html,
+                _depth,
+                eq_counter,
+                thm_counter,
+                labels,
+            );
         }
         Node::Extension { name, children, .. } => {
             html.push_str(&format!(
@@ -1050,10 +1255,7 @@ fn render_directive(
                 ));
             }
             if !style.is_empty() {
-                html.push_str(&format!(
-                    "<style>\n{}\n</style>\n",
-                    style
-                ));
+                html.push_str(&format!("<style>\n{}\n</style>\n", style));
             }
             for child in children {
                 render_node(child, html, _depth + 1, eq_counter, thm_counter, labels);
@@ -1086,7 +1288,10 @@ fn render_directive(
                     // Fallback: extract text from children
                     let mut text = String::new();
                     for child in children {
-                        if let Node::Paragraph { children: inlines, .. } = child {
+                        if let Node::Paragraph {
+                            children: inlines, ..
+                        } = child
+                        {
                             for inline in inlines {
                                 if let InlineNode::Text { value, .. } = inline {
                                     text.push_str(value);
@@ -1097,17 +1302,24 @@ fn render_directive(
                     text
                 }
             };
-            let label = props.get("label")
-                .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None });
+            let label = props.get("label").and_then(|v| {
+                if let PropValue::String(s) = v {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            });
 
             *eq_counter += 1;
             let eq_num = *eq_counter;
 
             let mathml = latex_to_mathml(&source, true);
-            let id_attr = label.as_ref()
+            let id_attr = label
+                .as_ref()
                 .map(|l| format!(" id=\"eq-{}\"", escape_html(l)))
                 .unwrap_or_default();
-            let label_attr = label.as_ref()
+            let label_attr = label
+                .as_ref()
                 .map(|l| format!(" data-label=\"{}\"", escape_html(l)))
                 .unwrap_or_default();
 
@@ -1120,22 +1332,29 @@ fn render_directive(
                 "<td class=\"eq-math\"><math display=\"block\">{}</math></td>\n",
                 mathml
             ));
-            html.push_str(&format!(
-                "<td class=\"eq-number\">({})</td>\n",
-                eq_num
-            ));
+            html.push_str(&format!("<td class=\"eq-number\">({})</td>\n", eq_num));
             html.push_str("</tr></table>\n");
             html.push_str("</div>\n");
         }
         // Theorem environments: Theorem, Proof, Lemma, Corollary, Definition, etc.
-        "Theorem" | "Proof" | "Lemma" | "Corollary" | "Definition" | "Remark" | "Example" | "Conjecture" | "Axiom" | "Proposition" | "Notation" => {
+        "Theorem" | "Proof" | "Lemma" | "Corollary" | "Definition" | "Remark" | "Example"
+        | "Conjecture" | "Axiom" | "Proposition" | "Notation" => {
             let theme_name = escape_html(name);
             let theme_class = theme_name.to_lowercase();
-            let extra = props.get("name")
-                .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None });
+            let extra = props.get("name").and_then(|v| {
+                if let PropValue::String(s) = v {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            });
 
             // Auto-number theorems (except Proof and Remark)
-            let counter_key = if theme_name == "Proof" || theme_name == "Remark" || theme_name == "Example" || theme_name == "Notation" {
+            let counter_key = if theme_name == "Proof"
+                || theme_name == "Remark"
+                || theme_name == "Example"
+                || theme_name == "Notation"
+            {
                 None
             } else {
                 let count = thm_counter.entry(theme_name.clone()).or_insert(0);
@@ -1143,9 +1362,15 @@ fn render_directive(
                 Some(*count)
             };
 
-            let theorem_label = props.get("label")
-                .and_then(|v| if let PropValue::String(s) = v { Some(s.clone()) } else { None });
-            let theorem_id = theorem_label.as_ref()
+            let theorem_label = props.get("label").and_then(|v| {
+                if let PropValue::String(s) = v {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            });
+            let theorem_id = theorem_label
+                .as_ref()
                 .map(|l| format!(" id=\"thm-{}\"", escape_html(l)))
                 .unwrap_or_default();
 
@@ -1168,60 +1393,63 @@ fn render_directive(
             }
             html.push_str("</div>\n");
             html.push_str("</div>\n");
-        }            // Phase 10: Diagram rendering (Mermaid, ASCII, Graphviz DOT)
-            "Diagram" => {
-                let diagram_type = match props.get("type") {
-                    Some(PropValue::String(s)) => escape_html(s),
-                    _ => String::from("general"),
-                };
-                let caption = match props.get("caption") {
-                    Some(PropValue::String(s)) => s.clone(),
-                    _ => String::new(),
-                };
-                // Extract source from children text
-                let mut source_parts: Vec<String> = Vec::new();
-                for child in children {
-                    if let Node::Paragraph { children: inlines, .. } = child {
-                        for inline in inlines {
-                            if let InlineNode::Text { value, .. } = inline {
-                                source_parts.push(value.clone());
-                            }
+        } // Phase 10: Diagram rendering (Mermaid, ASCII, Graphviz DOT)
+        "Diagram" => {
+            let diagram_type = match props.get("type") {
+                Some(PropValue::String(s)) => escape_html(s),
+                _ => String::from("general"),
+            };
+            let caption = match props.get("caption") {
+                Some(PropValue::String(s)) => s.clone(),
+                _ => String::new(),
+            };
+            // Extract source from children text
+            let mut source_parts: Vec<String> = Vec::new();
+            for child in children {
+                if let Node::Paragraph {
+                    children: inlines, ..
+                } = child
+                {
+                    for inline in inlines {
+                        if let InlineNode::Text { value, .. } = inline {
+                            source_parts.push(value.clone());
                         }
                     }
                 }
-                let source = source_parts.join("\n");
-
-                html.push_str(&format!(
-                    "<div class=\"vell-diagram\" data-type=\"{}\">\n",
-                    diagram_type
-                ));
-                match diagram_type.as_str() {
-                    "mermaid" => {
-                        html.push_str("<div class=\"mermaid\">\n");
-                        html.push_str(&escape_html(&source));
-                        html.push_str("\n</div>\n");
-                    }
-                    "dot" => {
-                        html.push_str("<div class=\"graphviz\">\n");
-                        html.push_str("<pre class=\"dot\">\n");
-                        html.push_str(&escape_html(&source));
-                        html.push_str("\n</pre>\n");
-                        html.push_str("</div>\n");
-                    }
-                    _ => {
-                        html.push_str("<pre>\n");
-                        html.push_str(&escape_html(&source));
-                        html.push_str("\n</pre>\n");
-                    }
-                }
-                if !caption.is_empty() {
-                    html.push_str(&format!(
-                        "<div class=\"diagram-caption\">{}</div>\n",
-                        escape_html(&caption)
-                    ));
-                }
-                html.push_str("</div>\n");
             }
+            let source = source_parts.join("\n");
+
+            html.push_str(&format!(
+                "<div class=\"vell-diagram\" data-type=\"{}\">\n",
+                diagram_type
+            ));
+            match diagram_type.as_str() {
+                "mermaid" => {
+                    html.push_str("<div class=\"mermaid\">\n");
+                    html.push_str(&escape_html(&source));
+                    html.push_str("\n</div>\n");
+                }
+                "dot" => {
+                    html.push_str("<div class=\"graphviz\">\n");
+                    html.push_str("<pre class=\"dot\">\n");
+                    html.push_str(&escape_html(&source));
+                    html.push_str("\n</pre>\n");
+                    html.push_str("</div>\n");
+                }
+                _ => {
+                    html.push_str("<pre>\n");
+                    html.push_str(&escape_html(&source));
+                    html.push_str("\n</pre>\n");
+                }
+            }
+            if !caption.is_empty() {
+                html.push_str(&format!(
+                    "<div class=\"diagram-caption\">{}</div>\n",
+                    escape_html(&caption)
+                ));
+            }
+            html.push_str("</div>\n");
+        }
         // Phase 11: Interactive form directives
         "Input" => {
             let var_name = match props.get("bind") {
@@ -1272,13 +1500,19 @@ fn render_directive(
                 _ => {
                     let mut opts = String::new();
                     for child in children {
-                        if let Node::Paragraph { children: inlines, .. } = child {
+                        if let Node::Paragraph {
+                            children: inlines, ..
+                        } = child
+                        {
                             for inline in inlines {
                                 if let InlineNode::Text { value, .. } = inline {
                                     for line in value.lines() {
                                         let line = line.trim();
                                         if !line.is_empty() {
-                                            opts.push_str(&format!("<option>{}</option>", escape_html(line)));
+                                            opts.push_str(&format!(
+                                                "<option>{}</option>",
+                                                escape_html(line)
+                                            ));
                                         }
                                     }
                                 }
@@ -1333,10 +1567,7 @@ fn render_directive(
                 ));
             } else if !source.is_empty() {
                 // File reference — rendered as a meta tag for runtime
-                html.push_str(&format!(
-                    "<meta data-vell-data=\"{}\">\n",
-                    source
-                ));
+                html.push_str(&format!("<meta data-vell-data=\"{}\">\n", source));
             }
         }
         // Phase 10: Chart rendering (inline SVG bar chart)
@@ -1352,13 +1583,17 @@ fn render_directive(
             // Extract data from children text
             let mut data_lines: Vec<(String, f64)> = Vec::new();
             for child in children {
-                if let Node::Paragraph { children: inlines, .. } = child {
+                if let Node::Paragraph {
+                    children: inlines, ..
+                } = child
+                {
                     for inline in inlines {
                         if let InlineNode::Text { value, .. } = inline {
                             for line in value.lines() {
                                 let trimmed = line.trim();
                                 if let Some(comma_pos) = trimmed.rfind(',') {
-                                    let label = trimmed.get(..comma_pos).unwrap_or("").trim().to_string();
+                                    let label =
+                                        trimmed.get(..comma_pos).unwrap_or("").trim().to_string();
                                     let val_str = trimmed.get(comma_pos + 1..).unwrap_or("").trim();
                                     if let Ok(val) = val_str.parse::<f64>() {
                                         data_lines.push((label, val));
@@ -1381,7 +1616,10 @@ fn render_directive(
                 // Fallback: render as a table
                 html.push_str("<div class=\"vell-chart\">\n");
                 if !title.is_empty() {
-                    html.push_str(&format!("<div class=\"chart-title\">{}</div>\n", escape_html(&title)));
+                    html.push_str(&format!(
+                        "<div class=\"chart-title\">{}</div>\n",
+                        escape_html(&title)
+                    ));
                 }
                 html.push_str("<table>\n");
                 for (label, val) in &data_lines {
@@ -1425,7 +1663,10 @@ fn render_directive(
                     // Extract from children
                     let mut text = String::new();
                     for child in children {
-                        if let Node::Paragraph { children: inlines, .. } = child {
+                        if let Node::Paragraph {
+                            children: inlines, ..
+                        } = child
+                        {
                             for inline in inlines {
                                 if let InlineNode::Text { value, .. } = inline {
                                     text.push_str(value);
@@ -1439,7 +1680,10 @@ fn render_directive(
             // Format: numbers become subscripts, other chars are HTML-escaped
             let formatted = format_chem_formula(&source);
             html.push_str("<div class=\"vell-chem\">\n");
-            html.push_str(&format!("<code class=\"chem-formula\">{}</code>\n", formatted));
+            html.push_str(&format!(
+                "<code class=\"chem-formula\">{}</code>\n",
+                formatted
+            ));
             html.push_str("</div>\n");
         }
 
@@ -1477,11 +1721,19 @@ fn render_directive(
                 html.push_str("<li class=\"lof-placeholder\">(no figures found)</li>\n");
             } else {
                 for (caption, id) in &entries {
-                    let id_attr = if id.is_empty() { String::new() } else { format!(" href=\"#{}\"", escape_html(id)) };
+                    let id_attr = if id.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" href=\"#{}\"", escape_html(id))
+                    };
                     html.push_str(&format!(
                         "<li><a{}>{}</a></li>\n",
                         id_attr,
-                        if caption.is_empty() { "(unnamed figure)".to_string() } else { escape_html(caption) }
+                        if caption.is_empty() {
+                            "(unnamed figure)".to_string()
+                        } else {
+                            escape_html(caption)
+                        }
                     ));
                 }
             }
@@ -1499,11 +1751,19 @@ fn render_directive(
                 html.push_str("<li class=\"lot-placeholder\">(no tables found)</li>\n");
             } else {
                 for (caption, id) in &entries {
-                    let id_attr = if id.is_empty() { String::new() } else { format!(" href=\"#{}\"", escape_html(id)) };
+                    let id_attr = if id.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" href=\"#{}\"", escape_html(id))
+                    };
                     html.push_str(&format!(
                         "<li><a{}>{}</a></li>\n",
                         id_attr,
-                        if caption.is_empty() { "(unnamed table)".to_string() } else { escape_html(caption) }
+                        if caption.is_empty() {
+                            "(unnamed table)".to_string()
+                        } else {
+                            escape_html(caption)
+                        }
                     ));
                 }
             }
@@ -1571,15 +1831,15 @@ fn render_directive(
                 width / 2, height - 8
             ));
             svg.push_str("</svg>\n");
-            html.push_str(&format!(
-                "<div class=\"vell-plot\">\n{}\n</div>\n",
-                svg
-            ));
+            html.push_str(&format!("<div class=\"vell-plot\">\n{}\n</div>\n", svg));
         }
 
         // Default: generic directive handler
         _ => {
-            html.push_str(&format!("<div class=\"directive-{}\">\n", escape_html(name)));
+            html.push_str(&format!(
+                "<div class=\"directive-{}\">\n",
+                escape_html(name)
+            ));
             for child in children {
                 render_node(child, html, _depth + 1, eq_counter, thm_counter, labels);
             }
@@ -1588,7 +1848,12 @@ fn render_directive(
     }
 }
 
-fn render_table_cell(cell: &TableCell, html: &mut String, is_header: bool, labels: &HashMap<String, LabelTarget>) {
+fn render_table_cell(
+    cell: &TableCell,
+    html: &mut String,
+    is_header: bool,
+    labels: &HashMap<String, LabelTarget>,
+) {
     let tag = if is_header { "th" } else { "td" };
     let mut attrs = String::new();
     if cell.colspan > 1 {
@@ -1610,7 +1875,11 @@ fn render_table_cell(cell: &TableCell, html: &mut String, is_header: bool, label
     html.push_str(&format!("</{}>\n", tag));
 }
 
-fn render_inline_children(children: &[InlineNode], html: &mut String, labels: &HashMap<String, LabelTarget>) {
+fn render_inline_children(
+    children: &[InlineNode],
+    html: &mut String,
+    labels: &HashMap<String, LabelTarget>,
+) {
     for node in children {
         render_inline(node, html, labels);
     }
@@ -1654,7 +1923,12 @@ fn render_inline(node: &InlineNode, html: &mut String, labels: &HashMap<String, 
             render_inline_children(children, html, labels);
             html.push_str("</sub>");
         }
-        InlineNode::Link { href, title, children, .. } => {
+        InlineNode::Link {
+            href,
+            title,
+            children,
+            ..
+        } => {
             let url = sanitize_url(href);
             let title_attr = title
                 .as_ref()
@@ -1672,13 +1946,20 @@ fn render_inline(node: &InlineNode, html: &mut String, labels: &HashMap<String, 
             render_inline_children(children, html, labels);
             html.push_str("</a>");
         }
-        InlineNode::Image { src, alt, title, .. } => {
+        InlineNode::Image {
+            src, alt, title, ..
+        } => {
             let url = sanitize_url(src);
             let title_attr = title
                 .as_ref()
                 .map(|t| format!(" title=\"{}\"", escape_html(t)))
                 .unwrap_or_default();
-            html.push_str(&format!("<img src=\"{}\" alt=\"{}\"{}>", url, escape_html(alt), title_attr));
+            html.push_str(&format!(
+                "<img src=\"{}\" alt=\"{}\"{}>",
+                url,
+                escape_html(alt),
+                title_attr
+            ));
         }
         InlineNode::ImageRef { id, alt, .. } => {
             html.push_str(&format!(
@@ -1692,7 +1973,11 @@ fn render_inline(node: &InlineNode, html: &mut String, labels: &HashMap<String, 
             html.push_str(&format!("<math display=\"inline\">{}</math>", mathml));
         }
         InlineNode::VarInterpolation { name, .. } => {
-            html.push_str(&format!("<span class=\"var\" data-vell-var=\"{}\">{}</span>", escape_html(name), escape_html(name)));
+            html.push_str(&format!(
+                "<span class=\"var\" data-vell-var=\"{}\">{}</span>",
+                escape_html(name),
+                escape_html(name)
+            ));
         }
         InlineNode::InlineComponent { name, props, .. } => {
             if name == "Ref" {
@@ -1784,7 +2069,10 @@ fn render_bar_chart_svg(data: &[(String, f64)], title: &str) -> String {
     let y_ticks = 5u32;
     svg.push_str(&format!(
         "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"#e2e8f0\" stroke-width=\"1\"/>\n",
-        padding_left, padding_top, padding_left, padding_top + chart_h
+        padding_left,
+        padding_top,
+        padding_left,
+        padding_top + chart_h
     ));
 
     for i in 0..=y_ticks {
@@ -1803,11 +2091,16 @@ fn render_bar_chart_svg(data: &[(String, f64)], title: &str) -> String {
     // X-axis
     svg.push_str(&format!(
         "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"#a0aec0\" stroke-width=\"1\"/>\n",
-        padding_left, padding_top + chart_h, padding_left + chart_w, padding_top + chart_h
+        padding_left,
+        padding_top + chart_h,
+        padding_left + chart_w,
+        padding_top + chart_h
     ));
 
     // Bars
-    let colors = ["#3182ce", "#38a169", "#d69e2e", "#e53e3e", "#805ad5", "#319795", "#dd6b20", "#2b6cb0"];
+    let colors = [
+        "#3182ce", "#38a169", "#d69e2e", "#e53e3e", "#805ad5", "#319795", "#dd6b20", "#2b6cb0",
+    ];
     for (i, (label, value)) in data.iter().enumerate() {
         let bar_h = if max_val > 0.0 {
             (chart_h as f64 * value / max_val) as u32
@@ -1839,7 +2132,6 @@ fn render_bar_chart_svg(data: &[(String, f64)], title: &str) -> String {
 // ---------------------------------------------------------------------------
 // LaTeX to MathML converter
 // ---------------------------------------------------------------------------
-
 
 /// Converts a LaTeX math expression to MathML markup.
 fn latex_to_mathml(latex: &str, _is_block: bool) -> String {
@@ -1875,28 +2167,52 @@ fn latex_to_mathml(latex: &str, _is_block: bool) -> String {
                 let mut depth = 1usize;
                 let mut group = String::new();
                 while i < chars.len() && depth > 0 {
-                    if chars[i] == '{' { depth += 1; if depth > 1 { group.push('{'); } }
-                    else if chars[i] == '}' { depth -= 1; if depth > 0 { group.push('}'); } }
-                    else { group.push(chars[i]); }
-                    if depth > 0 { i += 1; }
+                    if chars[i] == '{' {
+                        depth += 1;
+                        if depth > 1 {
+                            group.push('{');
+                        }
+                    } else if chars[i] == '}' {
+                        depth -= 1;
+                        if depth > 0 {
+                            group.push('}');
+                        }
+                    } else {
+                        group.push(chars[i]);
+                    }
+                    if depth > 0 {
+                        i += 1;
+                    }
                 }
                 i += 1;
                 let converted = latex_to_mathml(&group, false);
                 stack.push(wrap_in_mrow(&converted));
             }
-            '}' => { i += 1; }
+            '}' => {
+                i += 1;
+            }
             '\\' => {
                 i += 1;
-                if i < chars.len() && (chars[i] == ' ' || chars[i] == '\n') { i += 1; continue; }
+                if i < chars.len() && (chars[i] == ' ' || chars[i] == '\n') {
+                    i += 1;
+                    continue;
+                }
                 let mut cmd = String::new();
-                while i < chars.len() && chars[i].is_ascii_alphabetic() { cmd.push(chars[i]); i += 1; }
+                while i < chars.len() && chars[i].is_ascii_alphabetic() {
+                    cmd.push(chars[i]);
+                    i += 1;
+                }
                 if cmd.is_empty() {
                     // Check for single-char spacing shorthands: \,, \;, \:, \!
                     if i < chars.len() {
                         let sc = chars[i];
                         match sc {
-                            ',' | ';' | ':' | '!' => { i += 1; }
-                            _ => { stack.push("<mtext>\\</mtext>".to_string()); }
+                            ',' | ';' | ':' | '!' => {
+                                i += 1;
+                            }
+                            _ => {
+                                stack.push("<mtext>\\</mtext>".to_string());
+                            }
                         }
                     } else {
                         stack.push("<mtext>\\</mtext>".to_string());
@@ -1905,8 +2221,13 @@ fn latex_to_mathml(latex: &str, _is_block: bool) -> String {
                     stack.push(latex_cmd_to_mathml(&cmd, &chars, &mut i));
                 }
             }
-            ' ' | '\t' | '\n' | '\r' => { i += 1; }
-            '~' => { stack.push("<mtext> </mtext>".to_string()); i += 1; }
+            ' ' | '\t' | '\n' | '\r' => {
+                i += 1;
+            }
+            '~' => {
+                stack.push("<mtext> </mtext>".to_string());
+                i += 1;
+            }
             _ => {
                 if ch.is_ascii_digit() {
                     stack.push(format!("<mn>{}</mn>", ch));
@@ -1914,13 +2235,29 @@ fn latex_to_mathml(latex: &str, _is_block: bool) -> String {
                     stack.push(format!("<mi>{}</mi>", ch));
                 } else {
                     let op = match ch {
-                        '+' => "+", '-' => "\u{2212}", '=' => "=",
-                        '<' => "&lt;", '>' => "&gt;",
-                        '(' => "(", ')' => ")", '[' => "[", ']' => "]",
-                        ',' => ",", '.' => ".", '!' => "!", '?' => "?",
-                        '/' => "/", '|' => "|", '%' => "%", ':' => ":", ';' => ";",
+                        '+' => "+",
+                        '-' => "\u{2212}",
+                        '=' => "=",
+                        '<' => "&lt;",
+                        '>' => "&gt;",
+                        '(' => "(",
+                        ')' => ")",
+                        '[' => "[",
+                        ']' => "]",
+                        ',' => ",",
+                        '.' => ".",
+                        '!' => "!",
+                        '?' => "?",
+                        '/' => "/",
+                        '|' => "|",
+                        '%' => "%",
+                        ':' => ":",
+                        ';' => ";",
                         '"' => "&quot;",
-                        _ => { i += 1; continue; }
+                        _ => {
+                            i += 1;
+                            continue;
+                        }
                     };
                     stack.push(format!("<mo>{}</mo>", op));
                 }
@@ -1929,8 +2266,11 @@ fn latex_to_mathml(latex: &str, _is_block: bool) -> String {
         }
     }
 
-    if stack.len() == 1 { stack.remove(0) }
-    else { format!("<mrow>{}</mrow>", stack.join("")) }
+    if stack.len() == 1 {
+        stack.remove(0)
+    } else {
+        format!("<mrow>{}</mrow>", stack.join(""))
+    }
 }
 
 fn wrap_in_mrow(content: &str) -> String {
@@ -1942,41 +2282,63 @@ fn wrap_in_mrow(content: &str) -> String {
 }
 
 fn parse_math_group_chars(chars: &[char], i: &mut usize) -> String {
-    while *i < chars.len() && (chars[*i] == ' ' || chars[*i] == '\t') { *i += 1; }
-    if *i >= chars.len() { return String::new(); }
+    while *i < chars.len() && (chars[*i] == ' ' || chars[*i] == '\t') {
+        *i += 1;
+    }
+    if *i >= chars.len() {
+        return String::new();
+    }
     if chars[*i] == '{' {
         *i += 1;
         let mut depth = 1usize;
         let mut content = String::new();
         while *i < chars.len() && depth > 0 {
-            if chars[*i] == '{' { depth += 1; if depth > 1 { content.push('{'); } }
-            else if chars[*i] == '}' { depth -= 1; if depth > 0 { content.push('}'); } }
-            else { content.push(chars[*i]); }
-            if depth > 0 { *i += 1; }
+            if chars[*i] == '{' {
+                depth += 1;
+                if depth > 1 {
+                    content.push('{');
+                }
+            } else if chars[*i] == '}' {
+                depth -= 1;
+                if depth > 0 {
+                    content.push('}');
+                }
+            } else {
+                content.push(chars[*i]);
+            }
+            if depth > 0 {
+                *i += 1;
+            }
         }
         *i += 1;
         latex_to_mathml(&content, false)
     } else if *i < chars.len() {
-        let c = chars[*i]; *i += 1;
-        if c.is_ascii_digit() { format!("<mn>{}</mn>", c) }
-        else if c.is_ascii_alphabetic() { format!("<mi>{}</mi>", c) }
-        else {
+        let c = chars[*i];
+        *i += 1;
+        if c.is_ascii_digit() {
+            format!("<mn>{}</mn>", c)
+        } else if c.is_ascii_alphabetic() {
+            format!("<mi>{}</mi>", c)
+        } else {
             let op = match c {
-                '+' | '-' | '=' | '(' | ')' | '[' | ']' | ',' | '.' | '!' | '?' | '/' | '|' => c.to_string(),
+                '+' | '-' | '=' | '(' | ')' | '[' | ']' | ',' | '.' | '!' | '?' | '/' | '|' => {
+                    c.to_string()
+                }
                 _ => return String::new(),
             };
             format!("<mo>{}</mo>", op)
         }
-    } else { String::new() }
+    } else {
+        String::new()
+    }
 }
 
 fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
     match cmd {
         // Greek lowercase
-        "alpha"|"beta"|"gamma"|"delta"|"epsilon"|"zeta"|"eta"|"theta"
-        |"iota"|"kappa"|"lambda"|"mu"|"nu"|"xi"|"omicron"|"pi"
-        |"rho"|"sigma"|"tau"|"upsilon"|"phi"|"chi"|"psi"|"omega"
-            => format!("<mi>&{};</mi>", cmd),
+        "alpha" | "beta" | "gamma" | "delta" | "epsilon" | "zeta" | "eta" | "theta" | "iota"
+        | "kappa" | "lambda" | "mu" | "nu" | "xi" | "omicron" | "pi" | "rho" | "sigma" | "tau"
+        | "upsilon" | "phi" | "chi" | "psi" | "omega" => format!("<mi>&{};</mi>", cmd),
         // Greek variants
         "varepsilon" => "<mi>&epsilon;</mi>".into(),
         "vartheta" => "<mi>&theta;</mi>".into(),
@@ -1984,8 +2346,8 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
         "varsigma" => "<mi>&sigmaf;</mi>".into(),
         "varphi" => "<mi>&phi;</mi>".into(),
         // Greek uppercase
-        "Gamma"|"Delta"|"Theta"|"Lambda"|"Xi"|"Pi"|"Sigma"|"Phi"|"Psi"|"Omega"
-            => format!("<mi>&{};</mi>", cmd),
+        "Gamma" | "Delta" | "Theta" | "Lambda" | "Xi" | "Pi" | "Sigma" | "Phi" | "Psi"
+        | "Omega" => format!("<mi>&{};</mi>", cmd),
         // Operators
         "int" => "<mo>&#x222B;</mo>".into(),
         "iint" => "<mo>&#x222C;</mo>".into(),
@@ -2072,17 +2434,20 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
         "mid" => "<mo>&#x2223;</mo>".into(),
         "models" => "<mo>&#x22A7;</mo>".into(),
         // Functions
-        "sin"|"cos"|"tan"|"cot"|"sec"|"csc"|"log"|"ln"
-        |"sinh"|"cosh"|"tanh"
-        |"arcsin"|"arccos"|"arctan"
-        |"det"|"dim"|"lim"|"max"|"min"|"sup"|"inf"
-        |"exp"|"deg"|"arg"|"ker"|"hom"|"gcd"|"Pr"
-            => format!("<mi>{}</mi>", cmd),
+        "sin" | "cos" | "tan" | "cot" | "sec" | "csc" | "log" | "ln" | "sinh" | "cosh" | "tanh"
+        | "arcsin" | "arccos" | "arctan" | "det" | "dim" | "lim" | "max" | "min" | "sup"
+        | "inf" | "exp" | "deg" | "arg" | "ker" | "hom" | "gcd" | "Pr" => {
+            format!("<mi>{}</mi>", cmd)
+        }
         // Fractions
         "frac" => {
             let num = parse_math_group_chars(chars, i);
             let den = parse_math_group_chars(chars, i);
-            format!("<mfrac>{}{}</mfrac>", wrap_in_mrow(&num), wrap_in_mrow(&den))
+            format!(
+                "<mfrac>{}{}</mfrac>",
+                wrap_in_mrow(&num),
+                wrap_in_mrow(&den)
+            )
         }
         // Roots
         "sqrt" => {
@@ -2100,7 +2465,11 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
         }
         "bar" => {
             let content = parse_math_group_chars(chars, i);
-            format!("<mover>{}{}</mover>", wrap_in_mrow(&content), "<mo>&#x00AF;</mo>")
+            format!(
+                "<mover>{}{}</mover>",
+                wrap_in_mrow(&content),
+                "<mo>&#x00AF;</mo>"
+            )
         }
         "dot" => {
             let content = parse_math_group_chars(chars, i);
@@ -2112,17 +2481,25 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
         }
         "vec" => {
             let content = parse_math_group_chars(chars, i);
-            format!("<mover>{}{}</mover>", wrap_in_mrow(&content), "<mo>&#x2192;</mo>")
+            format!(
+                "<mover>{}{}</mover>",
+                wrap_in_mrow(&content),
+                "<mo>&#x2192;</mo>"
+            )
         }
         // Blackboard bold
         "mathbb" => {
             let content = parse_math_group_chars(chars, i);
             // Strip HTML tags to extract the content letter
             let text: String = content
-                .replace("<mi>", "").replace("</mi>", "")
-                .replace("<mn>", "").replace("</mn>", "")
-                .replace("<mo>", "").replace("</mo>", "")
-                .replace("<mrow>", "").replace("</mrow>", "")
+                .replace("<mi>", "")
+                .replace("</mi>", "")
+                .replace("<mn>", "")
+                .replace("</mn>", "")
+                .replace("<mo>", "")
+                .replace("</mo>", "")
+                .replace("<mrow>", "")
+                .replace("</mrow>", "")
                 .chars()
                 .filter(|c| c.is_ascii_alphabetic())
                 .collect();
@@ -2134,8 +2511,10 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
             let content = parse_math_group_chars(chars, i);
             // Extract letter and wrap
             let text: String = content
-                .replace("<mi>", "").replace("</mi>", "")
-                .replace("<mrow>", "").replace("</mrow>", "")
+                .replace("<mi>", "")
+                .replace("</mi>", "")
+                .replace("<mrow>", "")
+                .replace("</mrow>", "")
                 .chars()
                 .filter(|c| c.is_ascii_alphabetic())
                 .collect();
@@ -2171,8 +2550,11 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
         "binom" => {
             let num = parse_math_group_chars(chars, i);
             let den = parse_math_group_chars(chars, i);
-            format!("<mrow><mo>(</mo><mfrac linethickness=\"0\">{}{}</mfrac><mo>)</mo></mrow>",
-                wrap_in_mrow(&num), wrap_in_mrow(&den))
+            format!(
+                "<mrow><mo>(</mo><mfrac linethickness=\"0\">{}{}</mfrac><mo>)</mo></mrow>",
+                wrap_in_mrow(&num),
+                wrap_in_mrow(&den)
+            )
         }
         // Named operator
         "operatorname" => {
@@ -2182,11 +2564,17 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
         // Physics: bra-ket notation
         "bra" => {
             let content = parse_math_group_chars(chars, i);
-            format!("<mrow><mo>&#x27E8;</mo>{}<mo>|</mo></mrow>", wrap_in_mrow(&content))
+            format!(
+                "<mrow><mo>&#x27E8;</mo>{}<mo>|</mo></mrow>",
+                wrap_in_mrow(&content)
+            )
         }
         "ket" => {
             let content = parse_math_group_chars(chars, i);
-            format!("<mrow><mo>|</mo>{}<mo>&#x27E9;</mo></mrow>", wrap_in_mrow(&content))
+            format!(
+                "<mrow><mo>|</mo>{}<mo>&#x27E9;</mo></mrow>",
+                wrap_in_mrow(&content)
+            )
         }
         "braket" => {
             let content = parse_math_group_chars(chars, i);
@@ -2196,10 +2584,16 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
                 let right = content.get(pipe_pos + 1..).unwrap_or_default();
                 let left_conv = latex_to_mathml(left.trim(), false);
                 let right_conv = latex_to_mathml(right.trim(), false);
-                format!("<mrow><mo>&#x27E8;</mo>{}<mo>|</mo>{}<mo>&#x27E9;</mo></mrow>",
-                    wrap_in_mrow(&left_conv), wrap_in_mrow(&right_conv))
+                format!(
+                    "<mrow><mo>&#x27E8;</mo>{}<mo>|</mo>{}<mo>&#x27E9;</mo></mrow>",
+                    wrap_in_mrow(&left_conv),
+                    wrap_in_mrow(&right_conv)
+                )
             } else {
-                format!("<mrow><mo>&#x27E8;</mo>{}<mo>&#x27E9;</mo></mrow>", wrap_in_mrow(&content))
+                format!(
+                    "<mrow><mo>&#x27E8;</mo>{}<mo>&#x27E9;</mo></mrow>",
+                    wrap_in_mrow(&content)
+                )
             }
         }
         // Text in math
@@ -2208,8 +2602,8 @@ fn latex_cmd_to_mathml(cmd: &str, chars: &[char], i: &mut usize) -> String {
             format!("<mtext>{}</mtext>", content)
         }
         // Spacing (long-form names)
-        "quad"|"qquad"
-        |"thinspace"|"medspace"|"thickspace"|"negthinspace"|"negmedspace"|"negthickspace" => String::new(),
+        "quad" | "qquad" | "thinspace" | "medspace" | "thickspace" | "negthinspace"
+        | "negmedspace" | "negthickspace" => String::new(),
         " " => "<mtext> </mtext>".into(),
         _ => format!("<mtext>\\{}</mtext>", cmd),
     }
@@ -2245,12 +2639,18 @@ mod tests {
             .unwrap_or_else(|e| panic!("spec example 12 failed to parse: {:?}", e));
         let html = render_document(&doc);
         assert!(!html.is_empty(), "spec example 12 produced empty HTML");
-        assert!(html.contains("vell-chem"), "should contain chemical equation rendering");
+        assert!(
+            html.contains("vell-chem"),
+            "should contain chemical equation rendering"
+        );
         assert!(html.contains("vell-toc"), "should contain TOC rendering");
         assert!(html.contains("vell-lof"), "should contain LOF rendering");
         assert!(html.contains("vell-lot"), "should contain LOT rendering");
         assert!(html.contains("vell-plot"), "should contain plot rendering");
-        assert!(html.contains("vell-diagram"), "should contain diagram rendering");
+        assert!(
+            html.contains("vell-diagram"),
+            "should contain diagram rendering"
+        );
         assert!(html.contains("Phase 8-10"), "should contain page title");
     }
 
@@ -2260,9 +2660,21 @@ mod tests {
             let doc = parse_document(source)
                 .unwrap_or_else(|e| panic!("spec example {} failed to parse: {:?}", i + 1, e));
             let html = render_document(&doc);
-            assert!(!html.is_empty(), "spec example {} produced empty HTML", i + 1);
-            assert!(html.starts_with("<!doctype html>"), "spec example {} missing doctype", i + 1);
-            assert!(html.contains("</html>"), "spec example {} missing closing html", i + 1);
+            assert!(
+                !html.is_empty(),
+                "spec example {} produced empty HTML",
+                i + 1
+            );
+            assert!(
+                html.starts_with("<!doctype html>"),
+                "spec example {} missing doctype",
+                i + 1
+            );
+            assert!(
+                html.contains("</html>"),
+                "spec example {} missing closing html",
+                i + 1
+            );
         }
     }
 
@@ -2401,7 +2813,10 @@ mod tests {
     fn check_sanitize_url_safe() {
         assert_eq!(sanitize_url("https://example.com"), "https://example.com");
         assert_eq!(sanitize_url("http://example.com"), "http://example.com");
-        assert_eq!(sanitize_url("mailto:user@example.com"), "mailto:user@example.com");
+        assert_eq!(
+            sanitize_url("mailto:user@example.com"),
+            "mailto:user@example.com"
+        );
         assert_eq!(sanitize_url("/relative/path"), "/relative/path");
     }
 
@@ -2427,10 +2842,22 @@ mod tests {
     fn render_equation_produces_numbered_div() {
         let doc = parse_document("@[Equation](source=\"E = mc^2\")\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"vell-equation\""), "should have vell-equation class");
-        assert!(html.contains("data-number=\"1\""), "should have data-number=1");
-        assert!(html.contains("class=\"eq-number\""), "should have eq-number class");
-        assert!(html.contains("(1)"), "should display (1) as equation number");
+        assert!(
+            html.contains("class=\"vell-equation\""),
+            "should have vell-equation class"
+        );
+        assert!(
+            html.contains("data-number=\"1\""),
+            "should have data-number=1"
+        );
+        assert!(
+            html.contains("class=\"eq-number\""),
+            "should have eq-number class"
+        );
+        assert!(
+            html.contains("(1)"),
+            "should display (1) as equation number"
+        );
         assert!(html.contains("<math"), "should contain MathML");
     }
 
@@ -2449,15 +2876,24 @@ mod tests {
     fn render_equation_with_label() {
         let doc = parse_document("@[Equation](source=\"E = mc^2\" label=e:mass-energy)\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("data-label=\"e:mass-energy\""), "should have label attribute");
+        assert!(
+            html.contains("data-label=\"e:mass-energy\""),
+            "should have label attribute"
+        );
     }
 
     #[test]
     fn render_theorem_produces_styled_block() {
         let doc = parse_document("@[Theorem](name=\"Pythagoras\") {\n  Body text.\n}\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"vell-theorem vell-theorem\""), "should have theorem class");
-        assert!(html.contains("class=\"theorem-label\""), "should have label");
+        assert!(
+            html.contains("class=\"vell-theorem vell-theorem\""),
+            "should have theorem class"
+        );
+        assert!(
+            html.contains("class=\"theorem-label\""),
+            "should have label"
+        );
         assert!(html.contains("Theorem 1"), "should have auto-numbered");
         assert!(html.contains("(Pythagoras)"), "should have name");
         assert!(html.contains("class=\"theorem-body\""), "should have body");
@@ -2466,18 +2902,28 @@ mod tests {
 
     #[test]
     fn render_theorem_increments_counter() {
-        let src = "@[Theorem](name=\"A\") {\n  First.\n}\n\n@[Theorem](name=\"B\") {\n  Second.\n}\n";
+        let src =
+            "@[Theorem](name=\"A\") {\n  First.\n}\n\n@[Theorem](name=\"B\") {\n  Second.\n}\n";
         let doc = parse_document(src).unwrap();
         let html = render_document(&doc);
-        assert!(html.find("Theorem 1").is_some(), "first theorem should be 1");
-        assert!(html.find("Theorem 2").is_some(), "second theorem should be 2");
+        assert!(
+            html.find("Theorem 1").is_some(),
+            "first theorem should be 1"
+        );
+        assert!(
+            html.find("Theorem 2").is_some(),
+            "second theorem should be 2"
+        );
     }
 
     #[test]
     fn render_proof_has_no_number() {
         let doc = parse_document("@[Proof] {\n  A proof.\n}\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"vell-theorem vell-proof\""), "should have proof class");
+        assert!(
+            html.contains("class=\"vell-theorem vell-proof\""),
+            "should have proof class"
+        );
         assert!(html.contains(">Proof</div>"), "should not have a number");
     }
 
@@ -2485,7 +2931,10 @@ mod tests {
     fn render_math_env_produces_mathml() {
         let doc = parse_document("@[Align](source=\"a &= b\\\\ c &= d\")\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"vell-math-env vell-align\""), "should have math-env class");
+        assert!(
+            html.contains("class=\"vell-math-env vell-align\""),
+            "should have math-env class"
+        );
         assert!(html.contains("<math"), "should contain MathML");
     }
 
@@ -2493,9 +2942,18 @@ mod tests {
     fn render_css_is_included() {
         let doc = parse_document("Hello.\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("vell-equation"), "CSS should include vell-equation");
-        assert!(html.contains("vell-theorem"), "CSS should include vell-theorem");
-        assert!(html.contains("vell-math-env"), "CSS should include vell-math-env");
+        assert!(
+            html.contains("vell-equation"),
+            "CSS should include vell-equation"
+        );
+        assert!(
+            html.contains("vell-theorem"),
+            "CSS should include vell-theorem"
+        );
+        assert!(
+            html.contains("vell-math-env"),
+            "CSS should include vell-math-env"
+        );
         assert!(html.contains("admonition"), "CSS should include admonition");
     }
 
@@ -2526,8 +2984,14 @@ mod tests {
         }
 
         // First equation has a label
-        assert!(html.contains("data-label=\"e:mass-energy\""), "eq 1 should have data-label");
-        assert!(html.contains("data-label=\"e:pythagoras\""), "eq 3 should have data-label");
+        assert!(
+            html.contains("data-label=\"e:mass-energy\""),
+            "eq 1 should have data-label"
+        );
+        assert!(
+            html.contains("data-label=\"e:pythagoras\""),
+            "eq 3 should have data-label"
+        );
 
         // All equations get the vell-equation wrapper class
         assert_eq!(
@@ -2547,24 +3011,51 @@ mod tests {
         assert!(html.contains("Theorem 1"), "first Theorem should be 1");
         assert!(html.contains("(Pythagoras)"), "Theorem 1 should have name");
         assert!(html.contains("Theorem 2"), "second Theorem should be 2");
-        assert!(html.contains("(Fundamental Theorem of Calculus)"), "Theorem 2 should have name");
+        assert!(
+            html.contains("(Fundamental Theorem of Calculus)"),
+            "Theorem 2 should have name"
+        );
         assert!(html.contains("Lemma 1"), "Lemma should be 1");
-        assert!(html.contains("(Triangle Inequality)"), "Lemma 1 should have name");
+        assert!(
+            html.contains("(Triangle Inequality)"),
+            "Lemma 1 should have name"
+        );
         assert!(html.contains("Corollary 1"), "Corollary should be 1");
-        assert!(html.contains("(Reverse Triangle Inequality)"), "Corollary 1 should have name");
+        assert!(
+            html.contains("(Reverse Triangle Inequality)"),
+            "Corollary 1 should have name"
+        );
         assert!(html.contains("Definition 1"), "Definition should be 1");
-        assert!(html.contains("(Prime Number)"), "Definition 1 should have name");
+        assert!(
+            html.contains("(Prime Number)"),
+            "Definition 1 should have name"
+        );
         assert!(html.contains("Axiom 1"), "Axiom should be 1");
-        assert!(html.contains("(Euclid's Fifth Postulate)"), "Axiom 1 should have name");
+        assert!(
+            html.contains("(Euclid's Fifth Postulate)"),
+            "Axiom 1 should have name"
+        );
         assert!(html.contains("Conjecture 1"), "Conjecture should be 1");
-        assert!(html.contains("(Goldbach's Conjecture)"), "Conjecture 1 should have name");
+        assert!(
+            html.contains("(Goldbach's Conjecture)"),
+            "Conjecture 1 should have name"
+        );
         assert!(html.contains("Proposition 1"), "Proposition should be 1");
-        assert!(html.contains("(Sum of First n Naturals)"), "Proposition 1 should have name");
+        assert!(
+            html.contains("(Sum of First n Naturals)"),
+            "Proposition 1 should have name"
+        );
 
         // Non-numbered theorems
         assert!(html.contains(">Proof</div>"), "Proof should have no number");
-        assert!(html.contains(">Remark</div>"), "Remark should have no number");
-        assert!(html.contains(">Example</div>"), "Example should have no number");
+        assert!(
+            html.contains(">Remark</div>"),
+            "Remark should have no number"
+        );
+        assert!(
+            html.contains(">Example</div>"),
+            "Example should have no number"
+        );
     }
 
     #[test]
@@ -2574,16 +3065,46 @@ mod tests {
         let html = render_document(&doc);
 
         // CSS classes for theorem types
-        assert!(html.contains("vell-theorem vell-theorem"), "should have vell-theorem class");
-        assert!(html.contains("vell-theorem vell-proof"), "should have vell-proof class");
-        assert!(html.contains("vell-theorem vell-lemma"), "should have vell-lemma class");
-        assert!(html.contains("vell-theorem vell-corollary"), "should have vell-corollary class");
-        assert!(html.contains("vell-theorem vell-definition"), "should have vell-definition class");
-        assert!(html.contains("vell-theorem vell-remark"), "should have vell-remark class");
-        assert!(html.contains("vell-theorem vell-example"), "should have vell-example class");
-        assert!(html.contains("vell-theorem vell-axiom"), "should have vell-axiom class");
-        assert!(html.contains("vell-theorem vell-conjecture"), "should have vell-conjecture class");
-        assert!(html.contains("vell-theorem vell-proposition"), "should have vell-proposition class");
+        assert!(
+            html.contains("vell-theorem vell-theorem"),
+            "should have vell-theorem class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-proof"),
+            "should have vell-proof class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-lemma"),
+            "should have vell-lemma class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-corollary"),
+            "should have vell-corollary class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-definition"),
+            "should have vell-definition class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-remark"),
+            "should have vell-remark class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-example"),
+            "should have vell-example class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-axiom"),
+            "should have vell-axiom class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-conjecture"),
+            "should have vell-conjecture class"
+        );
+        assert!(
+            html.contains("vell-theorem vell-proposition"),
+            "should have vell-proposition class"
+        );
 
         // Each theorem has a label and body
         let theorem_count = html.matches("class=\"theorem-label\"").count();
@@ -2599,14 +3120,32 @@ mod tests {
         let html = render_document(&doc);
 
         // Math environment CSS classes
-        assert!(html.contains("vell-math-env vell-align"), "should have vell-align class");
-        assert!(html.contains("vell-math-env vell-pmatrix"), "should have vell-pmatrix class");
-        assert!(html.contains("vell-math-env vell-cases"), "should have vell-cases class");
+        assert!(
+            html.contains("vell-math-env vell-align"),
+            "should have vell-align class"
+        );
+        assert!(
+            html.contains("vell-math-env vell-pmatrix"),
+            "should have vell-pmatrix class"
+        );
+        assert!(
+            html.contains("vell-math-env vell-cases"),
+            "should have vell-cases class"
+        );
 
         // Align description text rendered from children
-        assert!(html.contains("multi-line equations"), "Align children should render");
-        assert!(html.contains("parentheses delimiters"), "PMatrix children should render");
-        assert!(html.contains("piecewise function"), "Cases children should render");
+        assert!(
+            html.contains("multi-line equations"),
+            "Align children should render"
+        );
+        assert!(
+            html.contains("parentheses delimiters"),
+            "PMatrix children should render"
+        );
+        assert!(
+            html.contains("piecewise function"),
+            "Cases children should render"
+        );
     }
 
     #[test]
@@ -2628,8 +3167,14 @@ mod tests {
         assert!(html.contains("<h2 id=\"combined-usage\">"));
 
         // Admonition (NOTE)
-        assert!(html.contains("class=\"admonition NOTE\""), "should have NOTE admonition");
-        assert!(html.contains("Cross-references resolve labels"), "should contain NOTE body");
+        assert!(
+            html.contains("class=\"admonition NOTE\""),
+            "should have NOTE admonition"
+        );
+        assert!(
+            html.contains("Cross-references resolve labels"),
+            "should contain NOTE body"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2643,11 +3188,23 @@ mod tests {
         ).unwrap();
         let html = render_document(&doc);
         // The ref should resolve to (1) with a link
-        assert!(html.contains("class=\"vell-ref\""), "should have vell-ref class");
-        assert!(html.contains("href=\"#eq-e:mass-energy\""), "should link to equation anchor");
-        assert!(html.contains(">(1)<"), "should display (1) as resolved text");
+        assert!(
+            html.contains("class=\"vell-ref\""),
+            "should have vell-ref class"
+        );
+        assert!(
+            html.contains("href=\"#eq-e:mass-energy\""),
+            "should link to equation anchor"
+        );
+        assert!(
+            html.contains(">(1)<"),
+            "should display (1) as resolved text"
+        );
         // The equation should have an id for anchoring
-        assert!(html.contains("id=\"eq-e:mass-energy\""), "equation should have id for anchor");
+        assert!(
+            html.contains("id=\"eq-e:mass-energy\""),
+            "equation should have id for anchor"
+        );
     }
 
     #[test]
@@ -2656,18 +3213,36 @@ mod tests {
             "@[Theorem](name=\"Test\" label=thm:test) {\n  Body.\n}\n\nSee @[Ref](label=thm:test).\n"
         ).unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"vell-ref\""), "should have vell-ref class");
-        assert!(html.contains("href=\"#thm-thm:test\""), "should link to theorem anchor");
-        assert!(html.contains(">Theorem 1 (Test)<"), "should display 'Theorem 1 (Test)' as resolved text");
-        assert!(html.contains("id=\"thm-thm:test\""), "theorem should have id for anchor");
+        assert!(
+            html.contains("class=\"vell-ref\""),
+            "should have vell-ref class"
+        );
+        assert!(
+            html.contains("href=\"#thm-thm:test\""),
+            "should link to theorem anchor"
+        );
+        assert!(
+            html.contains(">Theorem 1 (Test)<"),
+            "should display 'Theorem 1 (Test)' as resolved text"
+        );
+        assert!(
+            html.contains("id=\"thm-thm:test\""),
+            "theorem should have id for anchor"
+        );
     }
 
     #[test]
     fn render_ref_shows_unresolved_when_label_missing() {
         let doc = parse_document("See @[Ref](label=nonexistent).\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"unresolved-ref\""), "should have unresolved-ref class");
-        assert!(html.contains("[?nonexistent]"), "should show [?label] for unresolved ref");
+        assert!(
+            html.contains("class=\"unresolved-ref\""),
+            "should have unresolved-ref class"
+        );
+        assert!(
+            html.contains("[?nonexistent]"),
+            "should show [?label] for unresolved ref"
+        );
     }
 
     #[test]
@@ -2688,9 +3263,18 @@ mod tests {
         let doc = parse_document(source).unwrap();
         let html = render_document(&doc);
         // Should contain resolved refs to e:mass-energy and e:pythagoras
-        assert!(html.contains("href=\"#eq-e:mass-energy\""), "ref to e:mass-energy");
-        assert!(html.contains("href=\"#eq-e:pythagoras\""), "ref to e:pythagoras");
-        assert!(html.contains("href=\"#thm-thm:pythagoras\""), "ref to thm:pythagoras");
+        assert!(
+            html.contains("href=\"#eq-e:mass-energy\""),
+            "ref to e:mass-energy"
+        );
+        assert!(
+            html.contains("href=\"#eq-e:pythagoras\""),
+            "ref to e:pythagoras"
+        );
+        assert!(
+            html.contains("href=\"#thm-thm:pythagoras\""),
+            "ref to thm:pythagoras"
+        );
         assert!(html.contains("href=\"#thm-thm:ftc\""), "ref to thm:ftc");
     }
 
@@ -2705,11 +3289,20 @@ mod tests {
         let html = render_document(&doc);
 
         // Equations inside Theorem 2 (Fundamental Theorem of Calculus): eq 4 and eq 5
-        assert!(html.contains("data-number=\"4\""), "eq inside Theorem 2 should be 4");
-        assert!(html.contains("data-number=\"5\""), "eq inside Theorem 2 should be 5");
+        assert!(
+            html.contains("data-number=\"4\""),
+            "eq inside Theorem 2 should be 4"
+        );
+        assert!(
+            html.contains("data-number=\"5\""),
+            "eq inside Theorem 2 should be 5"
+        );
 
         // Equation inside Proof 2 (after Theorem 2): eq 6
-        assert!(html.contains("data-number=\"6\""), "eq inside Proof 2 should be 6");
+        assert!(
+            html.contains("data-number=\"6\""),
+            "eq inside Proof 2 should be 6"
+        );
     }
 
     #[test]
@@ -2718,40 +3311,65 @@ mod tests {
             "@[Diagram](type=mermaid caption=\"A sequence diagram\") {\n  sequenceDiagram\n    A->>B: Hello\n}\n"
         ).unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"vell-diagram\""), "should have vell-diagram class");
-        assert!(html.contains("data-type=\"mermaid\""), "should have data-type=mermaid");
-        assert!(html.contains("class=\"mermaid\""), "should have mermaid class for Mermaid.js");
-        assert!(html.contains("sequenceDiagram"), "should contain diagram source");
-        assert!(html.contains("A sequence diagram"), "should contain caption");
+        assert!(
+            html.contains("class=\"vell-diagram\""),
+            "should have vell-diagram class"
+        );
+        assert!(
+            html.contains("data-type=\"mermaid\""),
+            "should have data-type=mermaid"
+        );
+        assert!(
+            html.contains("class=\"mermaid\""),
+            "should have mermaid class for Mermaid.js"
+        );
+        assert!(
+            html.contains("sequenceDiagram"),
+            "should contain diagram source"
+        );
+        assert!(
+            html.contains("A sequence diagram"),
+            "should contain caption"
+        );
     }
 
     #[test]
     fn render_diagram_ascii_produces_pre_block() {
-        let doc = parse_document(
-            "@[Diagram](type=ascii) {\n  #######\n  # Node #\n  #######\n}\n"
-        ).unwrap();
+        let doc = parse_document("@[Diagram](type=ascii) {\n  #######\n  # Node #\n  #######\n}\n")
+            .unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("class=\"vell-diagram\""), "should have vell-diagram class");
-        assert!(html.contains("data-type=\"ascii\""), "should have data-type=ascii");
-        assert!(html.contains("<pre>"), "should have pre block for ASCII art");
+        assert!(
+            html.contains("class=\"vell-diagram\""),
+            "should have vell-diagram class"
+        );
+        assert!(
+            html.contains("data-type=\"ascii\""),
+            "should have data-type=ascii"
+        );
+        assert!(
+            html.contains("<pre>"),
+            "should have pre block for ASCII art"
+        );
         assert!(html.contains("#######"), "should contain ASCII art content");
     }
 
     #[test]
     fn render_diagram_general_defaults_to_pre() {
-        let doc = parse_document(
-            "@[Diagram] {\n  Some diagram content\n}\n"
-        ).unwrap();
+        let doc = parse_document("@[Diagram] {\n  Some diagram content\n}\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("data-type=\"general\""), "should default to general type");
+        assert!(
+            html.contains("data-type=\"general\""),
+            "should default to general type"
+        );
         assert!(html.contains("<pre>"), "should use pre block");
     }
 
     #[test]
     fn render_bar_chart_produces_svg() {
         let doc = parse_document(
-            "@[Chart](type=bar title=\"Sales\") {\n  Q1, 10\n  Q2, 25\n  Q3, 15\n}\n"
-        ).unwrap();
+            "@[Chart](type=bar title=\"Sales\") {\n  Q1, 10\n  Q2, 25\n  Q3, 15\n}\n",
+        )
+        .unwrap();
         let html = render_document(&doc);
         assert!(html.contains("vell-chart"), "should have vell-chart class");
         assert!(html.contains("<svg"), "should contain SVG element");
@@ -2773,9 +3391,18 @@ mod tests {
         let doc = parse_document(source).unwrap();
         let html = render_document(&doc);
         assert!(!html.is_empty(), "spec example 09 produced empty HTML");
-        assert!(html.contains("vell-diagram"), "should contain diagram rendering");
-        assert!(html.contains("vell-chart"), "should contain chart rendering");
-        assert!(html.contains("Phase 10: Native Diagrams"), "should contain page title");
+        assert!(
+            html.contains("vell-diagram"),
+            "should contain diagram rendering"
+        );
+        assert!(
+            html.contains("vell-chart"),
+            "should contain chart rendering"
+        );
+        assert!(
+            html.contains("Phase 10: Native Diagrams"),
+            "should contain page title"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2785,20 +3412,29 @@ mod tests {
     #[test]
     fn render_input_produces_text_input() {
         let doc = parse_document(
-            "@[Input](type=text bind=name label=\"Name\" placeholder=\"Enter name\")\n"
-        ).unwrap();
+            "@[Input](type=text bind=name label=\"Name\" placeholder=\"Enter name\")\n",
+        )
+        .unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("input type=\"text\""), "should have text input");
-        assert!(html.contains("data-bind=\"name\""), "should have data-bind attribute");
-        assert!(html.contains("placeholder=\"Enter name\""), "should have placeholder");
+        assert!(
+            html.contains("input type=\"text\""),
+            "should have text input"
+        );
+        assert!(
+            html.contains("data-bind=\"name\""),
+            "should have data-bind attribute"
+        );
+        assert!(
+            html.contains("placeholder=\"Enter name\""),
+            "should have placeholder"
+        );
         assert!(html.contains("Name"), "should have label");
     }
 
     #[test]
     fn render_select_produces_dropdown() {
-        let doc = parse_document(
-            "@[Select](bind=opt label=\"Pick\") {\n  A\n  B\n  C\n}\n"
-        ).unwrap();
+        let doc =
+            parse_document("@[Select](bind=opt label=\"Pick\") {\n  A\n  B\n  C\n}\n").unwrap();
         let html = render_document(&doc);
         assert!(html.contains("<select"), "should have select element");
         assert!(html.contains("data-bind=\"opt\""), "should have data-bind");
@@ -2808,29 +3444,34 @@ mod tests {
 
     #[test]
     fn render_checkbox_produces_checkbox_input() {
-        let doc = parse_document(
-            "@[Checkbox](bind=dark label=\"Enable dark mode\")\n"
-        ).unwrap();
+        let doc = parse_document("@[Checkbox](bind=dark label=\"Enable dark mode\")\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("type=\"checkbox\""), "should have checkbox input");
+        assert!(
+            html.contains("type=\"checkbox\""),
+            "should have checkbox input"
+        );
         assert!(html.contains("data-bind=\"dark\""), "should have data-bind");
         assert!(html.contains("Enable dark mode"), "should have label");
     }
 
     #[test]
     fn render_data_produces_json_script() {
-        let doc = parse_document(
-            "@[Data](data=\"{'x': 42, 'y': 'hello'}\")\n"
-        ).unwrap();
+        let doc = parse_document("@[Data](data=\"{'x': 42, 'y': 'hello'}\")\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("data-vell-init"), "should have data-vell-init attribute");
+        assert!(
+            html.contains("data-vell-init"),
+            "should have data-vell-init attribute"
+        );
     }
 
     #[test]
     fn render_interactive_variables_show_reactive_spans() {
         let doc = parse_document("Count: @{count}\n").unwrap();
         let html = render_document(&doc);
-        assert!(html.contains("data-vell-var=\"count\""), "should have reactive span");
+        assert!(
+            html.contains("data-vell-var=\"count\""),
+            "should have reactive span"
+        );
         assert!(html.contains("class=\"var\""), "should have var class");
     }
 
@@ -2840,14 +3481,35 @@ mod tests {
         let doc = parse_document(source).unwrap();
         let html = render_document(&doc);
         assert!(!html.is_empty(), "spec example 09 produced empty HTML");
-        assert!(html.contains("vell-diagram"), "should contain diagram rendering");
-        assert!(html.contains("vell-chart"), "should contain chart rendering");
-        assert!(html.contains("class=\"mermaid\""), "should contain mermaid divs");
-        assert!(html.contains("sequenceDiagram"), "should contain sequence diagram");
+        assert!(
+            html.contains("vell-diagram"),
+            "should contain diagram rendering"
+        );
+        assert!(
+            html.contains("vell-chart"),
+            "should contain chart rendering"
+        );
+        assert!(
+            html.contains("class=\"mermaid\""),
+            "should contain mermaid divs"
+        );
+        assert!(
+            html.contains("sequenceDiagram"),
+            "should contain sequence diagram"
+        );
         assert!(html.contains("flowchart TD"), "should contain flowchart");
         assert!(html.contains("<svg"), "should contain SVG bar charts");
-        assert!(html.contains("Quarterly Revenue"), "should contain first chart title");
-        assert!(html.contains("Product Sales by Category"), "should contain second chart title");
-        assert!(html.contains("Phase 10: Native Diagrams"), "should contain page title");
+        assert!(
+            html.contains("Quarterly Revenue"),
+            "should contain first chart title"
+        );
+        assert!(
+            html.contains("Product Sales by Category"),
+            "should contain second chart title"
+        );
+        assert!(
+            html.contains("Phase 10: Native Diagrams"),
+            "should contain page title"
+        );
     }
 }

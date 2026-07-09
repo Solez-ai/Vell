@@ -993,46 +993,45 @@ impl Parser {
         let trimmed = line.text.trim();
 
         // Check if directive has properties (Name](...)) or is prop-less (Name] { or Name] EOL)
-        let (name, props, tail) =
-            if let Some(close_name) = trimmed.find("](") {
-                // Has properties: @[Name](key=value) { ... }
-                let name = trimmed.get(2..close_name).unwrap_or_default().to_string();
-                let rest = trimmed.get(close_name + 2..).unwrap_or_default();
-                let Some(close_props) = find_matching_paren(rest) else {
-                    return Err(self.error(
-                        ParseErrorKind::MalformedDirective,
-                        Span::new(line.start, line.end),
-                        "Directive property list is not closed.",
-                        Some("Add a closing ')' after the property list.".to_string()),
-                    ));
-                };
-                let props_raw = rest.get(..close_props).unwrap_or_default();
-                let props = parse_props(props_raw).map_err(|message| {
-                    self.error(
-                        ParseErrorKind::InvalidPropValue,
-                        Span::new(line.start, line.end),
-                        message,
-                        None,
-                    )
-                })?;
-                let tail = trimmed
-                    .get(close_name + 3 + close_props..)
-                    .unwrap_or_default()
-                    .trim();
-                (name, props, tail)
-            } else if let Some(close_name) = trimmed.find(']') {
-                // No properties: @[Name] { ... } or @[Name]
-                let name = trimmed.get(2..close_name).unwrap_or_default().to_string();
-                let tail = trimmed.get(close_name + 1..).unwrap_or_default().trim();
-                (name, HashMap::new(), tail)
-            } else {
+        let (name, props, tail) = if let Some(close_name) = trimmed.find("](") {
+            // Has properties: @[Name](key=value) { ... }
+            let name = trimmed.get(2..close_name).unwrap_or_default().to_string();
+            let rest = trimmed.get(close_name + 2..).unwrap_or_default();
+            let Some(close_props) = find_matching_paren(rest) else {
                 return Err(self.error(
                     ParseErrorKind::MalformedDirective,
                     Span::new(line.start, line.end),
-                    "Directive name is missing closing ']'.",
-                    Some("Use @[Name](key=value) or @[Name] { body }.".to_string()),
+                    "Directive property list is not closed.",
+                    Some("Add a closing ')' after the property list.".to_string()),
                 ));
             };
+            let props_raw = rest.get(..close_props).unwrap_or_default();
+            let props = parse_props(props_raw).map_err(|message| {
+                self.error(
+                    ParseErrorKind::InvalidPropValue,
+                    Span::new(line.start, line.end),
+                    message,
+                    None,
+                )
+            })?;
+            let tail = trimmed
+                .get(close_name + 3 + close_props..)
+                .unwrap_or_default()
+                .trim();
+            (name, props, tail)
+        } else if let Some(close_name) = trimmed.find(']') {
+            // No properties: @[Name] { ... } or @[Name]
+            let name = trimmed.get(2..close_name).unwrap_or_default().to_string();
+            let tail = trimmed.get(close_name + 1..).unwrap_or_default().trim();
+            (name, HashMap::new(), tail)
+        } else {
+            return Err(self.error(
+                ParseErrorKind::MalformedDirective,
+                Span::new(line.start, line.end),
+                "Directive name is missing closing ']'.",
+                Some("Use @[Name](key=value) or @[Name] { body }.".to_string()),
+            ));
+        };
 
         self.index += 1;
         let (children, end) = if tail.starts_with('{') {

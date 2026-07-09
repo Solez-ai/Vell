@@ -87,11 +87,7 @@ fn format_node(node: &Node) -> String {
                 if def.is_empty() {
                     format!(":: {}", format_inline_nodes(&item.term))
                 } else {
-                    format!(
-                        ":: {}\n   {}",
-                        format_inline_nodes(&item.term),
-                        def
-                    )
+                    format!(":: {}\n   {}", format_inline_nodes(&item.term), def)
                 }
             })
             .collect::<Vec<_>>()
@@ -253,7 +249,7 @@ fn wrap_prose(text: &str, max: usize) -> String {
     while i < raw_words.len() {
         let word = raw_words[i];
         // Check if this word starts $ but doesn't contain a closing $ (except at position 0)
-        let has_close_dollar = word.get(1..).map_or(false, |s| s.contains('$'));
+        let has_close_dollar = word.get(1..).is_some_and(|s| s.contains('$'));
         if word.starts_with('$') && !has_close_dollar {
             // Start of a multi-word math expression — collect until closing $
             let mut math_parts = vec![word];
@@ -263,7 +259,7 @@ fn wrap_prose(text: &str, max: usize) -> String {
                 math_parts.push(part);
                 i += 1;
                 // A word has the closing $ if it contains $ anywhere beyond position 0
-                if part.get(1..).map_or(false, |s| s.contains('$')) {
+                if part.get(1..).is_some_and(|s| s.contains('$')) {
                     break;
                 }
             }
@@ -304,19 +300,46 @@ mod tests {
 
     /// All valid fixture names for idempotency testing.
     const FIXTURES: &[&str] = &[
-        "headings", "inline", "lists", "code_blocks", "math",
-        "pipe_table", "grid_table_merged", "directives", "variables",
-        "for_loop", "full_document", "nested_inline", "escaped_chars",
-        "ref_defs", "footnote_defs", "if_block", "image_refs",
-        "link_refs", "admonition", "def_list", "hrule_markers",
-        "pipe_table_align", "list_nested", "code_blocks_no_lang",
-        "math_inline", "inline_components", "empty_directive", "block_directive",
+        "headings",
+        "inline",
+        "lists",
+        "code_blocks",
+        "math",
+        "pipe_table",
+        "grid_table_merged",
+        "directives",
+        "variables",
+        "for_loop",
+        "full_document",
+        "nested_inline",
+        "escaped_chars",
+        "ref_defs",
+        "footnote_defs",
+        "if_block",
+        "image_refs",
+        "link_refs",
+        "admonition",
+        "def_list",
+        "hrule_markers",
+        "pipe_table_align",
+        "list_nested",
+        "code_blocks_no_lang",
+        "math_inline",
+        "inline_components",
+        "empty_directive",
+        "block_directive",
     ];
 
     /// All spec example names for idempotency testing.
     const SPEC_EXAMPLES: &[&str] = &[
-        "01-basic", "02-math", "03-tables", "04-interactive", "05-extensions", "06-full-document",
-        "07-math-advanced", "08-theorems-equations",
+        "01-basic",
+        "02-math",
+        "03-tables",
+        "04-interactive",
+        "05-extensions",
+        "06-full-document",
+        "07-math-advanced",
+        "08-theorems-equations",
     ];
 
     /// Load a fixture source from the vell-core test fixtures directory.
@@ -452,7 +475,10 @@ mod tests {
 
     #[test]
     fn idempotent_for_loop() {
-        assert_idempotent("for loop", "@var items = [1, 2]\n@for item in @{items} {\n  Body.\n}\n");
+        assert_idempotent(
+            "for loop",
+            "@var items = [1, 2]\n@for item in @{items} {\n  Body.\n}\n",
+        );
     }
 
     #[test]
@@ -487,7 +513,11 @@ mod tests {
         let doc = parse_document(source).unwrap();
         let formatted = format(&doc);
         for line in formatted.lines() {
-            assert_eq!(line, line.trim_end(), "line has trailing whitespace: {line:?}");
+            assert_eq!(
+                line,
+                line.trim_end(),
+                "line has trailing whitespace: {line:?}"
+            );
         }
     }
 
@@ -496,7 +526,10 @@ mod tests {
         let source = "= Title\n";
         let doc = parse_document(source).unwrap();
         let formatted = format(&doc);
-        assert!(formatted.ends_with('\n'), "formatted output must end with newline");
+        assert!(
+            formatted.ends_with('\n'),
+            "formatted output must end with newline"
+        );
     }
 
     #[test]
@@ -515,8 +548,14 @@ mod tests {
         for input in &cases {
             let doc = parse_document(input).unwrap();
             let formatted = format(&doc);
-            assert!(formatted.starts_with('='), "heading should start with =: {formatted:?}");
-            assert!(formatted.ends_with('\n'), "heading should end with newline: {formatted:?}");
+            assert!(
+                formatted.starts_with('='),
+                "heading should start with =: {formatted:?}"
+            );
+            assert!(
+                formatted.ends_with('\n'),
+                "heading should end with newline: {formatted:?}"
+            );
         }
     }
 

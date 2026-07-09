@@ -608,8 +608,7 @@ impl InlineNode {
 /// When these appear in Text nodes, they must be backslash-escaped
 /// so the formatted output can be correctly re-parsed.
 const INLINE_DELIMITER_STARTS: &[&str] = &[
-    "\\", "*", "/", "_", "~", "^", ",,", "`", "$",
-    "@{", "@[", "[[", "[^", "![", "[",
+    "\\", "*", "/", "_", "~", "^", ",,", "`", "$", "@{", "@[", "[[", "[^", "![", "[",
 ];
 
 /// Returns the text with inline delimiter characters backslash-escaped.
