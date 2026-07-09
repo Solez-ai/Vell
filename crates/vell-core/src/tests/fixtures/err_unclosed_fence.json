@@ -1,0 +1,4 @@
+{
+  "error_kind": "UnterminatedDelimiter",
+  "message_contains": "Unterminated code fence: ``` was opened but never closed."
+}

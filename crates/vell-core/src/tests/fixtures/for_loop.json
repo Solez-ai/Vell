@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "ForLoop",
+      "variable": "item",
+      "iterable": "items",
+      "children": [
+        {
+          "type": "List",
+          "ordered": false,
+          "start": null,
+          "items": [
+            {
+              "children": [
+                {
+                  "type": "Paragraph",
+                  "children": [
+                    {
+                      "type": "VarInterpolation",
+                      "name": "item",
+                      "span": {
+                        "start": 0,
+                        "end": 7
+                      }
+                    }
+                  ],
+                  "span": {
+                    "start": 0,
+                    "end": 10
+                  }
+                }
+              ],
+              "checked": null,
+              "span": {
+                "start": 0,
+                "end": 10
+              }
+            }
+          ],
+          "span": {
+            "start": 0,
+            "end": 10
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 41
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 41
+  }
+}

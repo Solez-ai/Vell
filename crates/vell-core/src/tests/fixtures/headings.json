@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Heading",
+      "level": 1,
+      "children": [
+        {
+          "type": "Text",
+          "value": "Heading",
+          "span": {
+            "start": 2,
+            "end": 9
+          }
+        }
+      ],
+      "id": "heading",
+      "span": {
+        "start": 0,
+        "end": 11
+      }
+    },
+    {
+      "type": "Heading",
+      "level": 2,
+      "children": [
+        {
+          "type": "Text",
+          "value": "Section",
+          "span": {
+            "start": 16,
+            "end": 23
+          }
+        }
+      ],
+      "id": "section",
+      "span": {
+        "start": 13,
+        "end": 25
+      }
+    }
+  ],
+  "metadata": {
+    "title": "Heading",
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 25
+  }
+}

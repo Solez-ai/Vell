@@ -1,0 +1,21 @@
+@[Meta](author="Samin Yeasar" date=2026-01-15 lang=en)
+
+= Research Note
+
+@var sample = 42
+
+This document uses @{sample}, [[smith2023]], and a footnote[^one].
+
+== Data
+
+| Metric | Value |
+|--------|-------|
+| Score  | 42    |
+
+$$
+y = mx + b
+$$
+
+[^one]: Footnote content.
+
+[ref]: https://example.com "Example"

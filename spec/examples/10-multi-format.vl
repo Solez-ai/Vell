@@ -1,0 +1,59 @@
+= Multi-Format Publishing
+
+@[Meta](title="Phase 12: Multi-Format Publishing" author="Samin Yeasar")
+
+== About This Document
+
+This document demonstrates Vell's multi-format publishing capabilities.
+The same source can output in multiple formats:
+
+- Standard HTML (`vell render html`)
+- PDF-friendly HTML with print CSS (`vell render pdf`)
+- Slide deck via reveal.js (`vell render slides`)
+
+== Slide Presentations
+
+Vell supports slide decks natively with the Slide directive:
+
+@[Slide] {
+  == Slide Title
+
+  Content for the first slide.
+  - Bullet point 1
+  - Bullet point 2
+}
+
+@[Slide] {
+  === Code Slide
+
+  ```python
+  def hello():
+      print("Hello, Vell!")
+  ```
+
+  Code blocks work inside slides.
+}
+
+@[Slide] {
+  === Math Slide
+
+  The famous equation: $E = mc^2$
+
+  And more complex math:
+
+  $$\\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$
+}
+
+== Print Features
+
+When rendering to PDF mode, Vell automatically includes:
+
+- Table of contents generated from headings
+- Page headers with document title
+- Print-optimized CSS with page breaks
+- Running page numbers in footers
+
+== Summary
+
+Multi-format publishing is a core Vell feature.
+One source, many outputs - HTML, PDF-friendly HTML, and slides.

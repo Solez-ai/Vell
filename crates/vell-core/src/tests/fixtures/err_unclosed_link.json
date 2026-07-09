@@ -1,0 +1,4 @@
+{
+  "error_kind": "UnterminatedDelimiter",
+  "message_contains": "Link text is missing closing ]."
+}

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Extension",
+      "name": "Name",
+      "props": {
+        "key": "value"
+      },
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [
+            {
+              "type": "Text",
+              "value": "Content",
+              "span": {
+                "start": 0,
+                "end": 7
+              }
+            }
+          ],
+          "span": {
+            "start": 0,
+            "end": 8
+          }
+        }
+      ],
+      "raw_source": "@[Name](key=\"value\") {",
+      "span": {
+        "start": 0,
+        "end": 38
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 38
+  }
+}

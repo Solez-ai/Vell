@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "List",
+      "ordered": false,
+      "start": null,
+      "items": [
+        {
+          "children": [
+            {
+              "type": "Paragraph",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "One",
+                  "span": {
+                    "start": 0,
+                    "end": 3
+                  }
+                }
+              ],
+              "span": {
+                "start": 0,
+                "end": 7
+              }
+            }
+          ],
+          "checked": null,
+          "span": {
+            "start": 0,
+            "end": 7
+          }
+        },
+        {
+          "children": [
+            {
+              "type": "Paragraph",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "Two",
+                  "span": {
+                    "start": 7,
+                    "end": 10
+                  }
+                }
+              ],
+              "span": {
+                "start": 7,
+                "end": 14
+              }
+            }
+          ],
+          "checked": null,
+          "span": {
+            "start": 7,
+            "end": 14
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 14
+      }
+    },
+    {
+      "type": "List",
+      "ordered": true,
+      "start": 1,
+      "items": [
+        {
+          "children": [
+            {
+              "type": "Paragraph",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "First",
+                  "span": {
+                    "start": 16,
+                    "end": 21
+                  }
+                }
+              ],
+              "span": {
+                "start": 16,
+                "end": 26
+              }
+            }
+          ],
+          "checked": null,
+          "span": {
+            "start": 16,
+            "end": 26
+          }
+        },
+        {
+          "children": [
+            {
+              "type": "Paragraph",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "Second",
+                  "span": {
+                    "start": 26,
+                    "end": 32
+                  }
+                }
+              ],
+              "span": {
+                "start": 26,
+                "end": 37
+              }
+            }
+          ],
+          "checked": null,
+          "span": {
+            "start": 26,
+            "end": 37
+          }
+        }
+      ],
+      "span": {
+        "start": 16,
+        "end": 37
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 37
+  }
+}

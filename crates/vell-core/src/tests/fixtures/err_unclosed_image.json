@@ -1,0 +1,4 @@
+{
+  "error_kind": "UnterminatedDelimiter",
+  "message_contains": "Image alt text is missing closing ]."
+}

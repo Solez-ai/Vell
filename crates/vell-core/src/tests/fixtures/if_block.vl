@@ -1,0 +1,9 @@
+@if true {
+  A
+} else {
+  B
+}
+
+@if false {
+  X
+}

@@ -1,0 +1,102 @@
+= Phase 8 & 9 & 10: New Features
+
+@[Meta](title="Phase 8-10: Professional Math, Cross-References & Diagrams" author="Samin Yeasar" date="2026-07-08" lang=en)
+
+== Chemical Equations
+
+Water: @[Chem](source="H2O")
+
+Sulfuric acid: @[Chem](source="H2SO4")
+
+Methane: @[Chem](source="CH4")
+
+Glucose: @[Chem](source="C6H12O6")
+
+== Physics Bra-Ket Notation
+
+The bra-ket notation is central to quantum mechanics:
+
+$\bra{\psi}$ is a bra vector.
+
+$\ket{\phi}$ is a ket vector.
+
+$\braket{\phi|\psi}$ is the inner product.
+
+$\hat{H} \ket{\psi} = E \ket{\psi}$ is the time-independent Schrodinger equation.
+
+== Font Commands in Math
+
+Calligraphic: $\mathcal{A}, \mathcal{B}, \mathcal{C}$
+
+Blackboard bold: $\mathbb{N}, \mathbb{Z}, \mathbb{Q}, \mathbb{R}, \mathbb{C}$
+
+Roman: $\mathrm{d}x$
+
+Bold: $\mathbf{x}, \mathbf{X}$
+
+Italic: $\mathit{effect}$
+
+Sans-serif: $\mathsf{Var}(X)$
+
+Typewriter: $\mathtt{code}$
+
+Binomial: $\binom{n}{k} = \frac{n!}{k!(n-k)!}$
+
+Named operators: $\operatorname{Var}(X) = \mathbb{E}[(X - \mu)^2]$
+
+== Table of Contents
+
+@[Toc]()
+
+== List of Figures
+
+@[Lof]()
+
+== List of Tables
+
+@[Lot]()
+
+== Function Plots
+
+Plot of sine: @[Plot](fn="sin(x)" xmin=-6 xmax=6 ymin=-2 ymax=2)
+
+Plot of cosine: @[Plot](fn="cos(x)" xmin=-6 xmax=6 ymin=-2 ymax=2)
+
+== Graphviz Diagrams
+
+@[Diagram](type=dot caption="Simple graph with Graphviz DOT") {
+  digraph G {
+    A -> B
+    A -> C
+    B -> D
+    C -> D
+  }
+}
+
+@[Diagram](type=dot caption="Flowchart using DOT") {
+  digraph Process {
+    Start -> Process
+    Process -> Decision
+    Decision -> End
+    Decision -> Process
+  }
+}
+
+== Cross-References
+
+@[Equation](label="eq:euler" source="e^{i\pi} + 1 = 0")
+
+Euler's identity @[Ref](label=eq:euler) is one of the most beautiful equations.
+
+@[Theorem](label="thm:fermat" name="Fermat's Last Theorem") {
+  There are no positive integers *a*, *b*, *c* that satisfy the equation
+
+  $$\displaystyle a^n + b^n = c^n$$
+
+  for any integer *n* > 2.
+}
+
+Theorem @[Ref](label=thm:fermat) was proven by Andrew Wiles in 1994.
+
+> [!NOTE]
+> All these features are part of Phases 8, 9, and 10 of the Vell roadmap.

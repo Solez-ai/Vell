@@ -1,0 +1,3 @@
+[^one]: First footnote.
+[^two]: Second footnote.
+Text with ref[^one].

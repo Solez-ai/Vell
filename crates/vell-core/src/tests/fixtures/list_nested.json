@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "List",
+      "ordered": false,
+      "start": null,
+      "items": [
+        {
+          "children": [
+            {
+              "type": "Paragraph",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "Outer",
+                  "span": {
+                    "start": 0,
+                    "end": 5
+                  }
+                }
+              ],
+              "span": {
+                "start": 0,
+                "end": 9
+              }
+            }
+          ],
+          "checked": null,
+          "span": {
+            "start": 0,
+            "end": 9
+          }
+        },
+        {
+          "children": [
+            {
+              "type": "Paragraph",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "Inner",
+                  "span": {
+                    "start": 9,
+                    "end": 14
+                  }
+                }
+              ],
+              "span": {
+                "start": 9,
+                "end": 20
+              }
+            }
+          ],
+          "checked": null,
+          "span": {
+            "start": 9,
+            "end": 20
+          }
+        },
+        {
+          "children": [
+            {
+              "type": "Paragraph",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "Another",
+                  "span": {
+                    "start": 20,
+                    "end": 27
+                  }
+                }
+              ],
+              "span": {
+                "start": 20,
+                "end": 31
+              }
+            }
+          ],
+          "checked": null,
+          "span": {
+            "start": 20,
+            "end": 31
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 31
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 31
+  }
+}

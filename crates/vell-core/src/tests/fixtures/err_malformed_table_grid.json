@@ -1,0 +1,4 @@
+{
+  "error_kind": "MalformedTable",
+  "message_contains": "Grid table borders must use consistent column boundaries."
+}

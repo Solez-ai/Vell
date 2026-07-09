@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "HorizontalRule",
+      "span": {
+        "start": 0,
+        "end": 5
+      }
+    },
+    {
+      "type": "HorizontalRule",
+      "span": {
+        "start": 5,
+        "end": 12
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 12
+  }
+}

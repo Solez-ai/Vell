@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Table",
+      "headers": [
+        {
+          "children": [
+            {
+              "type": "Text",
+              "value": "Left",
+              "span": {
+                "start": 1,
+                "end": 5
+              }
+            }
+          ],
+          "colspan": 1,
+          "rowspan": 1,
+          "align": "Left",
+          "span": {
+            "start": 1,
+            "end": 7
+          }
+        },
+        {
+          "children": [
+            {
+              "type": "Text",
+              "value": "Center",
+              "span": {
+                "start": 8,
+                "end": 14
+              }
+            }
+          ],
+          "colspan": 1,
+          "rowspan": 1,
+          "align": "Center",
+          "span": {
+            "start": 8,
+            "end": 16
+          }
+        },
+        {
+          "children": [
+            {
+              "type": "Text",
+              "value": "Right",
+              "span": {
+                "start": 17,
+                "end": 22
+              }
+            }
+          ],
+          "colspan": 1,
+          "rowspan": 1,
+          "align": "Right",
+          "span": {
+            "start": 17,
+            "end": 24
+          }
+        }
+      ],
+      "rows": [
+        [
+          {
+            "children": [
+              {
+                "type": "Text",
+                "value": "1",
+                "span": {
+                  "start": 55,
+                  "end": 56
+                }
+              }
+            ],
+            "colspan": 1,
+            "rowspan": 1,
+            "align": "Left",
+            "span": {
+              "start": 55,
+              "end": 61
+            }
+          },
+          {
+            "children": [
+              {
+                "type": "Text",
+                "value": "2",
+                "span": {
+                  "start": 62,
+                  "end": 63
+                }
+              }
+            ],
+            "colspan": 1,
+            "rowspan": 1,
+            "align": "Center",
+            "span": {
+              "start": 62,
+              "end": 70
+            }
+          },
+          {
+            "children": [
+              {
+                "type": "Text",
+                "value": "3",
+                "span": {
+                  "start": 71,
+                  "end": 72
+                }
+              }
+            ],
+            "colspan": 1,
+            "rowspan": 1,
+            "align": "Right",
+            "span": {
+              "start": 71,
+              "end": 78
+            }
+          }
+        ]
+      ],
+      "span": {
+        "start": 0,
+        "end": 81
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 81
+  }
+}

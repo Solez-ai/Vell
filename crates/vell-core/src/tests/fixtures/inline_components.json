@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Extension",
+      "name": "Component",
+      "props": {
+        "key": "value"
+      },
+      "children": [],
+      "raw_source": "@[Component](key=\"value\")",
+      "span": {
+        "start": 0,
+        "end": 27
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 27
+  }
+}

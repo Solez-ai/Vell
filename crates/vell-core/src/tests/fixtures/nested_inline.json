@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [
+        {
+          "type": "Text",
+          "value": "Bold with ",
+          "span": {
+            "start": 0,
+            "end": 10
+          }
+        },
+        {
+          "type": "Bold",
+          "children": [
+            {
+              "type": "Text",
+              "value": "italic ",
+              "span": {
+                "start": 11,
+                "end": 18
+              }
+            },
+            {
+              "type": "Italic",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "inside",
+                  "span": {
+                    "start": 19,
+                    "end": 25
+                  }
+                }
+              ],
+              "span": {
+                "start": 18,
+                "end": 26
+              }
+            },
+            {
+              "type": "Text",
+              "value": " here",
+              "span": {
+                "start": 26,
+                "end": 31
+              }
+            }
+          ],
+          "span": {
+            "start": 10,
+            "end": 32
+          }
+        },
+        {
+          "type": "Text",
+          "value": "\nItalic with ",
+          "span": {
+            "start": 32,
+            "end": 45
+          }
+        },
+        {
+          "type": "Italic",
+          "children": [
+            {
+              "type": "Text",
+              "value": "bold ",
+              "span": {
+                "start": 46,
+                "end": 51
+              }
+            },
+            {
+              "type": "Bold",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "inside",
+                  "span": {
+                    "start": 52,
+                    "end": 58
+                  }
+                }
+              ],
+              "span": {
+                "start": 51,
+                "end": 59
+              }
+            },
+            {
+              "type": "Text",
+              "value": " here",
+              "span": {
+                "start": 59,
+                "end": 64
+              }
+            }
+          ],
+          "span": {
+            "start": 45,
+            "end": 65
+          }
+        },
+        {
+          "type": "Text",
+          "value": "\nUnderline with ",
+          "span": {
+            "start": 65,
+            "end": 81
+          }
+        },
+        {
+          "type": "Underline",
+          "children": [
+            {
+              "type": "Text",
+              "value": "bold ",
+              "span": {
+                "start": 82,
+                "end": 87
+              }
+            },
+            {
+              "type": "Bold",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "inside",
+                  "span": {
+                    "start": 88,
+                    "end": 94
+                  }
+                }
+              ],
+              "span": {
+                "start": 87,
+                "end": 95
+              }
+            },
+            {
+              "type": "Text",
+              "value": " here",
+              "span": {
+                "start": 95,
+                "end": 100
+              }
+            }
+          ],
+          "span": {
+            "start": 81,
+            "end": 101
+          }
+        },
+        {
+          "type": "Text",
+          "value": "\nThree levels ",
+          "span": {
+            "start": 101,
+            "end": 115
+          }
+        },
+        {
+          "type": "Bold",
+          "children": [
+            {
+              "type": "Text",
+              "value": "bold ",
+              "span": {
+                "start": 116,
+                "end": 121
+              }
+            },
+            {
+              "type": "Italic",
+              "children": [
+                {
+                  "type": "Text",
+                  "value": "italic ",
+                  "span": {
+                    "start": 122,
+                    "end": 129
+                  }
+                },
+                {
+                  "type": "Underline",
+                  "children": [
+                    {
+                      "type": "Text",
+                      "value": "under",
+                      "span": {
+                        "start": 130,
+                        "end": 135
+                      }
+                    }
+                  ],
+                  "span": {
+                    "start": 129,
+                    "end": 136
+                  }
+                },
+                {
+                  "type": "Text",
+                  "value": " text",
+                  "span": {
+                    "start": 136,
+                    "end": 141
+                  }
+                }
+              ],
+              "span": {
+                "start": 121,
+                "end": 142
+              }
+            },
+            {
+              "type": "Text",
+              "value": " end",
+              "span": {
+                "start": 142,
+                "end": 146
+              }
+            }
+          ],
+          "span": {
+            "start": 115,
+            "end": 147
+          }
+        },
+        {
+          "type": "Text",
+          "value": "\nCode ",
+          "span": {
+            "start": 147,
+            "end": 153
+          }
+        },
+        {
+          "type": "Bold",
+          "children": [
+            {
+              "type": "Text",
+              "value": "inside ",
+              "span": {
+                "start": 154,
+                "end": 161
+              }
+            },
+            {
+              "type": "Code",
+              "value": "fn()",
+              "span": {
+                "start": 161,
+                "end": 167
+              }
+            },
+            {
+              "type": "Text",
+              "value": " here",
+              "span": {
+                "start": 167,
+                "end": 172
+              }
+            }
+          ],
+          "span": {
+            "start": 153,
+            "end": 173
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 179
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 179
+  }
+}

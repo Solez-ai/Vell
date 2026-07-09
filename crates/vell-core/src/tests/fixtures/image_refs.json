@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [
+        {
+          "type": "Image",
+          "src": "img.png",
+          "alt": "alt",
+          "title": null,
+          "span": {
+            "start": 0,
+            "end": 15
+          }
+        },
+        {
+          "type": "Text",
+          "value": "\n",
+          "span": {
+            "start": 15,
+            "end": 16
+          }
+        },
+        {
+          "type": "ImageRef",
+          "id": "ref",
+          "alt": "alt",
+          "span": {
+            "start": 16,
+            "end": 27
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 30
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 30
+  }
+}

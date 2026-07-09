@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "CodeBlock",
+      "lang": null,
+      "source": "code without lang",
+      "executable": false,
+      "span": {
+        "start": 0,
+        "end": 29
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 29
+  }
+}

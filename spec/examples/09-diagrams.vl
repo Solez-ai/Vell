@@ -1,0 +1,60 @@
+= Diagrams and Charts
+
+@[Meta](title="Phase 10: Native Diagrams")
+
+== Mermaid Sequence Diagram
+
+@[Diagram](type=mermaid caption="Sequence diagram of a client-server request") {
+  sequenceDiagram
+    participant Client
+    participant Server
+    participant Database
+    Client->>Server: Request data
+    Server->>Database: Query
+    Database-->>Server: Results
+    Server-->>Client: Response
+}
+
+== Flowchart
+
+@[Diagram](type=mermaid caption="Decision flowchart") {
+  flowchart TD
+    Start --> Condition
+    Condition -- Yes --> Process
+    Condition -- No --> Error
+    Process --> End
+    Error --> End
+}
+
+== ASCII Art Diagram
+
+@[Diagram](type=ascii caption="Simple network topology") {
+  ----------            ----------
+  | Client |---------->| Server |
+  ----------            ----------
+       |                     |
+       v                     v
+  ----------            ----------
+  | Router |            | Switch |
+  ----------            ----------
+}
+
+== Bar Chart - Quarterly Revenue
+
+@[Chart](type=bar title="Quarterly Revenue") {
+  Q1, 45
+  Q2, 62
+  Q3, 38
+  Q4, 71
+}
+
+== Bar Chart - Product Sales
+
+@[Chart](type=bar title="Product Sales by Category") {
+  Electronics, 120
+  Clothing, 85
+  Food, 200
+  Books, 45
+  Sports, 68
+  Toys, 92
+}

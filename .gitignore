@@ -1,0 +1,10 @@
+/target/
+/dist/
+/node_modules/
+**/pkg/
+**/*.wasm
+.DS_Store
+.env
+.vscode-test/
+coverage/
+AGENT-ROADMAP.md

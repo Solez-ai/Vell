@@ -1,0 +1,4 @@
+{
+  "error_kind": "UndefinedReference",
+  "message_contains": "Variable 'undefined' is not declared before use."
+}

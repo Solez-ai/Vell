@@ -1,0 +1,274 @@
+= Advanced Math in Vell
+
+@[Meta](author="Samin Yeasar" date="2026-07-03" lang="en")
+
+This document demonstrates the full range of LaTeX math syntax supported by Vell's LaTeX-to-MathML
+converters.
+
+== Greek Letters
+
+Lowercase: $\alpha$ $\beta$ $\gamma$ $\delta$ $\epsilon$ $\zeta$ $\eta$ $\theta$ $\iota$ $\kappa$
+$\lambda$ $\mu$ $\nu$ $\xi$ $\omicron$ $\pi$ $\rho$ $\sigma$ $\tau$ $\upsilon$ $\phi$ $\chi$ $\psi$
+$\omega$
+
+Uppercase: $\Gamma$ $\Delta$ $\Theta$ $\Lambda$ $\Xi$ $\Pi$ $\Sigma$ $\Phi$ $\Psi$ $\Omega$
+
+Variants: $\varepsilon$ $\vartheta$ $\varrho$ $\varsigma$ $\varphi$
+
+== Superscripts and Subscripts
+
+Simple: $x^2$ $x_i$ $x_i^2$
+
+Multiple: $x^{2n}$ $e^{i\pi}$ $a_{ij}$ $x^{2}_{i}$
+
+Combined: $\int_0^1$ $\sum_{i=1}^n$ $\prod_{i=1}^\infty$
+
+== Fractions
+
+Simple: $\frac{1}{2}$ $\frac{a}{b}$ $\frac{x+1}{x-1}$
+
+Nested: $\frac{\frac{1}{2}}{3}$ $\frac{x^{\frac{1}{2}}}{y}$
+
+Display:
+
+$$
+\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+$$
+
+== Integrals, Sums, and Products
+
+Integrals:
+
+$$
+\int_0^\infty e^{-x^2} \, dx = \frac{\sqrt{\pi}}{2}
+$$
+
+$$
+\oint_C \vec{F} \cdot d\vec{r}
+$$
+
+$$
+\iint_S f \, dS \qquad \iiint_V g \, dV
+$$
+
+Sums and products:
+
+$$
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+$$
+
+$$
+\prod_{k=1}^{n} \frac{k}{k+1} = \frac{1}{n+1}
+$$
+
+$$
+\coprod_{i \in I} G_i
+$$
+
+== Roots
+
+Square: $\sqrt{2}$ $\sqrt{x}$ $\sqrt{x^2 + y^2}$
+
+Nested: $\sqrt{\frac{a}{b}}$ $\sqrt{\sqrt{x}}$
+
+== Operators
+
+Arithmetic: $a \times b$ $a \div b$ $a \pm b$ $a \mp b$ $a \cdot b$ $a \circ b$ $a \ast b$ $a \star
+b$
+
+Matrix-style: $A \otimes B$ $A \oplus B$ $A \ominus B$ $A \oslash B$ $A \odot B$
+
+== Relations
+
+Equality: $a \equiv b$ $a \approx b$ $a \sim b$ $a \simeq b$ $a \cong b$ $a \propto b$
+
+Inequality: $a \neq b$ $a \le b$ $a \ge b$ $a \ll b$ $a \gg b$ $a \prec b$ $a \succ b$
+
+Ordering: $a \preceq b$ $a \succeq b$
+
+$$
+\epsilon \ll 1 \quad \text{implies} \quad \epsilon^2 \approx 0
+$$
+
+== Set Theory
+
+Containment: $A \subset B$ $A \supset B$ $A \subseteq B$ $A \supseteq B$
+
+Operations: $A \cap B$ $A \cup B$ $A \setminus B$
+
+Elements: $x \in X$ $x \notin Y$ $X \ni x$
+
+Empty set: $\emptyset$ $\varnothing$
+
+$$
+\mathbb{N} \subset \mathbb{Z} \subset \mathbb{Q} \subset \mathbb{R} \subset \mathbb{C}
+$$
+
+== Arrows
+
+Single: $\rightarrow$ $\leftarrow$ $\uparrow$ $\downarrow$ $\leftrightarrow$
+
+Double: $\Rightarrow$ $\Leftarrow$ $\Leftrightarrow$
+
+Mapping: $\mapsto$
+
+Logical: $\implies$ $\iff$
+
+$$
+x \rightarrow \infty \implies \frac{1}{x} \rightarrow 0
+$$
+
+== Logical Symbols
+
+Quantifiers: $\forall x \in \mathbb{R}$ $\exists y > 0$ $\nexists$ such that $y < 0$
+
+Connectives: $P \land Q$ $P \lor Q$ $\neg P$
+
+Truth: $\top$ $\bot$
+
+Proof theory: $\Gamma \vdash P$ $\mathcal{M} \models \phi$
+
+== Functions and Operators
+
+Trigonometric: $\sin x$ $\cos x$ $\tan x$ $\cot x$ $\sec x$ $\csc x$
+
+Inverse: $\arcsin x$ $\arccos x$ $\arctan x$
+
+Hyperbolic: $\sinh x$ $\cosh x$ $\tanh x$
+
+Logarithms: $\log x$ $\ln x$ $\exp(x)$
+
+Calculus: $\frac{\partial f}{\partial x}$ $\nabla f$ $\dim V$ $\det A$ $\ker T$ $\hom(G, H)$
+$\gcd(a, b)$
+
+Limits: $\lim_{x \to 0} \frac{\sin x}{x} = 1$
+
+$$
+\lim_{n \to \infty} \left(1 + \frac{1}{n}\right)^n = e
+$$
+
+== Calculus and Analysis
+
+Derivative:
+
+$$
+\frac{d}{dx} \int_a^x f(t) \, dt = f(x)
+$$
+
+Partial derivatives:
+
+$$
+\frac{\partial^2 f}{\partial x \partial y}
+$$
+
+Gradient and Laplacian:
+
+$$
+\nabla \cdot \vec{F} = \frac{\partial F_x}{\partial x} + \frac{\partial F_y}{\partial y}
+$$
+
+$$
+\nabla^2 \phi = \frac{\partial^2 \phi}{\partial x^2} + \frac{\partial^2 \phi}{\partial y^2}
+$$
+
+== Famous Equations
+
+Euler's identity:
+
+$$
+e^{i\pi} + 1 = 0
+$$
+
+Pythagorean theorem:
+
+$$
+a^2 + b^2 = c^2
+$$
+
+Quadratic formula:
+
+$$
+x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+$$
+
+Einstein's mass-energy equivalence:
+
+$$
+E = mc^2
+$$
+
+== Accents and Decorations
+
+Hat: $\hat{x}$ $\hat{\theta}$
+
+Tilde: $\tilde{x}$ $\tilde{\mu}$
+
+Bar: $\bar{x}$ $\bar{z}$
+
+Dot: $\dot{x}$
+
+Double dot: $\ddot{x}$ $\ddot{\theta}$
+
+Vector: $\vec{v}$ $\vec{F}$
+
+$$
+\dot{\vec{r}} = \frac{d\vec{r}}{dt}
+$$
+
+== Text in Math
+
+$$
+\{x \in \mathbb{R} \mid x > 0 \quad \text{and} \quad x < 1\}
+$$
+
+$$
+\text{Area} = \pi r^2 \quad \text{for} \quad r \geq 0
+$$
+
+$$
+f(x) = \begin{cases}
+x^2 & \text{if } x \geq 0 \\
+-x^2 & \text{if } x < 0
+\end{cases}
+$$
+
+== Combined Block
+
+A comprehensive demonstration:
+
+$$
+\forall \epsilon > 0 \; \exists \delta > 0 \quad \text{such that} \quad
+|x - a| < \delta \implies |f(x) - f(a)| < \epsilon
+$$
+
+$$
+\int_{-\infty}^{\infty} \frac{1}{\sqrt{2\pi\sigma^2}}
+\exp\left(-\frac{(x - \mu)^2}{2\sigma^2}\right) dx = 1
+$$
+
+$$
+\sum_{k=0}^{\infty} \frac{(-1)^k}{(2k+1)!} x^{2k+1}
+= x - \frac{x^3}{3!} + \frac{x^5}{5!} - \cdots
+= \sin x
+$$
+
+$$
+\frac{\partial u}{\partial t} = \alpha \nabla^2 u
+\quad \text{(heat equation)}
+$$
+
+$$
+\hat{\beta} = (X^{\top} X)^{-1} X^{\top} y
+\quad \text{where} \quad
+X \in \mathbb{R}^{n \times p}
+$$
+
+== Inline Mixed
+
+Vell supports all of this inline too: $\int_a^b f(x)\,dx$, $\sum_{i=1}^n i = \frac{n(n+1)}{2}$,
+$\forall \epsilon > 0$, $\alpha \neq \beta \implies \alpha \prec \beta \lor \beta \prec \alpha$,
+$\emptyset \subset A \subseteq B$, $\dot{x} = \frac{dx}{dt}$, $\vec{v} = \langle v_x, v_y, v_z
+\rangle$, $\lim_{x \to 0} \frac{\sin x}{x} = 1$, $e^{i\pi} + 1 = 0$, $\frac{\partial f}{\partial x}
+= 2x$.
+
+That's the full breadth of LaTeX math that Vell can handle.

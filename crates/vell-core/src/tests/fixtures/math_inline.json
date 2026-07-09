@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [
+        {
+          "type": "Text",
+          "value": "Inline ",
+          "span": {
+            "start": 0,
+            "end": 7
+          }
+        },
+        {
+          "type": "MathInline",
+          "source": "x",
+          "span": {
+            "start": 7,
+            "end": 10
+          }
+        },
+        {
+          "type": "Text",
+          "value": " and ",
+          "span": {
+            "start": 10,
+            "end": 15
+          }
+        },
+        {
+          "type": "MathInline",
+          "source": "y+1",
+          "span": {
+            "start": 15,
+            "end": 20
+          }
+        },
+        {
+          "type": "Text",
+          "value": " and ",
+          "span": {
+            "start": 20,
+            "end": 25
+          }
+        },
+        {
+          "type": "MathInline",
+          "source": "a^2+b^2=c^2",
+          "span": {
+            "start": 25,
+            "end": 38
+          }
+        },
+        {
+          "type": "Text",
+          "value": ".",
+          "span": {
+            "start": 38,
+            "end": 39
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 41
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 41
+  }
+}

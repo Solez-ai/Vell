@@ -1,0 +1,55 @@
+= Interactive
+
+@var count = 0
+@var items = [1, 2, 3]
+@var name = "World"
+@var dark_mode = false
+@var selected = "Option B"
+
+Count: @{count}
+
+@[Slider](min=0 max=100 bind=count label="Count")
+
+== Live Binding Demos
+
+=== Text Input
+
+@[Input](type=text bind=name label="Enter your name:")
+
+Hello, @{name}
+
+=== Checkbox
+
+@[Checkbox](bind=dark_mode label="Enable dark mode")
+
+Dark mode is: @{dark_mode}
+
+=== Dropdown
+
+@[Select](bind=selected label="Pick an option:") {
+  Option A
+  Option B
+  Option C
+}
+
+You selected: @{selected}
+
+== Data-Driven Content
+
+@var items = ["Apples", "Bananas", "Cherries", "Dates"]
+
+=== For Loop Demo
+
+@for item in @{items} {
+  - @{item}
+}
+
+=== Conditional
+
+@var score = 75
+
+@if @{score} >= 50 {
+  Score is @{score} — passing.
+} else {
+  Score is @{score} — failing.
+}

@@ -1,0 +1,13 @@
+[package]
+name = "vell-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Command-line interface for the Vell markup language: parse, format, render, and validate .vl files."
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde_json.workspace = true
+vell-core = { path = "../vell-core" }
+vell-fmt = { path = "../vell-fmt" }

@@ -1,0 +1,4 @@
+{
+  "error_kind": "MalformedTable",
+  "message_contains": "Pipe table row has 3 cells, but the header has 2 cells."
+}

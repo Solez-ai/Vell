@@ -1,0 +1,133 @@
+@[Meta](author="Samin Yeasar" date="2026-07-03" title="Phase 8: Professional Math")
+
+= Professional Math in Vell
+
+This document demonstrates Vell's Phase 8 math engine: numbered equations, theorem environments, and
+math environment directives.
+
+== Numbered Equations
+
+A simple numbered equation with a label:
+
+@[Equation](label="e:mass-energy" source="E = mc^2")
+
+An unlabeled equation still gets a number:
+
+@[Equation](source="\\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}")
+
+Multiple equations auto-increment:
+
+@[Equation](label="e:pythagoras" source="a^2 + b^2 = c^2")
+
+== Theorem Environments
+
+@[Theorem](label="thm:pythagoras" name="Pythagoras") {
+  For any right triangle with legs *a*, *b* and hypotenuse *c*:
+
+  $$
+  a^2 + b^2 = c^2
+  $$
+}
+
+@[Proof]() {
+  Consider a square of side *a* + *b*. Its area is (a + b)(a + b). Arrange four copies of the triangle
+  inside. The remaining area equals c sup 2. But (a + b)(a + b) expands to a-squared + 2ab +
+  b-squared, and the four triangles have area 2ab. Therefore c-squared equals a-squared + b-squared.
+}
+
+@[Lemma](name="Triangle Inequality") {
+  For any triangle with sides *a*, *b*, *c*:
+
+  $$
+  a + b \\geq c
+  $$
+
+  with equality only in the degenerate case.
+}
+
+@[Corollary](name="Reverse Triangle Inequality") {
+  For any triangle with sides *a*, *b*, *c*:
+
+  $$
+  |a - b| \\leq c
+  $$
+}
+
+@[Definition](name="Prime Number") {
+  A natural number *p* > 1 is *prime* if its only positive divisors are 1 and *p* itself.
+}
+
+@[Example]() {
+  The prime numbers less than 20 are:
+
+  $$
+  2, 3, 5, 7, 11, 13, 17, 19
+  $$
+}
+
+@[Remark]() {
+  The number 1 is neither prime nor composite by convention.
+}
+
+@[Axiom](name="Euclid's Fifth Postulate") {
+  If a line segment intersects two straight lines forming two interior angles on the same side that
+  sum to less than two right angles, then the two lines, if extended indefinitely, meet on that side.
+}
+
+@[Conjecture](name="Goldbach's Conjecture") {
+  Every even integer greater than 2 can be expressed as the sum of two primes.
+}
+
+@[Proposition](name="Sum of First n Naturals") {
+  For any positive integer *n*:
+
+  $$
+  \\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}
+  $$
+}
+
+== Align Environment
+
+@[Align](source="(a + b)^2 &= a^2 + 2ab + b^2 \\\\ (a - b)^2 &= a^2 - 2ab + b^2") {
+  The align environment supports multi-line equations.
+}
+
+== Matrix Environment
+
+@[PMatrix](source="\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}") {
+  A matrix with parentheses delimiters.
+}
+
+== Cases Environment
+
+@[Cases](source="f(x) = \\begin{cases} x^2 & \\text{if } x \\geq 0 \\\\ -x^2 & \\text{if } x < 0 \\end{cases}") {
+  A piecewise function definition.
+}
+
+== Combined Usage
+
+@[Theorem](label="thm:ftc" name="Fundamental Theorem of Calculus") {
+  Let *f* be a continuous real-valued function on an interval. Then:
+
+  @[Equation](source="\\frac{d}{dx} \\int_a^x f(t) \\, dt = f(x)")
+
+  @[Equation](source="\\int_a^b f(x) \\, dx = F(b) - F(a)")
+}
+
+@[Proof]() {
+  By the definition of the derivative and the first fundamental theorem:
+
+  @[Equation](source="F'(x) = \\lim_{h \\to 0} \\frac{1}{h} \\int_x^{x+h} f(t) \\, dt = f(x)")
+}
+
+== Cross-References
+
+Reference equation @[Ref](label="e:mass-energy") (the mass-energy equivalence) and equation
+@[Ref](label="e:pythagoras") (the Pythagorean theorem).
+
+Theorem @[Ref](label="thm:pythagoras") proves the same relationship, while @[Ref](label="thm:ftc")
+connects differentiation and integration.
+
+> [!NOTE]
+> Cross-references resolve labels like `e:mass-energy` and `thm:pythagoras` to their numbered targets
+> automatically.

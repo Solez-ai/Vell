@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [
+        {
+          "type": "Text",
+          "value": "Inline ",
+          "span": {
+            "start": 0,
+            "end": 7
+          }
+        },
+        {
+          "type": "MathInline",
+          "source": "x+1",
+          "span": {
+            "start": 7,
+            "end": 12
+          }
+        },
+        {
+          "type": "Text",
+          "value": ".",
+          "span": {
+            "start": 12,
+            "end": 13
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 15
+      }
+    },
+    {
+      "type": "MathBlock",
+      "source": "y = mx + b",
+      "span": {
+        "start": 17,
+        "end": 37
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 37
+  }
+}

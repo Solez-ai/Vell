@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Table",
+      "headers": [
+        {
+          "children": [
+            {
+              "type": "Text",
+              "value": "A",
+              "span": {
+                "start": 1,
+                "end": 2
+              }
+            }
+          ],
+          "colspan": 1,
+          "rowspan": 1,
+          "align": null,
+          "span": {
+            "start": 1,
+            "end": 4
+          }
+        },
+        {
+          "children": [
+            {
+              "type": "Text",
+              "value": "B",
+              "span": {
+                "start": 5,
+                "end": 6
+              }
+            }
+          ],
+          "colspan": 1,
+          "rowspan": 1,
+          "align": null,
+          "span": {
+            "start": 5,
+            "end": 8
+          }
+        }
+      ],
+      "rows": [
+        [
+          {
+            "children": [
+              {
+                "type": "Text",
+                "value": "1",
+                "span": {
+                  "start": 23,
+                  "end": 24
+                }
+              }
+            ],
+            "colspan": 1,
+            "rowspan": 1,
+            "align": null,
+            "span": {
+              "start": 23,
+              "end": 26
+            }
+          },
+          {
+            "children": [
+              {
+                "type": "Text",
+                "value": "2",
+                "span": {
+                  "start": 27,
+                  "end": 28
+                }
+              }
+            ],
+            "colspan": 1,
+            "rowspan": 1,
+            "align": null,
+            "span": {
+              "start": 27,
+              "end": 30
+            }
+          }
+        ]
+      ],
+      "span": {
+        "start": 0,
+        "end": 33
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 33
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@vell-lang/extensions",
+  "version": "0.1.0",
+  "author": "Samin Yeasar",
+  "license": "AGPL-3.0-or-later",
+  "description": "Built-in extension library for Vell documents — YouTube, Chart, Mermaid, Callout, and more",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@vell-lang/renderer-html": "^0.1.0"
+  }
+}

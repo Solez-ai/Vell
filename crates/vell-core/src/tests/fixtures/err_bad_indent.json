@@ -1,0 +1,4 @@
+{
+  "error_kind": "UnexpectedToken",
+  "message_contains": "Variable declarations require '='."
+}

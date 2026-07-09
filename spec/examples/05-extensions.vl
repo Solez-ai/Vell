@@ -1,0 +1,9 @@
+= Extensions
+
+@[Figure](src="plot.png" alt="Plot" caption="A plot")
+
+@[Layout](columns=2) {
+  Left column.
+}
+
+@[myorg/CustomWidget](data=@{count})

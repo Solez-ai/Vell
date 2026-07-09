@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "Blockquote",
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [
+            {
+              "type": "Text",
+              "value": "Be careful.",
+              "span": {
+                "start": 0,
+                "end": 11
+              }
+            }
+          ],
+          "span": {
+            "start": 0,
+            "end": 12
+          }
+        }
+      ],
+      "admonition_type": "WARNING",
+      "span": {
+        "start": 0,
+        "end": 29
+      }
+    },
+    {
+      "type": "Blockquote",
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [
+            {
+              "type": "Text",
+              "value": "A tip.",
+              "span": {
+                "start": 0,
+                "end": 6
+              }
+            }
+          ],
+          "span": {
+            "start": 0,
+            "end": 7
+          }
+        }
+      ],
+      "admonition_type": "TIP",
+      "span": {
+        "start": 31,
+        "end": 51
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 51
+  }
+}

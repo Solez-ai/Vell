@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "type": "FootnoteDefinition",
+      "marker": "one",
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [
+            {
+              "type": "Text",
+              "value": "First footnote.",
+              "span": {
+                "start": 0,
+                "end": 15
+              }
+            }
+          ],
+          "span": {
+            "start": 0,
+            "end": 25
+          }
+        }
+      ],
+      "span": {
+        "start": 0,
+        "end": 25
+      }
+    },
+    {
+      "type": "FootnoteDefinition",
+      "marker": "two",
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [
+            {
+              "type": "Text",
+              "value": "Second footnote.",
+              "span": {
+                "start": 25,
+                "end": 41
+              }
+            }
+          ],
+          "span": {
+            "start": 25,
+            "end": 51
+          }
+        }
+      ],
+      "span": {
+        "start": 25,
+        "end": 51
+      }
+    },
+    {
+      "type": "Paragraph",
+      "children": [
+        {
+          "type": "Text",
+          "value": "Text with ref",
+          "span": {
+            "start": 51,
+            "end": 64
+          }
+        },
+        {
+          "type": "FootnoteRef",
+          "marker": "one",
+          "span": {
+            "start": 64,
+            "end": 70
+          }
+        },
+        {
+          "type": "Text",
+          "value": ".",
+          "span": {
+            "start": 70,
+            "end": 71
+          }
+        }
+      ],
+      "span": {
+        "start": 51,
+        "end": 73
+      }
+    }
+  ],
+  "metadata": {
+    "title": null,
+    "author": null,
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "span": {
+    "start": 0,
+    "end": 73
+  }
+}

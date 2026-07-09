@@ -1,0 +1,4 @@
+{
+  "error_kind": "MalformedDirective",
+  "message_contains": "Directive name is missing closing ']'."
+}

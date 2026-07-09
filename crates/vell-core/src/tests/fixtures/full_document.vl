@@ -1,0 +1,5 @@
+= Full
+
+@var count = 1
+
+Text @{count}.

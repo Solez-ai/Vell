@@ -1,0 +1,14 @@
+= Basic Vell
+
+This is a paragraph with *bold*, /italic/, [a link](https://example.com), and ![alt](image.png).
+
+- First item
+- Second item
+
+> A quoted paragraph.
+
+```rust
+fn main() {}
+```
+
+---

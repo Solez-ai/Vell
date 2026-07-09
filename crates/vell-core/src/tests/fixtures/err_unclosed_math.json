@@ -1,0 +1,4 @@
+{
+  "error_kind": "MalformedMath",
+  "message_contains": "Unterminated inline delimiter '$'."
+}

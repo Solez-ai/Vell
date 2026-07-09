@@ -1,0 +1,21 @@
+Document <- Block* EOF
+Block <- BlankLine* (Heading / Admonition / Blockquote / CodeFence / MathBlock / GridTable / PipeTable / HRule / OrderedList / UnorderedList / DefList / VarDecl / ForLoop / IfBlock / Directive / FootnoteDef / RefDef / Paragraph) BlankLine*
+Heading <- '='+ ' ' InlineLine NEWLINE
+Admonition <- '>' ' ' '[!' [A-Z]+ ']' NEWLINE ('>' ' ' InlineLine NEWLINE)*
+Blockquote <- ('>' '>'? ' '? InlineLine NEWLINE)+
+CodeFence <- '```' LangId? NEWLINE (!'```' AnyLine)* '```' NEWLINE
+MathBlock <- '$$' NEWLINE (!'$$' AnyLine)* '$$' NEWLINE
+GridTable <- GridBorder (GridRow GridBorder)+
+PipeTable <- PipeRow PipeSep PipeRow*
+HRule <- '---' '-'* NEWLINE
+OrderedList <- (Digit+ '.' ' ' ListItemBody NEWLINE)+
+UnorderedList <- ('-' ' ' ListItemBody NEWLINE)+
+DefList <- ('::' ' ' InlineLine NEWLINE INDENT AnyLine+ DEDENT)+
+VarDecl <- '@var' ' ' Ident ' '* '=' ' '* JsonValue NEWLINE
+ForLoop <- '@for' ' ' Ident ' ' 'in' ' ' VarRef ' ' '{' NEWLINE Block+ '}' NEWLINE
+IfBlock <- '@if' ' ' Expr ' ' '{' NEWLINE Block+ '}' (' else {' NEWLINE Block+ '}')? NEWLINE
+Directive <- '@[' DirectiveName '](' Props ')' (' ' '{' NEWLINE Block+ '}' )?
+RefDef <- '[' RefId ']:' ' ' URL Title? NEWLINE
+FootnoteDef <- '[^' Marker ']:' ' ' InlineLine NEWLINE
+Paragraph <- InlineLine (InlineLine)* NEWLINE
+Inline <- Bold / Italic / Underline / Strike / Code / Super / Sub / MathInline / VarRef / InlineComp / Citation / FootnoteRef / Link / LinkRef / Image / ImageRef / Text

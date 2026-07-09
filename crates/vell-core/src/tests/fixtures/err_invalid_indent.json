@@ -1,0 +1,4 @@
+{
+  "error_kind": "InvalidIndentation",
+  "message_contains": "List item indentation of 3 spaces is not a multiple of 2."
+}

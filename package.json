@@ -1,0 +1,19 @@
+{
+  "name": "vell-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "author": "Samin Yeasar",
+  "license": "AGPL-3.0-or-later",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

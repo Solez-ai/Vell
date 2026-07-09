@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "crates/vell-core",
+    "crates/vell-wasm",
+    "crates/vell-fmt",
+    "crates/vell-lsp",
+    "crates/vell-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+authors = ["Samin Yeasar"]
+repository = "https://example.invalid/vell"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+wasm-bindgen = "0.2"
+tower-lsp = "0.20"

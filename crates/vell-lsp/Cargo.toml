@@ -1,0 +1,13 @@
+[package]
+name = "vell-lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "sync", "fs"] }
+tower-lsp.workspace = true
+vell-core = { path = "../vell-core" }
+vell-fmt = { path = "../vell-fmt" }
+serde_json.workspace = true

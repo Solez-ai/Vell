@@ -1,0 +1,4 @@
+{
+  "error_kind": "InvalidPropValue",
+  "message_contains": "Property 'true' is missing '='."
+}
