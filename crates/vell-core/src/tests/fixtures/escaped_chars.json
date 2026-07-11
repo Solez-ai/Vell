@@ -23,7 +23,7 @@
       ],
       "span": {
         "start": 0,
-        "end": 9
+        "end": 8
       }
     },
     {
@@ -33,22 +33,22 @@
           "type": "Text",
           "value": "/",
           "span": {
-            "start": 11,
-            "end": 13
+            "start": 9,
+            "end": 11
           }
         },
         {
           "type": "Text",
           "value": " safe",
           "span": {
-            "start": 13,
-            "end": 18
+            "start": 11,
+            "end": 16
           }
         }
       ],
       "span": {
-        "start": 11,
-        "end": 20
+        "start": 9,
+        "end": 17
       }
     },
     {
@@ -58,22 +58,22 @@
           "type": "Text",
           "value": "_",
           "span": {
-            "start": 22,
-            "end": 24
+            "start": 18,
+            "end": 20
           }
         },
         {
           "type": "Text",
           "value": " safe",
           "span": {
-            "start": 24,
-            "end": 29
+            "start": 20,
+            "end": 25
           }
         }
       ],
       "span": {
-        "start": 22,
-        "end": 31
+        "start": 18,
+        "end": 26
       }
     },
     {
@@ -83,22 +83,22 @@
           "type": "Text",
           "value": "~",
           "span": {
-            "start": 33,
-            "end": 35
+            "start": 27,
+            "end": 29
           }
         },
         {
           "type": "Text",
           "value": " safe",
           "span": {
-            "start": 35,
-            "end": 40
+            "start": 29,
+            "end": 34
           }
         }
       ],
       "span": {
-        "start": 33,
-        "end": 42
+        "start": 27,
+        "end": 35
       }
     },
     {
@@ -108,22 +108,22 @@
           "type": "Text",
           "value": "`",
           "span": {
-            "start": 44,
-            "end": 46
+            "start": 36,
+            "end": 38
           }
         },
         {
           "type": "Text",
           "value": " safe",
           "span": {
-            "start": 46,
-            "end": 51
+            "start": 38,
+            "end": 43
           }
         }
       ],
       "span": {
-        "start": 44,
-        "end": 53
+        "start": 36,
+        "end": 44
       }
     },
     {
@@ -133,22 +133,22 @@
           "type": "Text",
           "value": "$",
           "span": {
-            "start": 55,
-            "end": 57
+            "start": 45,
+            "end": 47
           }
         },
         {
           "type": "Text",
           "value": " safe",
           "span": {
-            "start": 57,
-            "end": 62
+            "start": 47,
+            "end": 52
           }
         }
       ],
       "span": {
-        "start": 55,
-        "end": 64
+        "start": 45,
+        "end": 53
       }
     },
     {
@@ -158,22 +158,22 @@
           "type": "Text",
           "value": "\\",
           "span": {
-            "start": 66,
-            "end": 68
+            "start": 54,
+            "end": 56
           }
         },
         {
           "type": "Text",
           "value": " safe",
           "span": {
-            "start": 68,
-            "end": 73
+            "start": 56,
+            "end": 61
           }
         }
       ],
       "span": {
-        "start": 66,
-        "end": 75
+        "start": 54,
+        "end": 62
       }
     }
   ],
@@ -186,6 +186,6 @@
   },
   "span": {
     "start": 0,
-    "end": 75
+    "end": 62
   }
 }

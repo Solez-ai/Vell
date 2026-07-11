@@ -5,14 +5,14 @@
       "type": "HorizontalRule",
       "span": {
         "start": 0,
-        "end": 5
+        "end": 4
       }
     },
     {
       "type": "HorizontalRule",
       "span": {
         "start": 5,
-        "end": 12
+        "end": 9
       }
     }
   ],
@@ -25,6 +25,6 @@
   },
   "span": {
     "start": 0,
-    "end": 12
+    "end": 9
   }
 }

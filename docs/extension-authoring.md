@@ -38,6 +38,10 @@
 11. [Versioning and Compatibility](#11-versioning-and-compatibility)
 12. [Plugin Hooks Reference](#12-plugin-hooks-reference)
 13. [Template System Reference](#13-template-system-reference)
+14. [Testing Extensions](#14-testing-extensions)
+15. [Debugging Tips](#15-debugging-tips)
+16. [Counter Extension Example](#16-counter-extension-example)
+17. [Progress Bar Extension Example](#17-progress-bar-extension-example)
 
 ---
 
@@ -99,6 +103,16 @@ The extension system has four layers:
 2. **Renderers opt in.** Each renderer decides which extensions to support. Unknown extensions get fallback rendering.
 3. **Properties are typed.** The `PropValue` type supports strings, numbers, booleans, null, and variable references.
 4. **Bodies are nested documents.** Extension block bodies are parsed as full Vell documents, supporting arbitrary nesting.
+
+### Extension Lifecycle
+
+An extension goes through these stages during a document's lifecycle:
+
+1. **Authoring:** User writes `@[org/Name](props) { body }` in a `.vl` file.
+2. **Parsing:** The parser creates an `Extension` node with `name`, `props`, `children`, and `raw_source`.
+3. **Pre-processing (optional):** Some extensions may transform the AST before rendering (e.g., resolving external data).
+4. **Rendering:** A renderer adapter transforms the `Extension` node into output format.
+5. **Post-processing (future):** Extensions may modify rendered output (e.g., injecting scripts).
 
 ---
 
@@ -162,7 +176,7 @@ Extensions can include braced block bodies that contain nested Vell content:
 ```vell
 @[npm/callout](type=warning) {
   This is a warning message with **bold** text.
-  
+
   It can contain multiple paragraphs.
 }
 ```
@@ -237,7 +251,7 @@ function renderChart(node: VellNode, ctx: ExtensionContext): string {
   const props = node.props ?? {};
   const type = String(props.type ?? "bar");
   const data = String(props.data ?? "[]");
-  
+
   // Generate chart HTML
   return `<div class="chart chart-${ctx.escapeHtml(type)}" data-data="${ctx.escapeHtml(data)}"></div>`;
 }
@@ -288,11 +302,11 @@ interface ExtensionAdapter {
 
 class Renderer {
   private adapters: Map<string, ExtensionAdapter> = new Map();
-  
+
   use(adapter: ExtensionAdapter): void {
     this.adapters.set(adapter.name, adapter);
   }
-  
+
   private renderExtension(node: Node): void {
     const adapter = this.adapters.get(node.name ?? "");
     if (adapter) {
@@ -531,7 +545,7 @@ In this example, renderers that don't support `npm/chart` will still render the 
 **HTML renderer output:**
 ```html
 <div class="vell-extension" data-name="embed/YouTube">
-  <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" 
+  <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
     frameborder="0" allowfullscreen title="YouTube video"></iframe>
   <div class="vell-extension-fallback">A very informative video.</div>
 </div>
@@ -786,6 +800,363 @@ Multiple `@[Template]` directives can be used in a single document. They are app
 2. Use `style` for document-specific overrides
 3. Combine `@[Template]` with `@[Theme]` for complex theming
 4. Templates affect only the HTML output; PDF/slides respect their own styling
+
+---
+
+## 14. Testing Extensions
+
+Thorough testing ensures your extension works across different renderers and edge cases.
+
+### Unit Testing
+
+Test individual extension components in isolation:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { MyExtension } from "./my-extension";
+import { createExtensionContext } from "@vell-lang/extensions";
+
+describe("MyExtension", () => {
+  it("renders with required properties", () => {
+    const node = {
+      type: "Extension",
+      name: "myorg/Widget",
+      props: { data: 42 },
+      children: [],
+    };
+    const ctx = createExtensionContext();
+    const result = MyExtension.render(node, ctx);
+    expect(result).toContain("data=\"42\"");
+  });
+
+  it("uses default values for optional properties", () => {
+    const node = {
+      type: "Extension",
+      name: "myorg/Widget",
+      props: {},
+      children: [],
+    };
+    const ctx = createExtensionContext();
+    const result = MyExtension.render(node, ctx);
+    expect(result).toContain("default");
+  });
+
+  it("escapes HTML in user-supplied property values", () => {
+    const node = {
+      type: "Extension",
+      name: "myorg/Widget",
+      props: { title: "<script>alert('xss')</script>" },
+      children: [],
+    };
+    const ctx = createExtensionContext();
+    const result = MyExtension.render(node, ctx);
+    expect(result).not.toContain("<script>");
+    expect(result).toContain("&lt;script&gt;");
+  });
+});
+```
+
+### Integration Testing
+
+Test extension rendering within a full document:
+
+```typescript
+import { parse } from "vell-js";
+import { render } from "@vell-lang/renderer-html";
+import { register, renderExtension } from "@vell-lang/extensions";
+import { MyExtension } from "./my-extension";
+
+describe("MyExtension integration", () => {
+  it("renders correctly in a complete document", () => {
+    register(MyExtension);
+    const source = `= Test\n\n@[myorg/Widget](data=42) {\n  Fallback content\n}`;
+    const ast = parse(source);
+    const html = render(ast);
+    expect(html).toContain("myorg/Widget");
+    expect(html).toContain("data=\"42\"");
+  });
+});
+```
+
+### Test Fixtures
+
+Create `.vl` fixture files for manual and automated testing:
+
+```vell
+# tests/fixtures/widget-basic.vl
+= Widget Test
+
+@[myorg/Widget](data=42) {
+  This is fallback content.
+}
+```
+
+Run all fixtures through your renderer and verify output:
+
+```bash
+# For each fixture, parse and render
+vell parse tests/fixtures/widget-basic.vl > /tmp/ast.json
+# Then pipe AST to your custom renderer
+```
+
+### Test Checklist
+
+- [ ] Extension renders with all required properties
+- [ ] Extension uses default values for missing optional properties
+- [ ] Extension sanitizes URLs and escapes HTML in user input
+- [ ] Fallback content is rendered when the extension is not supported
+- [ ] Extension handles null/undefined property values gracefully
+- [ ] Extension produces valid HTML5 output
+- [ ] Body content with nested Vell markup renders correctly
+- [ ] Multiple instances of the extension in one document work independently
+- [ ] Extension works with both self-closing and body syntax
+
+---
+
+## 15. Debugging Tips
+
+### Inspect the AST
+
+Use `vell parse` to see how your extension is represented in the AST:
+
+```bash
+vell parse my-document.vl | jq '.children[] | select(.type == "Extension")'
+```
+
+This will show the full `Extension` node with `name`, `props`, `children`, and `span`.
+
+### Check Property Values
+
+Verify that property values are parsed correctly:
+
+```bash
+vell parse my-document.vl | jq '.children[] | select(.type == "Extension") | .props'
+```
+
+### Validate HTML Output
+
+Use the W3C HTML validator to check your extension's output:
+
+```bash
+vell render html my-document.vl > output.html
+# Paste output.html content into https://validator.w3.org/
+```
+
+### Log Extension Dispatch
+
+Add logging to your extension adapter to trace when it's called:
+
+```typescript
+const Chart: ExtensionAdapter = {
+  name: "npm/chart",
+  render(node, ctx) {
+    console.debug(`[Chart] Rendering with props:`, node.props);
+    // ... render logic ...
+  },
+};
+```
+
+### Common Issues
+
+| Issue | Likely Cause | Solution |
+|-------|-------------|----------|
+| Extension not rendering | Extension not registered | Call `register(MyExtension)` before rendering |
+| Wrong property value | Property name mismatch | Check exact property name in source vs. adapter |
+| HTML not escaping | Missing `escapeHtml` call | Wrap all user-supplied strings with `ctx.escapeHtml()` |
+| Fallback not showing | No body content provided | Add descriptive body content to the extension |
+| LSP not showing hover docs | Extension docs not registered | Add entry to the extension docs map in LSP handler |
+
+---
+
+## 16. Counter Extension Example
+
+A complete, runnable extension that renders an auto-incrementing counter, useful for numbered steps or sections.
+
+### Source Syntax
+
+```vell
+@[npm/counter](start=10 step=5) {
+  Step content here.
+}
+```
+
+### Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `start` | number | No | `1` | Starting counter value |
+| `step` | number | No | `1` | Increment between counters |
+| `format` | string | No | `"decimal"` | Output format: `decimal`, `roman` (lowercase), `ROMAN` (uppercase), `alpha` (a, b, c...) |
+
+### HTML Adapter
+
+```typescript
+import { ExtensionAdapter, ExtensionContext, VellNode } from "@vell-lang/extensions";
+
+let counterState = new Map<string, number>();
+
+function renderCounter(node: VellNode, ctx: ExtensionContext): string {
+  const props = node.props ?? {};
+  const start = Number(props.start ?? 1);
+  const step = Number(props.step ?? 1);
+  const format = String(props.format ?? "decimal");
+
+  // Get or initialize counter for this document
+  const key = node.span ? `${node.span.start}` : Math.random().toString();
+  if (!counterState.has(key)) {
+    counterState.set(key, start);
+  }
+  const current = counterState.get(key)!;
+  counterState.set(key, current + step);
+
+  // Format the number
+  let display: string;
+  switch (format) {
+    case "roman":
+      display = toRoman(current).toLowerCase();
+      break;
+    case "ROMAN":
+      display = toRoman(current);
+      break;
+    case "alpha":
+      display = String.fromCharCode(96 + current); // a, b, c, ...
+      break;
+    default:
+      display = String(current);
+  }
+
+  // Render children as fallback
+  const childrenHtml = (node.children ?? [])
+    .map((child) => renderNode(child, ctx))
+    .join("");
+
+  return `<div class="vell-counter" data-value="${ctx.escapeHtml(display)}">
+    <span class="counter-number">${ctx.escapeHtml(display)}.</span>
+    <span class="counter-body">${childrenHtml}</span>
+  </div>`;
+}
+
+export const Counter: ExtensionAdapter = {
+  name: "npm/counter",
+  description: "Auto-incrementing step counter",
+  schema: {
+    start: { type: "number", default: 1 },
+    step: { type: "number", default: 1 },
+    format: { type: "string", default: "decimal" },
+  },
+  render: renderCounter,
+};
+```
+
+### Usage Example
+
+```vell
+= Project Plan
+
+== Phase 1
+
+@[npm/counter] {
+  Research and gather requirements.
+}
+
+@[npm/counter] {
+  Design the system architecture.
+}
+
+== Phase 2
+
+@[npm/counter](start=10) {
+  Implement core features.
+}
+
+@[npm/counter](step=2) {
+  Write documentation. (Counter: 12)
+}
+```
+
+---
+
+## 17. Progress Bar Extension Example
+
+A visual progress bar extension that renders a colored, percentage-based progress bar.
+
+### Source Syntax
+
+```vell
+@[npm/progress](value=75 max=100 color=green)
+```
+
+### Properties
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `value` | number | Yes | — | Current progress value |
+| `max` | number | No | `100` | Maximum progress value |
+| `color` | string | No | `blue` | Bar color: `blue`, `green`, `red`, `yellow`, `purple` |
+| `showLabel` | boolean | No | `true` | Whether to show percentage text |
+
+### HTML Adapter
+
+```typescript
+import { ExtensionAdapter, ExtensionContext, VellNode } from "@vell-lang/extensions";
+
+function renderProgressBar(node: VellNode, ctx: ExtensionContext): string {
+  const props = node.props ?? {};
+  const value = Number(props.value ?? 0);
+  const max = Number(props.max ?? 100);
+  const color = String(props.color ?? "blue");
+  const showLabel = props.showLabel !== false;
+
+  const percent = Math.min(100, Math.max(0, (value / max) * 100));
+  const colorMap: Record<string, string> = {
+    blue: "#3182ce",
+    green: "#38a169",
+    red: "#e53e3e",
+    yellow: "#d69e2e",
+    purple: "#805ad5",
+  };
+  const barColor = colorMap[color] ?? colorMap.blue;
+
+  const labelHtml = showLabel
+    ? `<span class="progress-label">${Math.round(percent)}%</span>`
+    : "";
+
+  return `<div class="vell-progress-bar" role="progressbar" aria-valuenow="${value}" aria-valuemin="0" aria-valuemax="${max}">
+    <div class="progress-track">
+      <div class="progress-fill" style="width: ${percent}%; background-color: ${barColor};"></div>
+    </div>
+    ${labelHtml}
+  </div>`;
+}
+
+export const ProgressBar: ExtensionAdapter = {
+  name: "npm/progress",
+  description: "Visual progress bar",
+  schema: {
+    value: { type: "number", required: true },
+    max: { type: "number", default: 100 },
+    color: { type: "string", default: "blue" },
+    showLabel: { type: "boolean", default: true },
+  },
+  render: renderProgressBar,
+};
+```
+
+### Usage Example
+
+```vell
+== Project Status
+
+- Research: @[npm/progress](value=100 color=green)
+- Design: @[npm/progress](value=80 color=blue)
+- Implementation: @[npm/progress](value=45 color=yellow)
+- Testing: @[npm/progress](value=20 color=red showLabel=false)
+```
+
+**Renderers that don't support the extension** will display the inline component text with a fallback label:
+```html
+<span class="vell-component">[npm/progress]</span>
+```
 
 ---
 

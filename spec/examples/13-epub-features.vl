@@ -1,0 +1,228 @@
+@[Meta](author="Samin Yeasar" date="2026-07-10" lang="en" title="EPUB 3 Feature Showcase")
+
+= EPUB 3 Feature Showcase
+
+@var author = "Samin Yeasar"
+
+@{author}
+
+== Math and Equations
+
+Inline math: $E = mc^2$ and $\int_a^b f(x)\,dx = F(b) - F(a)$.
+
+=== Numbered Equations
+
+@[Equation](label="e:mass-energy" source="E = mc^2")
+
+The most famous equation in physics (@[Ref](label="e:mass-energy")).
+
+@[Equation](label="e:pythagoras" source="a^2 + b^2 = c^2")
+
+Pythagoras theorem (@[Ref](label="e:pythagoras")).
+
+=== Block Math
+
+$$
+\nabla \cdot \mathbf{E} = \frac{\rho}{\varepsilon_0}
+$$
+
+$$
+\oint_{\partial S} \mathbf{E} \cdot d\mathbf{l} = -\frac{d\Phi_B}{dt}
+$$
+
+=== Align Environment
+
+@[Align](source="(a + b)^2 &= a^2 + 2ab + b^2 \\\\ (a - b)^2 &= a^2 - 2ab + b^2")
+
+=== Matrix Environment
+
+@[PMatrix](source="\begin{pmatrix} a & b \\\\ c & d \end{pmatrix}")
+
+=== Cases Environment
+
+@[Cases](source="f(x) = \begin{cases} x^2 & \text{if } x \geq 0 \\\\ -x^2 & \text{if } x < 0 \end{cases}")
+
+== Theorem Environments
+
+@[Theorem](label="thm:pythagoras" name="Pythagoras") {
+  For any right triangle with legs $a$, $b$ and hypotenuse $c$:
+
+  $$
+  a^2 + b^2 = c^2
+  $$
+}
+
+@[Proof]() {
+  Consider a square of side $a + b$. The area is $(a+b)^2$. Four triangles of area $\frac{ab}{2}$
+  occupy $2ab$. The remaining inner square has area $c^2$. Thus $a^2 + b^2 = c^2$.
+}
+
+@[Lemma](name="Triangle Inequality") {
+  For any triangle with sides $a$, $b$, $c$:
+
+  $$
+  a + b \geq c
+  $$
+}
+
+@[Corollary](name="Reverse Triangle Inequality") {
+  $$
+  |a - b| \leq c
+  $$
+}
+
+@[Definition](name="Prime Number") {
+  A natural number $p > 1$ is *prime* if its only positive divisors are 1 and $p$ itself.
+}
+
+@[Example]() {
+  The primes less than 20: $2, 3, 5, 7, 11, 13, 17, 19$.
+}
+
+@[Remark]() {
+  The number 1 is neither prime nor composite.
+}
+
+== Chemical Formulas
+
+@[Chem](source="H2O")
+
+@[Chem](source="C6H12O6")
+
+@[Chem](source="CH3COOH")
+
+@[Chem](source="C2H5OH")
+
+== Figures and Diagrams
+
+=== Figure with Caption
+
+@[Figure](alt="Vell Logo" caption="The Vell logo" src="https://vell.dev/logo.png")
+
+=== Mermaid Diagram
+
+@[Diagram](caption="Client-server request flow" type="mermaid") {
+  sequenceDiagram participant Client participant Server Client->>Server: Request Server-->>Client:
+  Response
+}
+
+=== Bar Chart
+
+@[Chart](title="Monthly Revenue 2026" type="bar") {
+  Jan, 45 Feb, 62 Mar, 38 Apr, 71 May, 55 Jun, 89
+}
+
+== Cross-References and Citations
+
+Reference @[Ref](label="e:mass-energy") and @[Ref](label="e:pythagoras").
+
+Theorem @[Ref](label="thm:pythagoras") proves the famous relationship.
+
+This result was established by @[Cite](key="knuth1984").
+
+> [!NOTE]
+> Cross-references work in EPUB via anchor IDs.
+
+> [!WARNING]
+> This is a warning admonition for important cautions.
+
+> [!TIP]
+> This is a helpful tip for readers.
+
+== Tables
+
+=== Pipe Table
+
+| Feature | Status  | Priority |
+|---------|---------|----------|
+| EPUB 3  | Done    | High     |
+| PDF     | Done    | High     |
+| DOCX    | Planned | Medium   |
+
+=== Pipe Table with Alignment
+
+| Left | Center | Right |
+|------|--------|-------|
+| A    | B      | C     |
+| D    | E      | F     |
+
+=== Grid Table
+
+| Lang  | Type | Version |
+|-------|------|---------|
+| Vell  | DSL  | 1.0     |
+| LaTeX | DSL  | 2e      |
+
+== Lists
+
+=== Unordered
+
+- Parser and AST
+- Formatter and LSP
+- HTML and PDF renderers
+- EPUB 3 renderer (new in Phase 12)
+
+=== Ordered
+
+1. Parse the source document
+2. Resolve includes and variables
+3. Render to target format
+4. Validate output
+
+=== Definition List
+
+EPUB : Electronic Publication format based on XHTML and CSS
+
+MathML : Mathematical Markup Language for rendering equations in browsers and EPUB
+
+SVG : Scalable Vector Graphics for diagrams and charts
+
+== Code Blocks
+
+Rust code with syntax highlighting:
+
+```rust
+fn main() {
+    println!("Hello, Vell!");
+}
+```
+
+Python data processing:
+
+```python
+def process(data):
+    return [x * 2 for x in data if x > 0]
+```
+
+== Footnotes
+
+This sentence has a footnote[^epub].
+
+[^epub]: EPUB 3 is the latest version of the EPUB standard, using XHTML and CSS for content.
+
+== Inline Markup
+
+This text has *bold*, /italic/, _underline_, ~strikethrough~, ^superscript^, ,,subscript,, and
+`inline code`.
+
+== Variables
+
+@var version = 1.0
+
+The current version of Vell is @{version}.
+
+== Images
+
+![Vell Logo](https://vell.dev/logo.png)
+
+== Blockquotes
+
+> The only way to do great work is to love what you do. â€” Steve Jobs
+
+== Horizontal Rule
+
+---
+
+== References
+
+[knuth1984]: https://en.wikipedia.org/wiki/The_Art_of_Computer_Programming "Knuth, 1984"

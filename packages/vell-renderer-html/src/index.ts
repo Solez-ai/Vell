@@ -72,13 +72,16 @@ export function render(doc: VellDocument, options?: { interactive?: boolean }): 
   const langAttr = doc.metadata?.lang
     ? ` lang="${escapeAttr(doc.metadata.lang)}"`
     : "";
+  const dirAttr = doc.metadata?.lang
+    ? ` dir="${isRtlLanguage(doc.metadata.lang) ? "rtl" : "ltr"}"`
+    : "";
   // Embed the reactive runtime for interactive documents
   const runtimeScript = options?.interactive
     ? `\n<script defer>${getRuntimeScript()}</script>`
     : "";
   return (
     `<!doctype html>\n` +
-    `<html${langAttr}><head><meta charset="utf-8">${title}${runtimeScript}</head>` +
+    `<html${langAttr}${dirAttr}><head><meta charset="utf-8">${title}<style>\n${VELL_CSS}\n</style>${runtimeScript}</head>` +
     `<body>${content}${footnotesHtml}</body></html>`
   );
 }
@@ -184,7 +187,8 @@ function renderNode(node: VellNode, ctx: RenderContext): string {
     case "MathBlock": {
       const src = String(node.source ?? "");
       const mathml = latexToMathml(src, true);
-      return `<math display="block">${mathml}</math>`;
+      const alttext = escapeAttr(mathmlToPlainText(mathml));
+      return `<math display="block" alttext="${alttext}">${mathml}</math>`;
     }
     case "List": {
       const tag = node.ordered ? "ol" : "ul";
@@ -316,7 +320,6 @@ function renderDirective(node: VellNode, ctx: RenderContext): string {
       const chartType = String(props?.type ?? "bar");
       const title = props?.title ? String(props.title) : "";
       const source = extractTextFromChildren(node.children as VellNode[]);
-      // Parse data lines: each line is "label, value"
       const data: Array<{ label: string; value: number }> = [];
       for (const line of source.split("\n")) {
         const trimmed = line.trim();
@@ -334,7 +337,6 @@ function renderDirective(node: VellNode, ctx: RenderContext): string {
         const svg = renderBarChartSvg(data, title);
         return `<div class="vell-chart vell-chart-bar">\n${svg}\n</div>`;
       }
-      // Fallback: table
       let html = `<div class="vell-chart vell-chart-${escapeAttr(chartType)}">\n`;
       if (title) html += `<div class="chart-title">${escapeHtml(title)}</div>\n`;
       html += `<table>\n`;
@@ -384,7 +386,6 @@ function renderDirective(node: VellNode, ctx: RenderContext): string {
     }
     /* --- Phase 13: Template/Theme directives --- */
     case "Template": {
-      const props = node.props as Record<string, unknown> | undefined;
       const name = props?.name ? escapeAttr(String(props.name)) : "";
       const url = props?.url ? sanitizeUrl(String(props.url)) : "";
       const style = props?.style ? String(props.style) : "";
@@ -488,7 +489,6 @@ function renderDirective(node: VellNode, ctx: RenderContext): string {
     }
     case "Select": {
       const bind = props?.bind ? ` data-bind="${escapeAttr(String(props.bind))}"` : "";
-      // Options from props or children
       let optionsHtml = "";
       if (props?.options) {
         const opts = String(props.options).split(",");
@@ -601,7 +601,6 @@ function renderDefinitionList(node: VellNode, ctx: RenderContext): string {
 // Phase 9: Label collection for cross-references
 // ---------------------------------------------------------------------------
 
-/** Extracts plain text content from directive children (paragraph→text nodes). */
 function extractTextFromChildren(children: VellNode[]): string {
   const parts: string[] = [];
   for (const child of children) {
@@ -616,7 +615,6 @@ function extractTextFromChildren(children: VellNode[]): string {
   return parts.join("\n");
 }
 
-/** Renders an SVG bar chart from parsed data. */
 function renderBarChartSvg(
   data: Array<{ label: string; value: number }>,
   title: string,
@@ -642,12 +640,10 @@ function renderBarChartSvg(
 
   let svg = `<svg width="${width}px" height="${height}px" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">\n`;
 
-  // Title
   if (title) {
     svg += `<text x="${width / 2}" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#2d3748">${escapeHtml(title)}</text>\n`;
   }
 
-  // Y-axis grid lines and labels
   const yTicks = 5;
   for (let i = 0; i <= yTicks; i++) {
     const y = padTop + chartH - (chartH * i) / yTicks;
@@ -656,10 +652,8 @@ function renderBarChartSvg(
     svg += `<text x="${padLeft - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#666">${val.toFixed(1)}</text>\n`;
   }
 
-  // X-axis
   svg += `<line x1="${padLeft}" y1="${padTop + chartH}" x2="${padLeft + chartW}" y2="${padTop + chartH}" stroke="#a0aec0" stroke-width="1"/>\n`;
 
-  // Bars
   for (let i = 0; i < data.length; i++) {
     const d = data[i];
     const barH = maxVal > 0 ? (chartH * d.value) / maxVal : 0;
@@ -676,12 +670,10 @@ function renderBarChartSvg(
   return svg;
 }
 
-/** Formats a chemical formula with subscript tags for numbers. E.g. "H2O" → "H<sub>2</sub>O". */
 function formatChemFormula(source: string): string {
   return source.replace(/(\d+)/g, "<sub>$1</sub>");
 }
 
-/** Collects heading entries for table of contents generation. */
 function collectTocEntries(doc: VellDocument): Array<{ level: number; text: string; id: string }> {
   const entries: Array<{ level: number; text: string; id: string }> = [];
   for (const node of doc.children ?? []) {
@@ -695,7 +687,6 @@ function collectTocEntries(doc: VellDocument): Array<{ level: number; text: stri
   return entries;
 }
 
-/** Collects figure entries for List of Figures (recursively into containers). */
 function collectLofEntries(doc: VellDocument): Array<{ caption: string; id: string }> {
   const entries: Array<{ caption: string; id: string }> = [];
   collectLofEntriesNodes(doc.children ?? [], entries);
@@ -720,7 +711,6 @@ function collectLofEntriesNodes(
   }
 }
 
-/** Collects table entries for List of Tables (recursively into containers). */
 function collectLotEntries(doc: VellDocument): Array<{ caption: string; id: string }> {
   const entries: Array<{ caption: string; id: string }> = [];
   collectLotEntriesNodes(doc.children ?? [], entries);
@@ -748,7 +738,6 @@ function collectLotEntriesNodes(
   }
 }
 
-/** Pre-compute equation and theorem numbers and collect labels for cross-resolution. */
 function collectLabels(doc: VellDocument): Record<string, LabelTarget> {
   const labels: Record<string, LabelTarget> = {};
   let eqCounter = 0;
@@ -844,7 +833,6 @@ function renderTheoremEnvironment(node: VellNode, ctx: RenderContext): string {
   const extra = props?.name ? escapeHtml(String(props.name)) : null;
   const themeClass = name.toLowerCase();
 
-  // Auto-number theorems (except Proof, Remark, Example, Notation)
   let number: number | null = null;
   if (name !== "Proof" && name !== "Remark" && name !== "Example" && name !== "Notation") {
     ctx.theoremCounters[name] = (ctx.theoremCounters[name] ?? 0) + 1;
@@ -959,7 +947,8 @@ function renderInline(node: VellInline, ctx: RenderContext): string {
     case "MathInline": {
       const src = String(node.source ?? "");
       const mathml = latexToMathml(src, false);
-      return `<math display="inline">${mathml}</math>`;
+      const alttext = escapeAttr(mathmlToPlainText(mathml));
+      return `<math display="inline" alttext="${alttext}">${mathml}</math>`;
     }
 
     /* --- variables & components --- */
@@ -1032,12 +1021,6 @@ function renderTable(node: VellNode, ctx: RenderContext): string {
 // LaTeX to MathML converter
 // ---------------------------------------------------------------------------
 
-/**
- * Converts a LaTeX math expression to MathML markup.
- * Handles: ^ superscripts, _ subscripts, \\frac, \\sqrt, Greek letters,
- * common operators, and group tokens.
- * Falls back to mtext for unparseable content.
- */
 function latexToMathml(latex: string, _isBlock: boolean): string {
   const stack: string[] = [];
   let i = 0;
@@ -1081,7 +1064,7 @@ function latexToMathml(latex: string, _isBlock: boolean): string {
         }
         if (depth > 0) i++;
       }
-      i++; // skip closing }
+      i++;
       const converted = latexToMathml(group, false);
       stack.push(wrapMrow(converted));
     } else if (ch === "}") {
@@ -1098,7 +1081,6 @@ function latexToMathml(latex: string, _isBlock: boolean): string {
         i++;
       }
       if (!cmd) {
-        // Check for single-char spacing shorthands: \,, \;, \:, \!
         if (i < latex.length && [",", ";", ":", "!"].includes(latex[i])) {
           i++;
         } else {
@@ -1156,7 +1138,6 @@ interface MathGroupResult {
 
 function parseMathGroup(latex: string, pos: number): MathGroupResult {
   let i = pos;
-  // Skip whitespace
   while (i < latex.length && /[ \t]/.test(latex[i])) {
     i++;
   }
@@ -1179,7 +1160,7 @@ function parseMathGroup(latex: string, pos: number): MathGroupResult {
       }
       if (depth > 0) i++;
     }
-    i++; // skip closing }
+    i++;
     return { value: latexToMathml(content, false), newPos: i };
   }
   if (i < latex.length) {
@@ -1396,45 +1377,39 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
       newPos = content.newPos;
       return { value: `<mover>${wrapMrow(content.value)}<mo>&#x2192;</mo></mover>`, newPos };
     }
-    // Blackboard bold (already partially handled)
+    // Font commands
     case "mathbb": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
       const letter = content.value.replace(/<[^>]+>/g, "").trim().charAt(0) || "";
       return { value: `<mi mathvariant="double-struck">${letter}</mi>`, newPos };
     }
-    // Calligraphic / script
     case "mathcal": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
       const letter = content.value.replace(/<[^>]+>/g, "").trim().charAt(0) || "A";
       return { value: `<mi mathvariant="script">${letter}</mi>`, newPos };
     }
-    // Roman/upright
     case "mathrm": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
       return { value: `<mi mathvariant="normal">${content.value}</mi>`, newPos };
     }
-    // Bold
     case "mathbf": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
       return { value: `<mi mathvariant="bold">${content.value}</mi>`, newPos };
     }
-    // Italic
     case "mathit": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
       return { value: `<mi mathvariant="italic">${content.value}</mi>`, newPos };
     }
-    // Sans-serif
     case "mathsf": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
       return { value: `<mi mathvariant="sans-serif">${content.value}</mi>`, newPos };
     }
-    // Monospace
     case "mathtt": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
@@ -1495,22 +1470,52 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
     case "text": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
-      return { value: `<mtext>${content.value}</mtext>`, newPos };
+      return { value: `<mtext>${escapeHtml(content.value)}</mtext>`, newPos };
     }
-    // Blackboard bold
-    case "mathbb": {
+    // Additional math commands
+    case "displaystyle": {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
-      const letter = content.value.replace(/<[^>]+>/g, "").trim().charAt(0) || "";
-      return { value: `<mi mathvariant="double-struck">${letter}</mi>`, newPos };
+      return { value: content.value, newPos };
     }
+    case "left": {
+      // \left(, \left[, \left\{, etc. — skip the delimiter as a hint
+      newPos++;
+      return { value: "", newPos };
+    }
+    case "right": {
+      newPos++;
+      return { value: "", newPos };
+    }
+    case "bigl": case "bigr": case "biggl": case "biggr":
+    case "Bigl": case "Bigr": case "Biggl": case "Biggr": {
+      newPos++;
+      return { value: "", newPos };
+    }
+    case "not": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<mo>&#x00AC;</mo>${wrapMrow(content.value)}`, newPos };
+    }
+    case "colon": return { value: "<mo>:</mo>", newPos };
+    case "prime": return { value: "<mo>&#x2032;</mo>", newPos };
+    case "degree": return { value: "<mo>&#x00B0;</mo>", newPos };
+    case "percent": return { value: "<mo>%</mo>", newPos };
+    case "angles": return { value: "<mo>&#x27E8;</mo><mo>&#x27E9;</mo>", newPos };
+    case "flat": return { value: "<mo>&#x266D;</mo>", newPos };
+    case "sharp": return { value: "<mo>&#x266F;</mo>", newPos };
+    case "natural": return { value: "<mo>&#x266E;</mo>", newPos };
+    case "Re": return { value: "<mi mathvariant=\"double-struck\">R</mi>", newPos };
+    case "Im": return { value: "<mi mathvariant=\"double-struck\">I</mi>", newPos };
     // spacing
     case "quad": case "qquad":
     case "thinspace": case "medspace": case "thickspace":
     case "negthinspace": case "negmedspace": case "negthickspace":
+    case " ": case ",": case ";": case ":":
       return { value: "", newPos };
-    case " ":
-      return { value: "<mtext> </mtext>", newPos };
+    // Stub commands that are ignored safely
+    case "label": case "ref": case "tag":
+      return { value: "", newPos };
     // Default: render as mtext
     default:
       return { value: `<mtext>\\${cmd}</mtext>`, newPos };
@@ -1553,6 +1558,134 @@ function stringifyValue(value: unknown): string {
   if (typeof value === "string") return value;
   return JSON.stringify(value);
 }
+
+/** Detect if a language code is a right-to-left (RTL) language. */
+function isRtlLanguage(lang: string): boolean {
+  const rtlLangs = [
+    "ar", "arc", "bcc", "bqi", "ckb", "dv", "fa", "glk",
+    "ha", "he", "khw", "ks", "ku", "mzn", "nqo", "pa",
+    "ps", "sd", "ug", "ur", "uz", "yi",
+  ];
+  const base = lang.split("-")[0].toLowerCase();
+  return rtlLangs.includes(base);
+}
+
+/** Strip all MathML/HTML tags from a string, returning plain text for alttext. */
+function mathmlToPlainText(markup: string): string {
+  return markup.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Comprehensive CSS for Vell rendered output.
+ * Includes base styles, theme colors, code blocks, tables, admonitions,
+ * academic theorem environments, diagrams, equations, print CSS,
+ * high-contrast accessibility overrides, and CJK typography support.
+ */
+export const VELL_CSS = `
+/* Base */
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.6; color: #1a202c; max-width: 800px; margin: 0 auto; padding: 1em; }
+code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+pre { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; background: #f7fafc; padding: 0.8em; overflow-x: auto; border-radius: 4px; }
+img { max-width: 100%; height: auto; }
+.vell-equation { margin: 0.8em 0; padding: 0.2em 0; }
+.eq-table { width: 100%; border: none; border-collapse: collapse; }
+.eq-table td { padding: 0; vertical-align: middle; }
+.eq-math { text-align: center; width: 90%; }
+.eq-number { text-align: right; width: 10%; padding-left: 1em; font-size: 0.9em; color: #555; }
+.vell-theorem { margin: 1em 0; padding: 0.6em 1em; border-left: 3px solid #3182ce; background: #f7fafc; }
+.vell-proof { border-left-color: #718096; background: #fefefe; }
+.vell-lemma { border-left-color: #38a169; background: #f0fff4; }
+.vell-corollary { border-left-color: #d69e2e; background: #fffff0; }
+.vell-definition { border-left-color: #805ad5; background: #faf5ff; }
+.vell-remark { border-left-color: #a0aec0; background: #f5f5f5; }
+.vell-example { border-left-color: #319795; background: #f0fdfa; }
+.vell-conjecture { border-left-color: #e53e3e; background: #fff5f5; }
+.vell-axiom { border-left-color: #dd6b20; background: #fffaf0; }
+.vell-proposition { border-left-color: #2b6cb0; background: #ebf8ff; }
+.theorem-label { font-weight: bold; font-style: italic; margin-bottom: 0.3em; color: #2d3748; }
+.theorem-body > :first-child { margin-top: 0; }
+.theorem-body > :last-child { margin-bottom: 0; }
+.vell-math-env { margin: 0.8em 0; padding: 0.4em 1em; background: #fdfdfd; border: 1px solid #e2e8f0; border-radius: 4px; }
+.vell-math-env math { display: block; margin: 0.4em 0; }
+.vell-ref { color: #2b6cb0; text-decoration: none; }
+.vell-ref:hover { text-decoration: underline; }
+.unresolved-ref { color: #e53e3e; font-style: italic; }
+.admonition { padding: 0.6em 1em; margin: 1em 0; border-left: 4px solid #3182ce; background: #ebf8ff; }
+.admonition.warning, .admonition.warn { border-left-color: #d69e2e; background: #fffff0; }
+.admonition.danger, .admonition.error { border-left-color: #e53e3e; background: #fff5f5; }
+.admonition.success, .admonition.tip { border-left-color: #38a169; background: #f0fff4; }
+.vell-chem { margin: 0.6em 0; padding: 0.4em 1em; background: #f0fdfa; border: 1px solid #b2f5ea; border-radius: 4px; font-family: 'Courier New', monospace; }
+.vell-chem .chem-formula { font-size: 1.1em; font-weight: bold; color: #234e52; }
+.vell-toc, .vell-lof, .vell-lot { margin: 1em 0; padding: 0.6em 1em; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; }
+.vell-toc h2, .vell-lof h2, .vell-lot h2 { font-size: 1.1em; margin: 0 0 0.5em 0; color: #2d3748; }
+.vell-toc .toc-list, .vell-lof .lof-list, .vell-lot .lot-list { padding-left: 1.5em; }
+.vell-toc .toc-list li, .vell-lof .lof-list li, .vell-lot .lot-list li { margin: 0.2em 0; }
+.toc-placeholder, .lof-placeholder, .lot-placeholder { color: #a0aec0; font-style: italic; list-style: none; }
+.vell-diagram { margin: 1em 0; padding: 1em; background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px; overflow-x: auto; }
+.vell-diagram .diagram-caption { font-size: 0.9em; color: #666; margin-top: 0.5em; font-style: italic; }
+.vell-diagram pre { margin: 0; white-space: pre; font-family: 'Courier New', monospace; font-size: 0.9em; line-height: 1.4; }
+.vell-diagram[data-type="mermaid"] .mermaid { margin: 0; }
+.vell-diagram[data-type="ascii"] pre { color: #333; }
+.vell-diagram[data-type="dot"] .graphviz { margin: 0; }
+.vell-diagram[data-type="dot"] pre.dot { color: #2b6cb0; }
+.vell-chart { margin: 1em 0; padding: 0.5em; overflow-x: auto; }
+.vell-chart svg { display: block; margin: 0 auto; }
+.chart-title { text-align: center; font-size: 1em; font-weight: bold; margin-bottom: 0.3em; color: #2d3748; }
+.vell-plot { margin: 1em 0; padding: 0.5em; overflow-x: auto; }
+.vell-plot svg { display: block; margin: 0 auto; }
+/* Print CSS */
+@media print {
+  body { font-size: 11pt; line-height: 1.5; color: #000; background: #fff; max-width: none; padding: 0; }
+  @page { margin: 2.54cm; }
+  @page :first { margin-top: 2.54cm; }
+  h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
+  h1 { page-break-before: always; }
+  h1:first-of-type { page-break-before: avoid; }
+  table { page-break-inside: avoid; }
+  pre, blockquote { page-break-inside: avoid; }
+  img { page-break-inside: avoid; }
+  a { color: #000; text-decoration: none; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #555; }
+  .vell-slide { display: none; }
+  .vell-diagram { border: 1px solid #ddd; }
+  .vell-chart svg { max-width: 100%; }
+  .vell-plot svg { max-width: 100%; }
+  .vell-chem { border: 1px solid #b2f5ea; }
+  .vell-equation { page-break-inside: avoid; }
+  .footnotes { page-break-before: always; font-size: 0.85em; }
+  .page-break { page-break-before: always; }
+  .toc { page-break-after: always; }
+}
+/* Phase 19: High contrast theme */
+@media (prefers-contrast: high) {
+  body { color: #000; background: #fff; }
+  a { color: #0056b3; text-decoration: underline; }
+  a.vell-ref { color: #004080; }
+  pre, code { background: #fff; border: 2px solid #000; }
+  table th, table td { border: 2px solid #000; }
+  th { background: #e0e0e0; }
+  .vell-theorem { border-left: 4px solid #000; background: #fff; }
+  .vell-proof { border-left-color: #555; }
+  .vell-lemma { border-left-color: #333; }
+  .vell-corollary { border-left-color: #777; }
+  .vell-definition { border-left-color: #333; }
+  .admonition { border-left: 4px solid #000; background: #fff; }
+  .vell-chem { background: #fff; border: 2px solid #234e52; }
+  .vell-toc, .vell-lof, .vell-lot { background: #fff; border: 2px solid #000; }
+  .vell-diagram { background: #fff; border: 2px solid #000; }
+  .vell-math-env { background: #fff; border: 2px solid #000; }
+  .vell-equation { border: 1px solid #000; padding: 0.3em; }
+  input, select, textarea { border: 2px solid #000; }
+}
+/* Phase 19: CJK typography */
+:lang(zh) body { font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif; line-height: 1.9; }
+:lang(ja) body { font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif; line-height: 1.9; }
+:lang(ko) body { font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; line-height: 1.9; }
+:lang(zh) pre, :lang(ja) pre, :lang(ko) pre { font-family: "Noto Sans Mono CJK SC", "Source Han Sans SC", "Noto Sans Mono", monospace; }
+:lang(zh) h1, :lang(zh) h2, :lang(zh) h3 { letter-spacing: 0.05em; }
+:lang(ja) h1, :lang(ja) h2, :lang(ja) h3 { letter-spacing: 0.05em; }
+:lang(ko) h1, :lang(ko) h2, :lang(ko) h3 { letter-spacing: 0.03em; }
+`;
 
 function sanitizeUrl(value: string): string {
   try {

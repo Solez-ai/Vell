@@ -1,6 +1,6 @@
 = Extensions
 
-@[Figure](src="plot.png" alt="Plot" caption="A plot")
+@[Figure](alt="Plot" caption="A plot" src="plot.png")
 
 @[Layout](columns=2) {
   Left column.

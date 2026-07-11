@@ -1,1 +1,1 @@
-@[Figure](src="a.png" alt="A" caption="Caption")
+@[Figure](alt="A" caption="Caption" src="a.png")

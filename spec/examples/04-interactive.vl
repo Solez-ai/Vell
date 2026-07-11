@@ -1,42 +1,44 @@
 = Interactive
 
 @var count = 0
-@var items = [1, 2, 3]
+
+@var items = [1,2,3]
+
 @var name = "World"
+
 @var dark_mode = false
+
 @var selected = "Option B"
 
 Count: @{count}
 
-@[Slider](min=0 max=100 bind=count label="Count")
+@[Slider](bind="count" label="Count" max=100 min=0)
 
 == Live Binding Demos
 
 === Text Input
 
-@[Input](type=text bind=name label="Enter your name:")
+@[Input](bind="name" label="Enter your name:" type="text")
 
 Hello, @{name}
 
 === Checkbox
 
-@[Checkbox](bind=dark_mode label="Enable dark mode")
+@[Checkbox](bind="dark_mode" label="Enable dark mode")
 
 Dark mode is: @{dark_mode}
 
 === Dropdown
 
-@[Select](bind=selected label="Pick an option:") {
-  Option A
-  Option B
-  Option C
+@[Select](bind="selected" label="Pick an option:") {
+  Option A Option B Option C
 }
 
 You selected: @{selected}
 
 == Data-Driven Content
 
-@var items = ["Apples", "Bananas", "Cherries", "Dates"]
+@var items = ["Apples","Bananas","Cherries","Dates"]
 
 === For Loop Demo
 

@@ -1,6 +1,6 @@
 = Phase 8 & 9 & 10: New Features
 
-@[Meta](title="Phase 8-10: Professional Math, Cross-References & Diagrams" author="Samin Yeasar" date="2026-07-08" lang=en)
+@[Meta](author="Samin Yeasar" date="2026-07-08" lang="en" title="Phase 8-10: Professional Math, Cross-References & Diagrams")
 
 == Chemical Equations
 
@@ -58,45 +58,37 @@ Named operators: $\operatorname{Var}(X) = \mathbb{E}[(X - \mu)^2]$
 
 == Function Plots
 
-Plot of sine: @[Plot](fn="sin(x)" xmin=-6 xmax=6 ymin=-2 ymax=2)
+Plot of sine: @[Plot](fn="sin(x)" xmax=6 xmin=-6 ymax=2 ymin=-2)
 
-Plot of cosine: @[Plot](fn="cos(x)" xmin=-6 xmax=6 ymin=-2 ymax=2)
+Plot of cosine: @[Plot](fn="cos(x)" xmax=6 xmin=-6 ymax=2 ymin=-2)
 
 == Graphviz Diagrams
 
-@[Diagram](type=dot caption="Simple graph with Graphviz DOT") {
-  digraph G {
-    A -> B
-    A -> C
-    B -> D
-    C -> D
-  }
+@[Diagram](caption="Simple graph with Graphviz DOT" type="dot") {
+  digraph G { A -> B A -> C B -> D C -> D }
 }
 
-@[Diagram](type=dot caption="Flowchart using DOT") {
-  digraph Process {
-    Start -> Process
-    Process -> Decision
-    Decision -> End
-    Decision -> Process
-  }
+@[Diagram](caption="Flowchart using DOT" type="dot") {
+  digraph Process { Start -> Process Process -> Decision Decision -> End Decision -> Process }
 }
 
 == Cross-References
 
 @[Equation](label="eq:euler" source="e^{i\pi} + 1 = 0")
 
-Euler's identity @[Ref](label=eq:euler) is one of the most beautiful equations.
+Euler's identity @[Ref](label="eq:euler") is one of the most beautiful equations.
 
 @[Theorem](label="thm:fermat" name="Fermat's Last Theorem") {
   There are no positive integers *a*, *b*, *c* that satisfy the equation
 
-  $$\displaystyle a^n + b^n = c^n$$
+  $$
+  \displaystyle a^n + b^n = c^n
+  $$
 
   for any integer *n* > 2.
 }
 
-Theorem @[Ref](label=thm:fermat) was proven by Andrew Wiles in 1994.
+Theorem @[Ref](label="thm:fermat") was proven by Andrew Wiles in 1994.
 
 > [!NOTE]
 > All these features are part of Phases 8, 9, and 10 of the Vell roadmap.

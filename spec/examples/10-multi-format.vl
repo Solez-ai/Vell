@@ -1,11 +1,11 @@
 = Multi-Format Publishing
 
-@[Meta](title="Phase 12: Multi-Format Publishing" author="Samin Yeasar")
+@[Meta](author="Samin Yeasar" title="Phase 12: Multi-Format Publishing")
 
 == About This Document
 
-This document demonstrates Vell's multi-format publishing capabilities.
-The same source can output in multiple formats:
+This document demonstrates Vell's multi-format publishing capabilities. The same source can output
+in multiple formats:
 
 - Standard HTML (`vell render html`)
 - PDF-friendly HTML with print CSS (`vell render pdf`)
@@ -15,15 +15,16 @@ The same source can output in multiple formats:
 
 Vell supports slide decks natively with the Slide directive:
 
-@[Slide] {
+@[Slide]() {
   == Slide Title
 
   Content for the first slide.
+
   - Bullet point 1
   - Bullet point 2
 }
 
-@[Slide] {
+@[Slide]() {
   === Code Slide
 
   ```python
@@ -34,14 +35,16 @@ Vell supports slide decks natively with the Slide directive:
   Code blocks work inside slides.
 }
 
-@[Slide] {
+@[Slide]() {
   === Math Slide
 
   The famous equation: $E = mc^2$
 
   And more complex math:
 
-  $$\\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$
+  $$
+  \\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}
+  $$
 }
 
 == Print Features
@@ -55,5 +58,5 @@ When rendering to PDF mode, Vell automatically includes:
 
 == Summary
 
-Multi-format publishing is a core Vell feature.
-One source, many outputs - HTML, PDF-friendly HTML, and slides.
+Multi-format publishing is a core Vell feature. One source, many outputs - HTML, PDF-friendly HTML,
+and slides.

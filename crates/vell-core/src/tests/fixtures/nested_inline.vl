@@ -1,5 +1,2 @@
-Bold with *italic /inside/ here*
-Italic with /bold *inside* here/
-Underline with _bold *inside* here_
-Three levels *bold /italic _under_ text/ end*
-Code *inside `fn()` here*
+Bold with *italic /inside/ here* Italic with /bold *inside* here/ Underline with _bold *inside*
+here_ Three levels *bold /italic _under_ text/ end* Code *inside `fn()` here*

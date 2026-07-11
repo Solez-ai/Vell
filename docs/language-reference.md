@@ -38,6 +38,7 @@
    - 5.11 [Citations](#511-citations)
    - 5.12 [Footnote References](#512-footnote-references)
    - 5.13 [Line Breaks](#513-line-breaks)
+   - 5.14 [Inline Nesting Combinations](#514-inline-nesting-combinations)
 6. [Variables and Reactivity](#6-variables-and-reactivity)
    - 6.1 [Variable Declarations](#61-variable-declarations)
    - 6.2 [Variable Interpolation](#62-variable-interpolation)
@@ -67,6 +68,8 @@
    - 14.4 [vell parse](#144-vell-parse)
    - 14.5 [vell fmt](#145-vell-fmt)
    - 14.6 [vell validate](#146-vell-validate)
+15. [Common Pitfalls](#15-common-pitfalls)
+16. [Best Practices](#16-best-practices)
 
 ---
 
@@ -101,6 +104,14 @@ A Vell document consists of a sequence of **block elements** separated by blank 
 
 All Vell documents should be UTF-8 encoded. The parser operates on byte-level spans but treats character boundaries correctly for multi-byte UTF-8 sequences. Non-ASCII characters (Unicode) are fully supported in text content.
 
+### File Size Limits
+
+While Vell has no hard file size limit, practical considerations apply:
+- **Small documents** (< 100 KB): Parse in < 1 ms. Suitable for notes, memos, emails.
+- **Medium documents** (100 KB – 1 MB): Parse in < 10 ms. Suitable for articles, chapters, reports.
+- **Large documents** (1 MB – 10 MB): Parse in < 100 ms. Suitable for books, theses, documentation sets (especially with `@[Include]`).
+- **Very large documents** (> 10 MB): Parse time scales linearly. Consider splitting with `@[Include]`.
+
 ---
 
 ## 3. Comments
@@ -133,6 +144,14 @@ Headings are created using one or more `=` characters followed by a space and th
 - Heading text can contain inline markup (bold, italic, code, math, etc.).
 - The first level-1 heading in a document sets the document's metadata title.
 - Headings automatically generate an `id` attribute (slugified from the text) for anchor linking.
+
+**Inline markup in headings:**
+
+```vell
+= *Bold Title* with /italic/
+== Code: `parse_document()` and math: $E=mc^2$
+=== ~Strikethrough~ and _underline_ in a heading
+```
 
 **AST representation:**
 ```json
@@ -218,6 +237,7 @@ Admonitions are styled blockquotes with a type indicator. They use the `> [!TYPE
 - The admonition declaration `> [!TYPE]` must be on its own line.
 - Subsequent lines with `>` content form the admonition body.
 - Renderers apply distinct visual styling for each admonition type (colors, icons).
+- Admonitions can contain paragraphs, lists, and code blocks as body content.
 
 ### 4.5 Code Blocks
 
@@ -300,11 +320,33 @@ Vell supports both unordered and ordered lists.
 - Back to level one
 ```
 
+**Task lists (checkboxes):**
+
+Vell supports task list items with `[ ]` (unchecked) and `[x]` (checked) markers:
+
+```vell
+- [ ] Unfinished task
+- [x] Completed task
+- [ ] Another pending item
+```
+
+Task lists work with both unordered and ordered list markers. The `checked` field in the AST stores `true`, `false`, or `null` for each item.
+
+**Mixed ordered and unordered lists:**
+
+```vell
+1. First step
+   - Sub-step that is unordered
+   - Another sub-step
+2. Second step
+```
+
 **Rules:**
 - Unordered list markers are `- ` (hyphen followed by space).
 - Ordered list markers are digits followed by `. ` (e.g., `1. `).
 - Indentation must be a multiple of 2 spaces.
 - List items can contain paragraphs and other block content.
+- Task list markers `[ ]` and `[x]` must appear right after the list marker (e.g., `- [ ] task`).
 
 ### 4.8 Tables
 
@@ -339,6 +381,19 @@ Alignment is controlled by colons in the separator row:
 +----------+----------+
 ```
 
+**Inline markup in tables:**
+
+Table cells can contain inline elements like bold, italic, code, and math:
+
+```vell
+| Feature    | Status     |
+|------------|------------|
+| *Bold*     | ✅         |
+| /Italic/   | ✅         |
+| `Code`     | ✅         |
+| $Math$     | ✅         |
+```
+
 ### 4.9 Horizontal Rules
 
 A horizontal rule is created with three or more consecutive `-` characters on their own line:
@@ -363,6 +418,17 @@ Definition lists pair a term with its definition, using `:: ` as the term marker
 :: Another Term
    Definition of the second term.
    It can span multiple lines.
+```
+
+Definition bodies support paragraphs and inline markup:
+
+```vell
+:: Vell
+   A modern markup language with *deterministic* parsing.
+
+:: AST
+   Abstract Syntax Tree — a versioned, portable representation
+   of the document structure.
 ```
 
 ### 4.11 Reference Definitions
@@ -442,6 +508,12 @@ Einstein's E^mc^2^ is famous.
 Water is H,,2,,O.
 ```
 
+Superscript and subscript can be combined in scientific formulas:
+
+```vell
+The formula for water is H,,2,,O and E^mc^2^ is mass-energy equivalence.
+```
+
 ### 5.8 Links
 
 Vell supports inline links and reference-style links:
@@ -456,6 +528,13 @@ Vell supports inline links and reference-style links:
 ```vell
 [Reference link][ref-id]
 [Reference link][]
+```
+
+Links can contain inline markup in their text:
+
+```vell
+[*Bold link*](https://example.com)
+[A link with `code` inline](https://example.com)
 ```
 
 ### 5.9 Images
@@ -496,6 +575,25 @@ This statement has a footnote[^one] attached.
 
 - **Soft breaks** occur naturally at line boundaries in the source and render as a space in output.
 - **Hard breaks** are not currently supported with a specific syntax; paragraphs are automatically joined.
+
+### 5.14 Inline Nesting Combinations
+
+Inline elements can be nested inside each other to create rich text formatting:
+
+```vell
+Bold inside italic: /This is *bold* inside italic/
+Italic inside bold: *This is /italic/ inside bold*
+Code inside bold: *This is `code` inside bold*
+Math inside italic: /The value of $E=mc^2$ in italic/
+Strikethrough inside bold: *This is ~strikethrough~ inside bold*
+Bold inside link: [*Bold link text*](https://example.com)
+```
+
+**Nesting rules:**
+- Inline markup must be properly nested — overlapping is not allowed.
+- The innermost delimiter pair closes first: `*outer /inner/* still italic/` is invalid.
+- Code and math content is literal — no nested parsing occurs inside `` ` `` or `$` delimiters.
+- Escape characters (`\*`, `\/`, etc.) can be used to produce literal delimiters when needed.
 
 ---
 
@@ -546,6 +644,18 @@ For loops iterate over array variables:
 }
 ```
 
+For loops can be nested:
+
+```vell
+@var matrix = [[1, 2], [3, 4], [5, 6]]
+
+@for row in @{matrix} {
+  - Row: @for cell in @{row} {
+      @{cell}
+    }
+}
+```
+
 ### 6.4 If Blocks
 
 If blocks conditionally render content based on variable values:
@@ -558,6 +668,18 @@ If blocks conditionally render content based on variable values:
 }
 ```
 
+Multiple conditions can be chained:
+
+```vell
+@if @{score} >= 90 {
+  Grade: A
+} else @if @{score} >= 80 {
+  Grade: B
+} else {
+  Grade: C or below
+}
+```
+
 ---
 
 ## 7. Directives
@@ -566,7 +688,7 @@ Directives are the extension mechanism of Vell. They use `@[Name](props)` syntax
 
 ### 7.1 Built-in Directives
 
-Vell includes 13 built-in directives:
+Vell includes the following built-in directives:
 
 | Directive | Purpose | Example |
 |-----------|---------|---------|
@@ -600,6 +722,7 @@ Vell includes 13 built-in directives:
 | `@[Align]` | Multi-line equation alignment | `@[Align](source="a &= b")` ... |
 | `@[PMatrix]` | Matrix with parentheses | `@[PMatrix](source="...")` ... |
 | `@[Cases]` | Piecewise function cases | `@[Cases](source="...")` ... |
+| `@[Template]` | Document-level styling and theming | `@[Template](url="theme.css")` |
 
 ### 7.2 Directive Syntax
 
@@ -612,6 +735,10 @@ Directives can be self-closing or have a body:
   Content inside the frame goes here.
 }
 ```
+
+**Directive property ordering:**
+
+Properties are parsed in the order they appear. The formatter normalizes property ordering to a canonical sequence (alphabetical by property name). While all orderings parse correctly, it is best practice to list required properties first and optional properties after.
 
 ### 7.3 Inline Components
 
@@ -630,6 +757,11 @@ The `@[Meta]` directive sets document-level metadata:
 ```
 
 **Supported properties:** `title`, `author`, `date`, `lang`
+
+**Metadata precedence:**
+1. `@[Meta]` directive properties take highest precedence.
+2. The first level-1 heading provides the default title if `@[Meta](title=...)` is not set.
+3. If neither is present, the title is `null`.
 
 ### 7.5 Cross-References
 
@@ -1163,6 +1295,7 @@ Extensions are namespaced directives that follow the `@[org/Name]` pattern. They
 - Extension names must contain a `/` separator.
 - Unknown extensions are never rejected by the parser.
 - Extensions with braced bodies have their content parsed as nested Vell documents.
+- Supported extensions should be registered in renderers via the extension adapter API.
 
 ---
 
@@ -1229,6 +1362,19 @@ Variables declared with `@var` have document-level scope. They are available for
 | Null | `@var x = null` | `@var data = null` |
 | Array | `@var x = [1, 2, 3]` | `@var items = ["a", "b"]` |
 | Object | `@var x = {"k": "v"}` | `@var meta = {"version": 1}` |
+
+### Variable Naming
+
+Variables must follow these naming rules:
+- Must start with a letter (`a-z`, `A-Z`) or underscore (`_`).
+- Subsequent characters can be alphanumeric or underscores.
+- Must not be a reserved keyword (`true`, `false`, `null`, `for`, `if`, `else`, `var`).
+- Case-sensitive (`count` and `Count` are different variables).
+- Maximum recommended length: 64 characters.
+
+### Runtime Evaluation
+
+Variables declared in a document are available to the interactive runtime system. When rendered with the HTML renderer, variable values are embedded as `data-vell-var` attributes, enabling reactive client-side updates without re-parsing the source.
 
 ---
 
@@ -1479,6 +1625,126 @@ vell validate < input.vl     # reads from stdin
 - Parse errors (malformed syntax, unterminated delimiters, invalid indentation)
 - Warnings for undefined variable references (variables may be provided at runtime)
 - Malformed table and directive structure warnings
+
+---
+
+## 15. Common Pitfalls
+
+This section documents common mistakes and how to avoid them.
+
+### Unclosed Inline Delimiters
+
+**Problem:** Forgetting to close an inline markup delimiter causes the remainder of the paragraph to be consumed as markup.
+
+```vell
+This sentence has *bold that never closes.
+Everything after is bold.
+```
+
+**Solution:** Always close inline delimiters. Use escape sequences for literal character occurrences.
+
+```vell
+This sentence has *bold that closes* and the rest is normal.
+```
+
+### Incorrect List Indentation
+
+**Problem:** Inconsistent indentation in nested lists causes unexpected nesting behavior.
+
+```vell
+- Level one
+   - Level two (3 spaces — wrong!)
+```
+
+**Solution:** Use exactly 2 spaces of indentation per level.
+
+```vell
+- Level one
+  - Level two (2 spaces — correct)
+```
+
+### Table Column Mismatch
+
+**Problem:** Tables with mismatched column counts in the separator row produce parse errors.
+
+```vell
+| A | B | C |
+|---|---|
+| 1 | 2 | 3 |
+```
+
+**Solution:** Ensure the separator row has the same number of columns as the header row.
+
+```vell
+| A | B | C |
+|---|---|---|
+| 1 | 2 | 3 |
+```
+
+### Overlapping Inline Markup
+
+**Problem:** Overlapping inline delimiters are not supported.
+
+```vell
+This is *bold and /italic* crossing/ — invalid!
+```
+
+**Solution:** Nest properly — close the inner delimiter before the outer one.
+
+```vell
+This is *bold and /italic/ only bold* — valid!
+```
+
+### Undefined Variable References
+
+**Problem:** Referencing a variable before it is declared causes a parser warning.
+
+```vell
+Value: @{count}
+@var count = 42
+```
+
+**Solution:** Declare variables before their first use.
+
+```vell
+@var count = 42
+Value: @{count}
+```
+
+---
+
+## 16. Best Practices
+
+### Document Structure
+
+1. **Always set document metadata** with `@[Meta]` or a level-1 heading at the start.
+2. **Use headings consistently** — `=` for title, `==` for sections, `===` for subsections.
+3. **Separate blocks with blank lines** — This ensures reliable parsing and better readability.
+4. **Keep line lengths under 100 characters** for prose readability (the formatter enforces this).
+
+### Variables and Interpolation
+
+1. **Declare variables near the top** of the document or section where they are used.
+2. **Use descriptive variable names** like `@var items = [...]` rather than `@var x = [...]`.
+3. **Add fallback content** for optional variables by checking conditions with `@if`.
+
+### Directives
+
+1. **Put required properties first** in directive property lists for readability.
+2. **Use quoted strings** for property values that contain spaces or special characters.
+3. **Include fallback body content** in extensions so unsupported renderers still show useful output.
+
+### Performance
+
+1. **Split large documents** into multiple files using `@[Include]` for faster parsing of individual sections.
+2. **Avoid deeply nested lists** (more than 4 levels) as they can be difficult to read and maintain.
+3. **Limit variable array sizes** for for-loops to keep rendering time reasonable (hundreds of items, not thousands).
+
+### Editor Integration
+
+1. **Use the VS Code extension** for syntax highlighting, diagnostics, and formatting support.
+2. **Run `vell fmt` before committing** to ensure consistent formatting across contributions.
+3. **Use `vell validate` as a pre-commit hook** to catch errors early.
 
 ---
 

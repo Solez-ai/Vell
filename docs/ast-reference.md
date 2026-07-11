@@ -58,6 +58,7 @@
    - 7.6 [NodeKind](#76-nodekind)
 8. [Schema Validation](#8-schema-validation)
 9. [Versioning Policy](#9-versioning-policy)
+10. [Common Traversal Patterns](#10-common-traversal-patterns)
 
 ---
 
@@ -125,6 +126,11 @@ Every node includes a `span` that records its byte offsets in the original sourc
 
 **Note:** Spans reference positions in the original, unmodified source text. Formatters that rewrite source text produce new spans after re-parsing.
 
+**Span usage guidelines:**
+- A renderer can use `span` to highlight source locations in diagnostics.
+- Formatters use spans to map formatted output back to source positions.
+- LSP tooling uses spans to compute text ranges for hover, completion, and diagnostics.
+
 ---
 
 ## 4. Document Metadata
@@ -178,6 +184,22 @@ Represents a section heading.
 | `children` | `InlineNode[]` | Heading text with inline markup |
 | `id` | `string` or `null` | Slugified anchor identifier |
 
+**Example with inline markup:**
+Source: `== The *Fast* /Algorithm/`
+```json
+{
+  "type": "Heading",
+  "level": 2,
+  "children": [
+    { "type": "Text", "value": "The " },
+    { "type": "Bold", "children": [{ "type": "Text", "value": "Fast" }] },
+    { "type": "Text", "value": " " },
+    { "type": "Italic", "children": [{ "type": "Text", "value": "Algorithm" }] }
+  ],
+  "id": "the-fast-algorithm"
+}
+```
+
 ### 5.2 Paragraph
 
 Represents a text paragraph.
@@ -220,6 +242,18 @@ Represents a quoted block, optionally with an admonition type.
 |-------|------|-------------|
 | `children` | `Node[]` | Parsed content inside the blockquote |
 | `admonition_type` | `string` or `null` | Admonition type (`NOTE`, `WARNING`, etc.) when `> [!TYPE]` syntax is used |
+
+**Admonition example:**
+Source: `> [!WARNING]\n> Careful!`
+```json
+{
+  "type": "Blockquote",
+  "admonition_type": "WARNING",
+  "children": [
+    { "type": "Paragraph", "children": [{ "type": "Text", "value": "Careful!" }] }
+  ]
+}
+```
 
 ### 5.4 CodeBlock
 
@@ -295,6 +329,25 @@ Represents an ordered or unordered list.
 | `ordered` | `boolean` | `true` for ordered lists, `false` for unordered |
 | `start` | `integer` or `null` | Starting number for ordered lists |
 | `items` | `ListItem[]` | List items, each containing block children |
+
+**Task list example:**
+Source: `- [x] Done\n- [ ] Pending`
+```json
+{
+  "type": "List",
+  "ordered": false,
+  "items": [
+    {
+      "children": [{ "type": "Paragraph", "children": [{ "type": "Text", "value": "Done" }] }],
+      "checked": true
+    },
+    {
+      "children": [{ "type": "Paragraph", "children": [{ "type": "Text", "value": "Pending" }] }],
+      "checked": false
+    }
+  ]
+}
+```
 
 ### 5.7 Table
 
@@ -643,6 +696,19 @@ Inline hyperlink.
 | `title` | `string` or `null` | Optional hover title |
 | `children` | `InlineNode[]` | Link text with inline markup |
 
+**Complex link example (nested bold in link text):**
+```json
+{
+  "type": "Link",
+  "href": "https://example.com",
+  "title": null,
+  "children": [
+    { "type": "Bold", "children": [{ "type": "Text", "value": "Click" }] },
+    { "type": "Text", "value": " here" }
+  ]
+}
+```
+
 ### 6.10 LinkRef
 
 Reference-style link.
@@ -797,7 +863,7 @@ Renders as a newline in output.
 | Field | Type | Description |
 |-------|------|-------------|
 | `children` | `Node[]` | Block content of the list item |
-| `checked` | `boolean` or `null` | Task-list checkbox state |
+| `checked` | `boolean` or `null` | Task-list checkbox state (`true` for `[x]`, `false` for `[ ]`, `null` for plain items) |
 
 ### 7.2 TableCell
 
@@ -874,6 +940,100 @@ The AST schema follows semantic versioning:
 - **Patch version** (e.g., v1.0.1): Bug fixes or documentation changes. No impact on AST structure.
 
 The current schema version is **1** (v1). The version is incremented in the `version` field of the `Document` root node and reflected in the `AST_VERSION` constant in `crates/vell-core/src/ast.rs`.
+
+---
+
+## 10. Common Traversal Patterns
+
+When working with the AST programmatically (in renderers, formatters, or linters), the following traversal patterns are commonly used.
+
+### Recursive Walk (All Nodes)
+
+Walk every node in the tree depth-first:
+
+```typescript
+function walk(node: Node, visit: (node: Node) => void): void {
+  visit(node);
+  for (const child of node.children ?? []) {
+    walk(child, visit);
+  }
+}
+```
+
+### Find Nodes by Type
+
+Collect all nodes of a specific type:
+
+```typescript
+function findNodesByType(root: Document, type: string): Node[] {
+  const results: Node[] = [];
+  walk(root, (node) => {
+    if (node.type === type) results.push(node);
+  });
+  return results;
+}
+
+// Usage: find all headings
+const headings = findNodesByType(doc, "Heading");
+```
+
+### Collect Cross-Reference Labels
+
+Traverse only `Directive` nodes to build the label map:
+
+```typescript
+function collectLabels(root: Document): Map<string, LabelInfo> {
+  const labels = new Map();
+  let eqCounter = 0;
+  const thmCounters: Record<string, number> = {};
+
+  for (const child of root.children) {
+    collectLabelsRecursive(child, labels, eqCounter, thmCounters);
+  }
+  return labels;
+}
+```
+
+### Render All Inline Children
+
+Convert inline node arrays to output strings:
+
+```typescript
+function renderInlines(inlines: InlineNode[]): string {
+  return inlines.map(renderInline).join("");
+}
+```
+
+### Extract All Text Content
+
+Get plain text content from a node subtree (useful for search indexing):
+
+```typescript
+function extractText(node: Node): string {
+  if (node.type === "Text") return node.value;
+  if (node.type === "Code" || node.type === "CodeBlock") return node.source ?? node.value ?? "";
+  let text = "";
+  for (const child of node.children ?? []) {
+    text += extractText(child);
+  }
+  return text;
+}
+```
+
+### Span-to-Range Conversion (LSP)
+
+Convert byte spans to LSP line/column ranges for editor tooling:
+
+```typescript
+function spanToRange(source: string, span: Span): Range {
+  const startLines = source.substring(0, span.start).split("\n");
+  const endLines = source.substring(0, span.end).split("\n");
+  return {
+    start: { line: startLines.length - 1, character: startLines[startLines.length - 1].length },
+    end: { line: endLines.length - 1, character: endLines[endLines.length - 1].length },
+  };
+}
+```
 
 ---
 

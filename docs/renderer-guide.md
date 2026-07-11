@@ -53,6 +53,9 @@
 9. [HTML Renderer Reference](#9-html-renderer-reference)
 10. [PDF Renderer Reference](#10-pdf-renderer-reference)
 11. [Testing Your Renderer](#11-testing-your-renderer)
+12. [Accessibility](#12-accessibility)
+13. [Performance Optimization](#13-performance-optimization)
+14. [CSS Examples](#14-css-examples)
 
 ---
 
@@ -278,6 +281,16 @@ Blockquotes render with visual indentation or a left border.
 
 Admonition types (`NOTE`, `TIP`, `WARNING`, `IMPORTANT`, `CAUTION`) should receive distinct visual treatment (colors, icons, or labels).
 
+**Admonition CSS styling example:**
+```css
+.admonition { border-left: 4px solid; padding: 1em; margin: 1em 0; border-radius: 4px; }
+.admonition[data-type="NOTE"] { background: #ebf8ff; border-color: #3182ce; }
+.admonition[data-type="WARNING"] { background: #fffaf0; border-color: #dd6b20; }
+.admonition[data-type="TIP"] { background: #f0fff4; border-color: #38a169; }
+.admonition[data-type="IMPORTANT"] { background: #fefcbf; border-color: #d69e2e; }
+.admonition[data-type="CAUTION"] { background: #fff5f5; border-color: #e53e3e; }
+```
+
 ### 4.5 CodeBlock
 
 Code blocks render with monospace font and syntax highlighting support.
@@ -302,6 +315,18 @@ Lists render with appropriate list markers.
 - **PDF:** "• " bullet for unordered, numbered for ordered, with 14pt indent
 
 Task list items with `checked` set should render checkbox indicators.
+
+```html
+<!-- Task list rendering -->
+<ul class="task-list">
+  <li class="task-list-item">
+    <input type="checkbox" checked disabled> Completed task
+  </li>
+  <li class="task-list-item">
+    <input type="checkbox" disabled> Pending task
+  </li>
+</ul>
+```
 
 ### 4.8 Table
 
@@ -379,6 +404,7 @@ Built-in directives should render according to their purpose:
 | `@[Align]` | Multi-line equation alignment via MathML |
 | `@[PMatrix]` | Matrix with parentheses via MathML |
 | `@[Cases]` | Piecewise function cases via MathML |
+| `@[Template]` | CSS stylesheet link or inline style block |
 
 ### 4.16 Extension
 
@@ -655,8 +681,6 @@ The PDF renderer is at `packages/vell-renderer-pdf/src/index.ts`.
 | Math | Courier | 10pt | Light background |
 | Footnotes | Helvetica | 8pt | After divider |
 
----
-
 ## 11. Testing Your Renderer
 
 ### Test Data
@@ -677,7 +701,7 @@ All renderers should be tested against the files in `spec/examples/`:
 
 ### Test Checklist
 
-- [ ] All 8 spec examples render without errors
+- [ ] All 9 spec examples render without errors
 - [ ] Equations auto-number correctly across the document
 - [ ] Theorem environments auto-number correctly (skipping Proof, Remark, Example, Notation)
 - [ ] Cross-references (`@[Ref]`) resolve to correct equation/theorem numbers
@@ -693,6 +717,312 @@ All renderers should be tested against the files in `spec/examples/`:
 - [ ] Diagrams render with correct type-specific wrappers (mermaid div, ascii pre)
 - [ ] Chart data is parsed and rendered as SVG with proper bar scaling
 - [ ] Empty chart data produces safe fallback output (empty SVG or table)
+
+---
+
+## 12. Accessibility
+
+Rendered Vell documents should be accessible to users with disabilities. Follow these guidelines to ensure your renderer produces accessible output.
+
+### Semantic HTML
+
+Use HTML5 semantic elements for better screen reader navigation:
+
+```html
+<!-- Use <nav> for table of contents -->
+<nav aria-label="Table of Contents">...</nav>
+
+<!-- Use <main> for document body -->
+<main>...</main>
+
+<!-- Use <section> for document sections -->
+<section aria-labelledby="heading-id">...</section>
+```
+
+### Image Alt Text
+
+Always render the `alt` attribute from Image and ImageRef nodes. If alt text is missing, use an empty string `alt=""` (decorative image) rather than omitting the attribute.
+
+```html
+<!-- Good: explicit alt text -->
+<img src="chart.png" alt="Quarterly revenue bar chart">
+
+<!-- Good: decorative image -->
+<img src="decoration.png" alt="">
+```
+
+### Link Titles
+
+Use the `title` field from Link nodes as the link's title attribute for additional context:
+
+```html
+<a href="https://example.com" title="Visit Example website">Example</a>
+```
+
+### ARIA Attributes
+
+The `@[Accessibility]` directive can inject ARIA attributes into parent elements:
+
+```vell
+@[Accessibility](role=banner aria-label="Site header")
+```
+
+Renderers should apply these attributes to the nearest block-level parent element:
+
+```html
+<div role="banner" aria-label="Site header">...</div>
+```
+
+### Color Contrast
+
+Ensure that admonition types, diagram captions, and link colors meet WCAG 2.1 AA contrast ratios (4.5:1 for normal text, 3:1 for large text). The reference CSS uses these color combinations:
+- **NOTE:** Blue (#3182ce) on light blue (#ebf8ff) — 4.7:1
+- **WARNING:** Orange (#dd6b20) on light orange (#fffaf0) — 5.2:1
+- **TIP:** Green (#38a169) on light green (#f0fff4) — 4.8:1
+
+### Keyboard Navigation
+
+- Ensure links, footnotes, and cross-references are keyboard-focusable
+- Provide visible focus indicators (`:focus-visible` outlines)
+- Slide decks should support keyboard navigation (arrow keys)
+
+### Print Accessibility
+
+PDF-friendly output should include:
+- Running page headers with document titles
+- Page numbers for navigation
+- Visible URL text after links (`content: attr(href)` in `@media print`)
+
+---
+
+## 13. Performance Optimization
+
+For renderers handling large documents, the following optimization strategies are recommended.
+
+### Memoization
+
+Cache frequently computed results:
+
+```typescript
+class Renderer {
+  private escapedCache = new Map<string, string>();
+
+  escapeHtml(text: string): string {
+    let cached = this.escapedCache.get(text);
+    if (cached === undefined) {
+      cached = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      // Cache only strings shorter than 1KB
+      if (text.length < 1024) this.escapedCache.set(text, cached);
+    }
+    return cached;
+  }
+}
+```
+
+### String Builder Pattern
+
+Avoid repeated string concatenation for large documents:
+
+```typescript
+// Prefer array join over += concatenation
+const parts: string[] = [];
+for (const node of children) {
+  parts.push(renderNode(node));
+}
+return parts.join("");
+```
+
+### Pre-compute Label Maps
+
+For cross-reference resolution, compute the label map once during the pre-pass and reuse it for all `@[Ref]` directives:
+
+```typescript
+// Single pre-pass
+const labelMap = collectLabels(document);
+
+// Reuse during render pass
+function renderRef(props: Record<string, unknown>): string {
+  const label = String(props.label ?? "");
+  const target = labelMap.get(label);
+  // ...
+}
+```
+
+### Stream Output
+
+For very large documents (> 10 MB rendered output), consider streaming the output rather than building it all in memory:
+
+```typescript
+function renderStream(document: Document, writable: WritableStream): void {
+  writable.write("<!DOCTYPE html>\n<html>\n<head>\n");
+  // ... write incrementally ...
+}
+```
+
+### Profile Before Optimizing
+
+Always profile your renderer on real document sizes before optimizing. The parser is O(n) and renders typically spend:
+- 70% of time on string escaping/encoding
+- 20% of time on MathML conversion
+- 10% of time on tree traversal
+
+---
+
+## 14. CSS Examples
+
+The following CSS styles are used by the reference HTML renderer. You can include or customize them for your own renderer output.
+
+### Document Layout
+
+```css
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12pt;
+  line-height: 1.6;
+  color: #1a202c;
+  max-width: 42em;
+  margin: 2em auto;
+  padding: 0 1em;
+}
+```
+
+### Admonitions
+
+```css
+.admonition {
+  border-left: 4px solid;
+  padding: 0.8em 1em;
+  margin: 1em 0;
+  border-radius: 4px;
+}
+.admonition[data-type="NOTE"] { background: #ebf8ff; border-color: #3182ce; }
+.admonition[data-type="TIP"]   { background: #f0fff4; border-color: #38a169; }
+.admonition[data-type="WARNING"] { background: #fffaf0; border-color: #dd6b20; }
+.admonition[data-type="IMPORTANT"] { background: #fefcbf; border-color: #d69e2e; }
+.admonition[data-type="CAUTION"] { background: #fff5f5; border-color: #e53e3e; }
+.admonition-title {
+  font-weight: bold;
+  margin-bottom: 0.5em;
+  text-transform: uppercase;
+  font-size: 0.85em;
+}
+```
+
+### Code Blocks
+
+```css
+pre {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1em;
+  overflow-x: auto;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", monospace;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+code {
+  background: #f7fafc;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: "SF Mono", monospace;
+  font-size: 0.9em;
+}
+```
+
+### Tables
+
+```css
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+th, td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+th {
+  background: #f7fafc;
+  font-weight: 600;
+}
+```
+
+### Footnotes
+
+```css
+.footnotes {
+  margin-top: 2em;
+  padding-top: 1em;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.9em;
+}
+.footnotes ol {
+  padding-left: 1.5em;
+}
+.footnotes li:target {
+  background: #fffff0;
+}
+```
+
+### Cross-References
+
+```css
+.vell-ref {
+  color: #2b6cb0;
+  text-decoration: none;
+}
+.vell-ref:hover {
+  text-decoration: underline;
+}
+.unresolved-ref {
+  color: #e53e3e;
+  font-style: italic;
+}
+```
+
+### Diagrams
+
+```css
+.vell-diagram {
+  border: 1px solid #e2e8f0;
+  background: #f7fafc;
+  border-radius: 6px;
+  padding: 1em;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+.diagram-caption {
+  text-align: center;
+  font-style: italic;
+  margin-top: 0.5em;
+  color: #718096;
+}
+```
+
+### Print Styles (PDF)
+
+```css
+@media print {
+  @page {
+    size: A4;
+    margin: 2.54cm;
+    @top-center { content: attr(data-document-title); font-size: 9pt; color: #666; }
+    @bottom-center { content: counter(page); font-size: 9pt; color: #666; }
+  }
+  h1, h2 { page-break-before: always; }
+  h3, h4 { page-break-after: avoid; }
+  pre, table, blockquote, img, .vell-diagram { page-break-inside: avoid; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #666; }
+  .vell-slide { display: none; }
+  nav.toc { page-break-after: always; }
+}
+```
 
 ---
 

@@ -202,6 +202,69 @@ pub fn cmd_render_slides(input: &Option<PathBuf>, output: &Option<PathBuf>) -> R
 // HTML renderer
 // ---------------------------------------------------------------------------
 
+/// Render EPUB command: parse Vell source and invoke the TypeScript EPUB renderer.
+pub fn cmd_render_epub(
+    input: &Option<PathBuf>,
+    output: &Option<PathBuf>,
+    renderer_path: &Option<PathBuf>,
+) -> Result<(), String> {
+    let source = read_source(input)?;
+    let resolved = resolve_includes(&source, input)?;
+    let doc = parse_document(&resolved).map_err(|e| format!("Parse error: {}", e))?;
+    let ast_json = serde_json::to_string_pretty(&doc)
+        .map_err(|e| format!("Failed to serialize AST: {}", e))?;
+    let pkg_dir = if let Some(p) = renderer_path {
+        p.clone()
+    } else {
+        let cwd = std::env::current_dir().map_err(|e| format!("Failed to get CWD: {}", e))?;
+        let cwd_candidate = cwd.join("packages").join("vell-renderer-epub");
+        if cwd_candidate.join("cli.js").exists() {
+            cwd_candidate
+        } else if let Ok(exe) = std::env::current_exe() {
+                let mut probe = exe;
+                loop {
+                    let candidate = probe.join("packages").join("vell-renderer-epub");
+                    if candidate.join("cli.js").exists() { break candidate; }
+                    if !probe.pop() { break cwd; }
+                }
+        } else { cwd }
+    };
+    let cli_script = pkg_dir.join("cli.js");
+    if !cli_script.exists() {
+        return Err(format!(
+            "EPUB renderer not found at '{}'. Run `pnpm install && pnpm build` in the packages/vell-renderer-epub directory first.",
+            cli_script.display()
+        ));
+    }
+    let temp_dir = std::env::temp_dir();
+    let temp_ast = temp_dir.join(format!("vell-epub-{}.json", std::process::id()));
+    std::fs::write(&temp_ast, &ast_json)
+        .map_err(|e| format!("Failed to write temp AST: {}", e))?;
+    let output_path = if let Some(out) = output {
+        out.to_string_lossy().to_string()
+    } else {
+        temp_dir.join(format!("vell-output-{}.epub", std::process::id())).to_string_lossy().to_string()
+    };
+    let status = std::process::Command::new("node")
+        .arg(&cli_script).arg(&temp_ast).arg(&output_path)
+        .status()
+        .map_err(|e| format!("Failed to run EPUB renderer: {} (is Node.js installed?)", e))?;
+    if !status.success() {
+        let _ = std::fs::remove_file(&temp_ast);
+        return Err("EPUB rendering failed (see errors above)".to_string());
+    }
+    if output.is_none() {
+        use std::io::Write;
+        std::io::stdout().write_all(&std::fs::read(&output_path).map_err(|e| format!("Failed to read EPUB: {}", e))?)
+            .map_err(|e| format!("Failed to write EPUB to stdout: {}", e))?;
+    }
+    let _ = std::fs::remove_file(&temp_ast);
+    if output.is_none() { let _ = std::fs::remove_file(&output_path); }
+    Ok(())
+}
+
+
+/// Resolves @[Include](path="...") directives by reading and merging referenced files.
 /// Resolves @[Include](path="...") directives by reading and merging referenced files.
 /// This is done as a pre-processing step before parsing.
 /// Uses a `resolved_set` to detect and prevent circular includes.
@@ -486,6 +549,21 @@ thread_local! {
     static RENDER_BIBLIOGRAPHY: RefCell<Option<vell_core::bibliography::Bibliography>> = const { RefCell::new(None) };
 }
 
+/// Returns the `lang` and `dir` attribute string for the <html> element based on document metadata.
+fn html_lang_dir_attrs(lang: Option<&str>) -> String {
+    if let Some(l) = lang {
+        let dir = if is_rtl_language(l) { "rtl" } else { "ltr" };
+        format!(" lang=\"{}\" dir=\"{}\"", escape_html(l), dir)
+    } else { String::new() }
+}
+
+/// Detect if a language code is a right-to-left (RTL) language.
+fn is_rtl_language(lang: &str) -> bool {
+    let rtl_langs = ["ar","arc","bcc","bqi","ckb","dv","fa","glk","ha","he","khw","ks","ku","mzn","nqo","pa","ps","sd","ug","ur","uz","yi"];
+    let base = lang.split('-').next().unwrap_or(lang).to_lowercase();
+    rtl_langs.contains(&base.as_str())
+}
+
 /// Renders a parsed Vell document to an HTML string.
 pub fn render_document(doc: &Document) -> String {
     // Pre-collect TOC, LOF, LOT entries into thread-locals
@@ -498,10 +576,12 @@ pub fn render_document(doc: &Document) -> String {
 
     let mut html = String::new();
     let title = doc.metadata.title.as_deref().unwrap_or("Vell Document");
-    html.push_str("<!doctype html>\n<html>\n<head>\n");
+    let lang_dir = html_lang_dir_attrs(doc.metadata.lang.as_deref());
+    html.push_str(&format!("<!doctype html>\n<html{}>\n<head>\n", lang_dir));
     html.push_str("<meta charset=\"utf-8\">\n");
     html.push_str(&format!("<title>{}</title>\n", escape_html(title)));
     html.push_str(VELL_CSS);
+    html.push_str(VELL_CSS_A11Y);
     html.push_str("</head>\n<body>\n");
     let mut footnotes = Vec::new();
     for node in &doc.children {
@@ -546,10 +626,12 @@ pub fn render_document_pdf(doc: &Document) -> String {
 
     let mut html = String::new();
     let title = doc.metadata.title.as_deref().unwrap_or("Vell Document");
-    html.push_str("<!doctype html>\n<html>\n<head>\n");
+    let lang_dir = html_lang_dir_attrs(doc.metadata.lang.as_deref());
+    html.push_str(&format!("<!doctype html>\n<html{}>\n<head>\n", lang_dir));
     html.push_str("<meta charset=\"utf-8\">\n");
     html.push_str(&format!("<title>{}</title>\n", escape_html(title)));
     html.push_str(VELL_CSS);
+    html.push_str(VELL_CSS_A11Y);
     html.push_str("</head>\n<body>\n");
     // Running page header
     html.push_str(&format!(
@@ -987,6 +1069,38 @@ img { max-width: 100%; height: auto; }\n\
 }\n\
 </style>\n";
 
+
+const VELL_CSS_A11Y: &str = "\n\
+/* Phase 19: High contrast theme */\n\
+@media (prefers-contrast: high) {\n\
+  body { color: #000; background: #fff; }\n\
+  a { color: #0056b3; text-decoration: underline; }\n\
+  a.vell-ref { color: #004080; }\n\
+  pre, code { background: #fff; border: 2px solid #000; }\n\
+  table th, table td { border: 2px solid #000; }\n\
+  th { background: #e0e0e0; }\n\
+  .vell-theorem { border-left: 4px solid #000; background: #fff; }\n\
+  .vell-proof { border-left-color: #555; }\n\
+  .vell-lemma { border-left-color: #333; }\n\
+  .vell-corollary { border-left-color: #777; }\n\
+  .vell-definition { border-left-color: #333; }\n\
+  .admonition { border-left: 4px solid #000; background: #fff; }\n\
+  .vell-chem { background: #fff; border: 2px solid #234e52; }\n\
+  .vell-toc, .vell-lof, .vell-lot { background: #fff; border: 2px solid #000; }\n\
+  .vell-diagram { background: #fff; border: 2px solid #000; }\n\
+  .vell-math-env { background: #fff; border: 2px solid #000; }\n\
+  .vell-equation { border: 1px solid #000; padding: 0.3em; }\n\
+  input, select, textarea { border: 2px solid #000; }\n\
+}\n\
+/* Phase 19: CJK typography */\n\
+:lang(zh) body { font-family: \'Noto Sans SC\', \'PingFang SC\', \'Microsoft YaHei\', \'Hiragino Sans GB\', sans-serif; line-height: 1.9; }\n\
+:lang(ja) body { font-family: \'Noto Sans JP\', \'Hiragino Sans\', \'Yu Gothic\', \'Meiryo\', sans-serif; line-height: 1.9; }\n\
+:lang(ko) body { font-family: \'Noto Sans KR\', \'Apple SD Gothic Neo\', \'Malgun Gothic\', sans-serif; line-height: 1.9; }\n\
+:lang(zh) pre, :lang(ja) pre, :lang(ko) pre { font-family: \'Noto Sans Mono CJK SC\', \'Source Han Sans SC\', \'Noto Sans Mono\', monospace; }\n\
+:lang(zh) h1, :lang(zh) h2, :lang(zh) h3 { letter-spacing: 0.05em; }\n\
+:lang(ja) h1, :lang(ja) h2, :lang(ja) h3 { letter-spacing: 0.05em; }\n\
+:lang(ko) h1, :lang(ko) h2, :lang(ko) h3 { letter-spacing: 0.03em; }\n\
+";
 fn collect_footnotes(node: &Node, out: &mut Vec<(String, Vec<Node>)>) {
     if let Node::FootnoteDefinition {
         marker, children, ..

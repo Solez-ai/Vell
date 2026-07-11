@@ -2,7 +2,8 @@
 
 @[Meta](title="Phase 13: Package and Extension Ecosystem")
 
-This document demonstrates the Vell extension system, template support, and the built-in extension library.
+This document demonstrates the Vell extension system, template support, and the built-in extension
+library.
 
 ---
 
@@ -10,7 +11,7 @@ This document demonstrates the Vell extension system, template support, and the 
 
 Use the Template directive to apply document templates.
 
-@[Template](url="https://cdn.example.com/scientific-paper.css" name=scientific-paper)
+@[Template](name="scientific-paper" url="https://cdn.example.com/scientific-paper.css")
 
 == Built-in Extensions
 
@@ -18,34 +19,31 @@ Vell supports namespaced extensions using the pattern prefix-slash-name.
 
 === YouTube Embed
 
-@[embed/YouTube](video=dQw4w9WgXcQ width=560)
+@[embed/YouTube](video="dQw4w9WgXcQ" width=560)
 
 === Interactive Charts
 
-@[npm/chart](type=bar data="[10, 25, 15, 30, 20]" labels="Q1, Q2, Q3, Q4, Q5" title="Quarterly Sales")
+@[npm/chart](data="[10, 25, 15, 30, 20]" labels="Q1, Q2, Q3, Q4, Q5" title="Quarterly Sales" type="bar")
 
 === Mermaid Diagrams
 
-@[npm/mermaid](theme=default) {
-  graph LR
-    A -- text --> B
-    B -- more --> C
-    C -- result --> D
+@[npm/mermaid](theme="default") {
+  graph LR A -- text --> B B -- more --> C C -- result --> D
 }
 
 === Callout Boxes
 
-@[npm/callout](type=note title="Note") {
+@[npm/callout](title="Note" type="note") {
   This is a note callout for general information.
 }
 
-@[npm/callout](type=warning title="Important") {
+@[npm/callout](title="Important" type="warning") {
   Warning callouts should be used sparingly.
 }
 
 === Map Embed
 
-@[npm/map](lat=51.5074 lng=-0.1278 zoom=12 title="London Map")
+@[npm/map](lat=51.5074 lng=-0.1278 title="London Map" zoom=12)
 
 == Extension Registration
 
@@ -55,13 +53,14 @@ Extensions are registered at the application level: import, register, and render
 
 Extensions use the pattern prefix-slash-name to avoid conflicts.
 
-| Namespace | Usage |
-|-----------|-------|
-| embed-slash | Media embeds |
-| npm-slash | Open-source packages |
-| gh-slash | GitHub-hosted extensions |
+| Namespace    | Usage                            |
+|--------------|----------------------------------|
+| embed-slash  | Media embeds                     |
+| npm-slash    | Open-source packages             |
+| gh-slash     | GitHub-hosted extensions         |
 | domain-slash | Organization-specific extensions |
 
 == Summary
 
-Vell's extension system provides namespaced extensions, rich adapters, graceful fallback, and a template system.
+Vell's extension system provides namespaced extensions, rich adapters, graceful fallback, and a
+template system.

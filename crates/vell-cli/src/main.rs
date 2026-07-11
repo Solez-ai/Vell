@@ -73,6 +73,16 @@ enum RenderFormat {
         #[arg(short = 'o')]
         output: Option<PathBuf>,
     },
+    /// Render to EPUB 3 (requires Node.js).
+    Epub {
+        /// Input file (reads from stdin if absent).
+        input: Option<PathBuf>,
+        /// Output .epub file path.
+        output: Option<PathBuf>,
+        /// Path to the vell-renderer-epub package (default: packages/vell-renderer-epub).
+        #[arg(long)]
+        renderer_path: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -89,6 +99,13 @@ fn main() {
         Command::Render {
             format: RenderFormat::Slides { input, output },
         } => vell_cli::cmd_render_slides(&input, &output),
+        Command::Render {
+            format: RenderFormat::Epub {
+                input,
+                output,
+                renderer_path,
+            },
+        } => vell_cli::cmd_render_epub(&input, &output, &renderer_path),
         Command::Validate { input } => vell_cli::cmd_validate(&input),
     };
 

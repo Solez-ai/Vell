@@ -1,19 +1,17 @@
 = Advanced Math in Vell
 
-@[Meta](author="Samin Yeasar" date="2026-07-03" lang=en)
+@[Meta](author="Samin Yeasar" date="2026-07-03" lang="en")
 
-This document demonstrates the full range of LaTeX math syntax
-supported by Vell's LaTeX-to-MathML converters.
+This document demonstrates the full range of LaTeX math syntax supported by Vell's LaTeX-to-MathML
+converters.
 
 == Greek Letters
 
-Lowercase: $\alpha$ $\beta$ $\gamma$ $\delta$ $\epsilon$
-$\zeta$ $\eta$ $\theta$ $\iota$ $\kappa$ $\lambda$
-$\mu$ $\nu$ $\xi$ $\omicron$ $\pi$ $\rho$ $\sigma$
-$\tau$ $\upsilon$ $\phi$ $\chi$ $\psi$ $\omega$
+Lowercase: $\alpha$ $\beta$ $\gamma$ $\delta$ $\epsilon$ $\zeta$ $\eta$ $\theta$ $\iota$ $\kappa$
+$\lambda$ $\mu$ $\nu$ $\xi$ $\omicron$ $\pi$ $\rho$ $\sigma$ $\tau$ $\upsilon$ $\phi$ $\chi$ $\psi$
+$\omega$
 
-Uppercase: $\Gamma$ $\Delta$ $\Theta$ $\Lambda$ $\Xi$
-$\Pi$ $\Sigma$ $\Phi$ $\Psi$ $\Omega$
+Uppercase: $\Gamma$ $\Delta$ $\Theta$ $\Lambda$ $\Xi$ $\Pi$ $\Sigma$ $\Phi$ $\Psi$ $\Omega$
 
 Variants: $\varepsilon$ $\vartheta$ $\varrho$ $\varsigma$ $\varphi$
 
@@ -32,6 +30,7 @@ Simple: $\frac{1}{2}$ $\frac{a}{b}$ $\frac{x+1}{x-1}$
 Nested: $\frac{\frac{1}{2}}{3}$ $\frac{x^{\frac{1}{2}}}{y}$
 
 Display:
+
 $$
 \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
 $$
@@ -39,6 +38,7 @@ $$
 == Integrals, Sums, and Products
 
 Integrals:
+
 $$
 \int_0^\infty e^{-x^2} \, dx = \frac{\sqrt{\pi}}{2}
 $$
@@ -52,6 +52,7 @@ $$
 $$
 
 Sums and products:
+
 $$
 \sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
 $$
@@ -72,19 +73,16 @@ Nested: $\sqrt{\frac{a}{b}}$ $\sqrt{\sqrt{x}}$
 
 == Operators
 
-Arithmetic: $a \times b$ $a \div b$ $a \pm b$ $a \mp b$
-$a \cdot b$ $a \circ b$ $a \ast b$ $a \star b$
+Arithmetic: $a \times b$ $a \div b$ $a \pm b$ $a \mp b$ $a \cdot b$ $a \circ b$ $a \ast b$
+$a \star b$
 
-Matrix-style: $A \otimes B$ $A \oplus B$ $A \ominus B$
-$A \oslash B$ $A \odot B$
+Matrix-style: $A \otimes B$ $A \oplus B$ $A \ominus B$ $A \oslash B$ $A \odot B$
 
 == Relations
 
-Equality: $a \equiv b$ $a \approx b$ $a \sim b$
-$a \simeq b$ $a \cong b$ $a \propto b$
+Equality: $a \equiv b$ $a \approx b$ $a \sim b$ $a \simeq b$ $a \cong b$ $a \propto b$
 
-Inequality: $a \neq b$ $a \le b$ $a \ge b$
-$a \ll b$ $a \gg b$ $a \prec b$ $a \succ b$
+Inequality: $a \neq b$ $a \le b$ $a \ge b$ $a \ll b$ $a \gg b$ $a \prec b$ $a \succ b$
 
 Ordering: $a \preceq b$ $a \succeq b$
 
@@ -94,8 +92,7 @@ $$
 
 == Set Theory
 
-Containment: $A \subset B$ $A \supset B$
-$A \subseteq B$ $A \supseteq B$
+Containment: $A \subset B$ $A \supset B$ $A \subseteq B$ $A \supseteq B$
 
 Operations: $A \cap B$ $A \cup B$ $A \setminus B$
 
@@ -109,8 +106,7 @@ $$
 
 == Arrows
 
-Single: $\rightarrow$ $\leftarrow$ $\uparrow$ $\downarrow$
-$\leftrightarrow$
+Single: $\rightarrow$ $\leftarrow$ $\uparrow$ $\downarrow$ $\leftrightarrow$
 
 Double: $\Rightarrow$ $\Leftarrow$ $\Leftrightarrow$
 
@@ -124,8 +120,7 @@ $$
 
 == Logical Symbols
 
-Quantifiers: $\forall x \in \mathbb{R}$ $\exists y > 0$
-$\nexists$ such that $y < 0$
+Quantifiers: $\forall x \in \mathbb{R}$ $\exists y > 0$ $\nexists$ such that $y < 0$
 
 Connectives: $P \land Q$ $P \lor Q$ $\neg P$
 
@@ -135,8 +130,7 @@ Proof theory: $\Gamma \vdash P$ $\mathcal{M} \models \phi$
 
 == Functions and Operators
 
-Trigonometric: $\sin x$ $\cos x$ $\tan x$ $\cot x$
-$\sec x$ $\csc x$
+Trigonometric: $\sin x$ $\cos x$ $\tan x$ $\cot x$ $\sec x$ $\csc x$
 
 Inverse: $\arcsin x$ $\arccos x$ $\arctan x$
 
@@ -144,8 +138,8 @@ Hyperbolic: $\sinh x$ $\cosh x$ $\tanh x$
 
 Logarithms: $\log x$ $\ln x$ $\exp(x)$
 
-Calculus: $\frac{\partial f}{\partial x}$ $\nabla f$
-$\dim V$ $\det A$ $\ker T$ $\hom(G, H)$ $\gcd(a, b)$
+Calculus: $\frac{\partial f}{\partial x}$ $\nabla f$ $\dim V$ $\det A$ $\ker T$ $\hom(G, H)$
+$\gcd(a, b)$
 
 Limits: $\lim_{x \to 0} \frac{\sin x}{x} = 1$
 
@@ -156,16 +150,19 @@ $$
 == Calculus and Analysis
 
 Derivative:
+
 $$
 \frac{d}{dx} \int_a^x f(t) \, dt = f(x)
 $$
 
 Partial derivatives:
+
 $$
 \frac{\partial^2 f}{\partial x \partial y}
 $$
 
 Gradient and Laplacian:
+
 $$
 \nabla \cdot \vec{F} = \frac{\partial F_x}{\partial x} + \frac{\partial F_y}{\partial y}
 $$
@@ -177,21 +174,25 @@ $$
 == Famous Equations
 
 Euler's identity:
+
 $$
 e^{i\pi} + 1 = 0
 $$
 
 Pythagorean theorem:
+
 $$
 a^2 + b^2 = c^2
 $$
 
 Quadratic formula:
+
 $$
 x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
 $$
 
 Einstein's mass-energy equivalence:
+
 $$
 E = mc^2
 $$
@@ -256,7 +257,7 @@ $$
 \quad \text{(heat equation)}
 $$
 
-$$ 
+$$
 \hat{\beta} = (X^{\top} X)^{-1} X^{\top} y
 \quad \text{where} \quad
 X \in \mathbb{R}^{n \times p}
@@ -264,13 +265,10 @@ $$
 
 == Inline Mixed
 
-Vell supports all of this inline too: $\int_a^b f(x)\,dx$, 
-$\sum_{i=1}^n i = \frac{n(n+1)}{2}$, $\forall \epsilon > 0$,
-$\alpha \neq \beta \implies \alpha \prec \beta \lor \beta \prec \alpha$,
+Vell supports all of this inline too: $\int_a^b f(x)\,dx$, $\sum_{i=1}^n i = \frac{n(n+1)}{2}$,
+$\forall \epsilon > 0$, $\alpha \neq \beta \implies \alpha \prec \beta \lor \beta \prec \alpha$,
 $\emptyset \subset A \subseteq B$, $\dot{x} = \frac{dx}{dt}$,
-$\vec{v} = \langle v_x, v_y, v_z \rangle$,
-$\lim_{x \to 0} \frac{\sin x}{x} = 1$,
-$e^{i\pi} + 1 = 0$,
-$\frac{\partial f}{\partial x} = 2x$.
+$\vec{v} = \langle v_x, v_y, v_z \rangle$, $\lim_{x \to 0} \frac{\sin x}{x} = 1$,
+$e^{i\pi} + 1 = 0$, $\frac{\partial f}{\partial x} = 2x$.
 
 That's the full breadth of LaTeX math that Vell can handle.

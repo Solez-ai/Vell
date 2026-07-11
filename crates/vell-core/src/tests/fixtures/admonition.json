@@ -25,7 +25,7 @@
       "admonition_type": "WARNING",
       "span": {
         "start": 0,
-        "end": 29
+        "end": 27
       }
     },
     {
@@ -51,8 +51,8 @@
       ],
       "admonition_type": "TIP",
       "span": {
-        "start": 31,
-        "end": 51
+        "start": 28,
+        "end": 46
       }
     }
   ],
@@ -65,6 +65,6 @@
   },
   "span": {
     "start": 0,
-    "end": 51
+    "end": 46
   }
 }

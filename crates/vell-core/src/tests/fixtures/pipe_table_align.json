@@ -17,7 +17,7 @@
           ],
           "colspan": 1,
           "rowspan": 1,
-          "align": "Left",
+          "align": null,
           "span": {
             "start": 1,
             "end": 7
@@ -36,7 +36,7 @@
           ],
           "colspan": 1,
           "rowspan": 1,
-          "align": "Center",
+          "align": null,
           "span": {
             "start": 8,
             "end": 16
@@ -55,7 +55,7 @@
           ],
           "colspan": 1,
           "rowspan": 1,
-          "align": "Right",
+          "align": null,
           "span": {
             "start": 17,
             "end": 24
@@ -70,17 +70,17 @@
                 "type": "Text",
                 "value": "1",
                 "span": {
-                  "start": 55,
-                  "end": 56
+                  "start": 53,
+                  "end": 54
                 }
               }
             ],
             "colspan": 1,
             "rowspan": 1,
-            "align": "Left",
+            "align": null,
             "span": {
-              "start": 55,
-              "end": 61
+              "start": 53,
+              "end": 59
             }
           },
           {
@@ -89,17 +89,17 @@
                 "type": "Text",
                 "value": "2",
                 "span": {
-                  "start": 62,
-                  "end": 63
+                  "start": 60,
+                  "end": 61
                 }
               }
             ],
             "colspan": 1,
             "rowspan": 1,
-            "align": "Center",
+            "align": null,
             "span": {
-              "start": 62,
-              "end": 70
+              "start": 60,
+              "end": 68
             }
           },
           {
@@ -108,24 +108,24 @@
                 "type": "Text",
                 "value": "3",
                 "span": {
-                  "start": 71,
-                  "end": 72
+                  "start": 69,
+                  "end": 70
                 }
               }
             ],
             "colspan": 1,
             "rowspan": 1,
-            "align": "Right",
+            "align": null,
             "span": {
-              "start": 71,
-              "end": 78
+              "start": 69,
+              "end": 76
             }
           }
         ]
       ],
       "span": {
         "start": 0,
-        "end": 81
+        "end": 78
       }
     }
   ],
@@ -138,6 +138,6 @@
   },
   "span": {
     "start": 0,
-    "end": 81
+    "end": 78
   }
 }

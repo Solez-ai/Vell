@@ -8,7 +8,7 @@
       "title": null,
       "span": {
         "start": 0,
-        "end": 29
+        "end": 28
       }
     },
     {
@@ -18,7 +18,7 @@
       "title": "With Title",
       "span": {
         "start": 29,
-        "end": 71
+        "end": 70
       }
     },
     {
@@ -53,7 +53,7 @@
       ],
       "span": {
         "start": 71,
-        "end": 101
+        "end": 100
       }
     }
   ],
@@ -66,6 +66,6 @@
   },
   "span": {
     "start": 0,
-    "end": 101
+    "end": 100
   }
 }

@@ -7,9 +7,10 @@ authors.workspace = true
 
 [features]
 default = []
-http = []
+http = ["dep:ureq"]
 
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+ureq = { version = "2", optional = true }
