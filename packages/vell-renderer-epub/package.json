@@ -1,5 +1,5 @@
 {
-  "name": "@vell-lang/renderer-epub",
+  "name": "@solez-ai/vell-renderer-epub",
   "version": "0.1.0",
   "description": "EPUB 3 renderer for Vell documents",
   "author": "Samin Yeasar",

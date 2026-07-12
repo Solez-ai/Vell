@@ -45,6 +45,26 @@ enum Command {
         /// Optional input file (reads from stdin if absent).
         input: Option<PathBuf>,
     },
+    /// Watch a file and auto-rebuild on changes.
+    Watch {
+        /// Input file to watch.
+        input: Option<PathBuf>,
+        /// Output format (html, pdf, slides, epub).
+        #[arg(long, default_value = "html", value_parser = clap::builder::PossibleValuesParser::new(["html", "pdf", "slides", "epub"]))]
+        format: String,
+        /// Output file path (defaults to stdout).
+        #[arg(short = 'o')]
+        output: Option<PathBuf>,
+        /// Debounce interval in milliseconds.
+        #[arg(long, default_value_t = 500)]
+        debounce_ms: u64,
+        /// Start a live-reload HTTP server on port 3000 (alias for --port 3000).
+        #[arg(long, default_value_t = false)]
+        serve: bool,
+        /// Serve rebuilt HTML on this port (e.g. --port 3000). Ignored without --serve.
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
+    },
 }
 
 #[derive(Subcommand)]
@@ -106,6 +126,17 @@ fn main() {
                 renderer_path,
             },
         } => vell_cli::cmd_render_epub(&input, &output, &renderer_path),
+        Command::Watch {
+            input,
+            format,
+            output,
+            debounce_ms,
+            serve,
+            port,
+        } => {
+            let actual_port = if serve { port } else { 0 };
+            vell_cli::watch::cmd_watch(&input, &format, &output, debounce_ms, actual_port)
+        }
         Command::Validate { input } => vell_cli::cmd_validate(&input),
     };
 

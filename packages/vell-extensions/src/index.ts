@@ -8,8 +8,8 @@
  * Each extension provides its own schema, HTML adapter, and LSP metadata.
  *
  * Usage:
- *   import { YouTube, Chart, Mermaid, Callout } from "@vell-lang/extensions";
- *   import { render } from "@vell-lang/renderer-html";
+ *   import { YouTube, Chart, Mermaid, Callout } from "@solez-ai/vell-extensions";
+ *   import { render } from "@solez-ai/vell-renderer-html";
  *   const html = render(doc, { extensions: [YouTube, Chart] });
  */
 

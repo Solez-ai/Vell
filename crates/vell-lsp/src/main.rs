@@ -27,7 +27,7 @@ use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
-use vell_core::{parse_document, validate, Document, InlineNode, Node, ParseError, PropValue};
+use vell_core::{parse_document, parse_document_from, validate, Document, InlineNode, Node, ParseError, PropValue, Span};
 
 /// Cached document state for an open file.
 #[derive(Clone, Default)]
@@ -1568,7 +1568,7 @@ impl LanguageServer for Backend {
                     let mut new_source = vd.source.clone();
                     new_source.replace_range(start_byte..end_byte, &change.text);
                     drop(docs);
-                    self.update_document(uri, new_source).await;
+                    self.update_document_incremental(uri, new_source, start_byte).await;
                     return;
                 }
                 drop(docs);
@@ -2791,6 +2791,101 @@ impl Backend {
             vell_core::ParseErrorKind::MalformedTable => 6,
             vell_core::ParseErrorKind::MalformedMath => 7,
             vell_core::ParseErrorKind::InvalidPropValue => 8,
+        }
+    }
+
+    /// Incremental variant: only re-parses from start_byte, reusing existing
+    /// metadata and variables. Falls back to full parse when no cached AST exists.
+    async fn update_document_incremental(&self, uri: Url, source: String, start_byte: usize) {
+        let existing_parsed = {
+            let docs = self.documents.read().await;
+            docs.get(&uri).and_then(|vd| vd.parsed.clone())
+        };
+
+        let (parsed, errors) = if let Some(existing_doc) = existing_parsed {
+            let existing_variables: HashSet<String> = existing_doc.metadata.variables.keys().cloned().collect();
+            // Find safe start byte: re-parse from the beginning of the child
+            // block that contains start_byte, to avoid mid-block re-parsing.
+            let safe_start = existing_doc.children
+                .iter()
+                .find(|child| child.span().end > start_byte)
+                .map(|child| child.span().start)
+                .unwrap_or(start_byte);
+
+            match parse_document_from(&source, safe_start, &existing_doc.metadata, &existing_variables) {
+                Ok(outcome) => {
+                    let mut merged_children: Vec<Node> = existing_doc.children
+                        .iter()
+                        .filter(|child| child.span().end <= safe_start)
+                        .cloned()
+                        .collect();
+                    merged_children.extend(outcome.document.children);
+
+                    let doc = Document {
+                        version: outcome.document.version,
+                        children: merged_children,
+                        metadata: outcome.document.metadata,
+                        span: Span::new(0, source.len()),
+                    };
+                    (Some(doc), outcome.warnings)
+                }
+                Err(e) => {
+                    let parsed = parse_document(&source).ok();
+                    (parsed, vec![e])
+                }
+            }
+        } else {
+            let parsed = parse_document(&source).ok();
+            (parsed, Vec::new())
+        };
+
+        let vd = VellDocument {
+            source: source.clone(),
+            parsed,
+            errors: errors.clone(),
+        };
+        self.documents.write().await.insert(uri.clone(), vd);
+
+        let diagnostics: Vec<Diagnostic> = errors
+            .into_iter()
+            .map(|error| {
+                let range = Self::span_to_range(&source, &error.span);
+                let is_undefined_ref = error.kind == vell_core::ParseErrorKind::UndefinedReference;
+                let code = Self::diagnostic_code(&error.kind);
+
+                let tags = if is_undefined_ref {
+                    Some(vec![DiagnosticTag::UNNECESSARY])
+                } else {
+                    None
+                };
+
+                Diagnostic {
+                    range,
+                    severity: Some(if is_undefined_ref {
+                        DiagnosticSeverity::WARNING
+                    } else {
+                        DiagnosticSeverity::ERROR
+                    }),
+                    code: Some(NumberOrString::Number(code)),
+                    code_description: Some(CodeDescription {
+                        href: Url::parse(&format!(
+                            "https://vell-lang.dev/docs/diagnostics#vell{}",
+                            code
+                        ))
+                        .ok()
+                        .unwrap(),
+                    }),
+                    source: Some("vell".to_string()),
+                    message: error.message,
+                    tags,
+                    related_information: None,
+                    ..Diagnostic::default()
+                }
+            })
+            .collect();
+
+        if let Some(ref client) = self.client {
+            client.publish_diagnostics(uri, diagnostics, None).await;
         }
     }
 

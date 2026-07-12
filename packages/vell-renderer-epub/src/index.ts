@@ -26,7 +26,7 @@
  * ## Usage
  *
  * ```typescript
- * import { renderEpub } from "@vell-lang/renderer-epub";
+ * import { renderEpub } from "@solez-ai/vell-renderer-epub";
  * const epubData = await renderEpub(parsedDocument);
  * // epubData is a Uint8Array of the EPUB ZIP
  * ```

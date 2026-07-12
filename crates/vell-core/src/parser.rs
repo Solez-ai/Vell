@@ -56,9 +56,12 @@ struct Parser {
 
 impl Parser {
     fn new(source: &str) -> Self {
+        // Strip comments as a pre-processing step before splitting into lines.
+        // Comments inside fenced code blocks, math blocks, and inline code/math are preserved.
+        let cleaned = strip_comments(source);
         let mut lines = Vec::new();
         let mut start = 0usize;
-        for part in source.split_inclusive('\n') {
+        for part in cleaned.split_inclusive('\n') {
             let end = start + part.len();
             let without_lf = part.strip_suffix('\n').unwrap_or(part);
             let text = without_lf
@@ -68,7 +71,7 @@ impl Parser {
             lines.push(Line { text, start, end });
             start = end;
         }
-        if source.is_empty() || !source.ends_with('\n') {
+        if cleaned.is_empty() || !cleaned.ends_with('\n') {
             lines.push(Line {
                 text: String::new(),
                 start,
@@ -76,7 +79,7 @@ impl Parser {
             });
         }
         Self {
-            source: source.to_string(),
+            source: cleaned,
             lines,
             index: 0,
             metadata: DocumentMetadata::default(),
@@ -1634,6 +1637,165 @@ impl Parser {
     ) -> ParseError {
         ParseError::new(kind, span, message, suggestion)
     }
+}
+
+/// Parse a Vell document starting from a given byte offset.
+/// Lines before the offset are skipped, but the metadata and variable
+/// state from the provided `existing` document are preserved.
+/// This enables incremental re-parsing for the LSP.
+pub fn parse_document_from(
+    source: &str,
+    start_byte: usize,
+    existing_metadata: &DocumentMetadata,
+    existing_variables: &HashSet<String>,
+) -> Result<ParseOutcome, ParseError> {
+    let cleaned = strip_comments(source);
+    let safe_start = start_byte.min(cleaned.len());
+    // Count lines before start_byte in the cleaned source
+    let line_idx = cleaned[..safe_start].matches('\n').count();
+
+    // Clamp to valid range
+    let total_lines = if cleaned.is_empty() {
+        0
+    } else {
+        cleaned.matches('\n').count()
+    };
+    let start_line = line_idx.min(total_lines);
+
+    let mut parser = Parser::new(source);
+    parser.metadata = existing_metadata.clone();
+    parser.variables = existing_variables.clone();
+    parser.index = start_line;
+    parser.parse_document()
+}
+
+/// Strips `//` line comments and `/* */` block comments from source text.
+/// Comments inside fenced code blocks (```...```) are preserved as-is.
+/// Line comments (`//`) are only recognized at the start of a line
+/// (optionally preceded by whitespace) to avoid breaking URLs like `https://`.
+/// Block comments (`/* */`) can span multiple lines and can be nested.
+fn strip_comments(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    let mut in_code_fence = false;
+    let mut in_block_comment = false;
+    let mut block_depth: u32 = 0;
+
+    for line in source.split_inclusive('\n') {
+        let bytes = line.as_bytes();
+
+        // Code fence: pass through everything unchanged
+        if in_code_fence {
+            out.push_str(line);
+            if line.trim_start().starts_with("```") {
+                in_code_fence = false;
+            }
+            continue;
+        }
+        if line.trim_start().starts_with("```") {
+            in_code_fence = true;
+            out.push_str(line);
+            continue;
+        }
+
+        // Inside a block comment from a previous line — skip until */
+        if in_block_comment {
+            let mut ci = 0usize;
+            while ci < bytes.len() {
+                if ci + 1 < bytes.len() && bytes[ci] == b'*' && bytes[ci + 1] == b'/' {
+                    ci += 2;
+                    block_depth -= 1;
+                    if block_depth == 0 {
+                        in_block_comment = false;
+                        break;
+                    }
+                } else if ci + 1 < bytes.len() && bytes[ci] == b'/' && bytes[ci + 1] == b'*' {
+                    ci += 2;
+                    block_depth += 1;
+                } else {
+                    ci += 1;
+                }
+            }
+            if !in_block_comment {
+                let remainder = &line[ci..];
+                let (rest, open_depth) = process_line(remainder, false);
+                if open_depth > 0 {
+                    in_block_comment = true;
+                    block_depth = open_depth;
+                }
+                out.push_str(&rest);
+            }
+            continue;
+        }
+
+        // Normal line processing
+        let (result, open_depth) = process_line(line, true);
+        if open_depth > 0 {
+            in_block_comment = true;
+            block_depth = open_depth;
+        }
+        out.push_str(&result);
+    }
+    out
+}
+
+/// Process one line of content, returning (cleaned_text, block_comment_depth_left_open).
+/// Depth is 0 when no block comment is left open, >0 when a block comment crosses to the next line.
+/// When `check_line_start` is true, `//` at the start (after whitespace) is a line comment.
+fn process_line(line: &str, check_line_start: bool) -> (String, u32) {
+    let bytes = line.as_bytes();
+    let mut buf = String::with_capacity(line.len());
+    let mut i = 0usize;
+
+    // Check for line-start `//` comment (only when not already in a block comment)
+    if check_line_start {
+        let mut j = 0;
+        while j < bytes.len() && bytes[j] == b' ' {
+            buf.push(' ');
+            j += 1;
+        }
+        i = j;
+        if j + 1 < bytes.len() && bytes[j] == b'/' && bytes[j + 1] == b'/' {
+            if line.ends_with('\n') {
+                buf.push('\n');
+            }
+            return (buf, 0);
+        }
+    }
+
+    // Scan for inline /* */ patterns
+    while i < bytes.len() {
+        if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
+            i += 2;
+            let mut depth: u32 = 1;
+            while i + 1 < bytes.len() {
+                if bytes[i] == b'/' && bytes[i + 1] == b'*' {
+                    i += 2;
+                    depth += 1;
+                } else if bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                    i += 2;
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+            if depth > 0 {
+                // Block comment crosses to next line — return actual depth
+                return (buf, depth);
+            }
+        } else {
+            buf.push(bytes[i] as char);
+            i += 1;
+        }
+    }
+
+    // Preserve trailing newline
+    if !buf.ends_with('\n') && line.ends_with('\n') {
+        buf.push('\n');
+    }
+    (buf, 0)
 }
 
 fn is_heading(trim: &str) -> bool {

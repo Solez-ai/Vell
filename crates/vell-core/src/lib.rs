@@ -18,7 +18,8 @@ pub use ast::*;
 pub use error::{ParseError, ParseErrorKind};
 pub use lexer::{Lexer, Token, TokenKind};
 pub use parser::{
-    parse_document, parse_document_with_warnings, slugify_inline, validate, ParseOutcome,
+    parse_document, parse_document_from, parse_document_with_warnings, slugify_inline, validate,
+    ParseOutcome,
 };
 
 #[cfg(test)]

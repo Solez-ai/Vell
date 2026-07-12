@@ -30,7 +30,7 @@ Created and developed by **Samin Yeasar**.
 
 ```bash
 cargo install vell-cli
-npm install @vell-lang/vell-js @vell-lang/renderer-html
+npm install @solez-ai/vell @solez-ai/vell-renderer-html
 ```
 
 ### Usage

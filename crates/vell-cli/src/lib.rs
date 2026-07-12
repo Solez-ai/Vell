@@ -16,6 +16,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use vell_core::*;
+pub mod watch;
 use vell_fmt;
 
 /// Collects bibliography entries from all @[Bibliography] directives in the document.

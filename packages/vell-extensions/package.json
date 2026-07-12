@@ -1,5 +1,5 @@
 {
-  "name": "@vell-lang/extensions",
+  "name": "@solez-ai/vell-extensions",
   "version": "0.1.0",
   "author": "Samin Yeasar",
   "license": "AGPL-3.0-or-later",
@@ -16,6 +16,6 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "@vell-lang/renderer-html": "^0.1.0"
+    "@solez-ai/vell-renderer-html": "^0.1.0"
   }
 }
