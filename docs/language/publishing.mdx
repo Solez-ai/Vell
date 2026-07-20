@@ -1,0 +1,84 @@
+---
+title: "Publishing and books"
+description: "Structure books and export Vell documents to HTML, PDF, EPUB, DOCX, LaTeX, JATS XML, and slides."
+---
+
+Vell uses directives for semantic publishing structures. Renderers can preserve these structures even when a target format does not have an exact equivalent.
+
+## Book structure
+
+Use `@[Book]` as the outer container. Add parts, chapters, front matter, and appendices inside it.
+
+```vell
+@[Book](title="The Vell Handbook") {
+  @[Foreword](title="Foreword") {
+    Why this book exists.
+  }
+
+  @[Part](title="Foundations") {
+    @[Chapter](title="Getting started") {
+      Your first chapter.
+    }
+  }
+
+  @[Appendix](title="Syntax reference") {
+    Reference material.
+  }
+}
+```
+
+Supported semantic sections are `Book`, `Part`, `Chapter`, `Appendix`, `Foreword`, and `Preface`.
+
+## Indexes
+
+Add an index marker with a `term` property. Add `@[Index]` without a term where you want the generated index.
+
+```vell
+Vell has a stable AST.@[Index](term="AST")
+
+@[Index]
+```
+
+The renderer deduplicates terms, sorts them, and links each term to its marker.
+
+## Glossaries
+
+Define a glossary term with `term` and `definition`. Use an empty `@[Glossary]` directive to render the collected glossary.
+
+```vell
+@[Glossary](term="AST" definition="Abstract syntax tree")
+
+@[Glossary]
+```
+
+You can place the definition in the directive body when you prefer longer content.
+
+## Page references
+
+`@[PageRef](label="...")` resolves through the same label map as `@[Ref]`.
+
+```vell
+@[Equation](label="e:energy" source="E=mc^2")
+
+See @[PageRef](label="e:energy").
+```
+
+HTML uses a clickable fallback. The current renderers do not guarantee a physical page number because browser support for generated page counters varies. Treat `@[PageRef]` as a resolved labeled reference until your chosen PDF pipeline verifies page-counter support.
+
+## Export commands
+
+```bash
+vell render html book.vl -o book.html
+vell render pdf book.vl -o book-print.html
+vell render slides talk.vl -o talk.html
+vell render epub book.vl book.epub
+vell render docx book.vl -o book.docx
+vell render latex book.vl -o book.tex
+vell render jats article.vl -o article.xml
+```
+
+`DOCX` output is a valid baseline Office Open XML archive. LaTeX output is standalone and includes common math, link, image, and table packages. JATS output targets JATS 1.3-oriented article XML. See [Publishing format exporters](/rendering/publishing) for fidelity limits and validation requirements.
+
+<Note>
+  EPUB rendering uses the `@solez-ai/vell-renderer-epub` workspace package and requires Node.js. The other CLI exports run directly from the Rust CLI.
+</Note>

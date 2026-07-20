@@ -8,3 +8,12 @@
 .vscode-test/
 coverage/
 AGENT-ROADMAP.md
+# Windows reserved device names — prevents git add failures
+nul
+CON
+PRN
+AUX
+COM1
+COM2
+LPT1
+LPT2

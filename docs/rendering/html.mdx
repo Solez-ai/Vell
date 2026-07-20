@@ -1,0 +1,374 @@
+---
+title: "HTML5 Renderer for Vell: render() and renderInteractive()"
+sidebarTitle: "HTML Renderer"
+description: "Render Vell documents to HTML5 with MathML, footnotes, cross-references, and an interactive runtime for reactive variables using @solez-ai/vell-renderer-html."
+---
+
+The `@solez-ai/vell-renderer-html` package takes a parsed Vell AST and produces a complete, self-contained HTML5 document. It handles everything from the `<!doctype html>` declaration down to footnote sections and cross-reference links — so you can feed the output directly to a browser, write it to a `.html` file, or serve it over HTTP without any post-processing.
+
+## Installation
+
+```bash
+npm install @solez-ai/vell-renderer-html
+```
+
+You also need the Vell parser to produce the AST:
+
+```bash
+npm install @solez-ai/vell
+```
+
+## API
+
+The package exports three rendering functions:
+
+<ParamField path="render(doc, options?)" type="function">
+  Renders a `VellDocument` to a complete `<!doctype html>` HTML string. Pass `{ interactive: true }` in `options` to embed the reactive runtime (equivalent to calling `renderInteractive`).
+</ParamField>
+
+<ParamField path="renderInteractive(doc)" type="function">
+  Renders a `VellDocument` to a complete HTML string with the reactive runtime embedded as an inline `<script defer>` tag. Use this whenever your document contains `@var`, `@for`, `@if`, or `@[Slider]` directives.
+</ParamField>
+
+<ParamField path="renderToFragment(doc)" type="function">
+  Renders a `VellDocument` to a browser `DocumentFragment`. Useful when you need to insert Vell-rendered content into an existing DOM without creating a full document. Only available in browser environments.
+</ParamField>
+
+### TypeScript signatures
+
+```typescript
+import type { VellDocument } from '@solez-ai/vell';
+
+export function render(
+  doc: VellDocument,
+  options?: { interactive?: boolean }
+): string;
+
+export function renderInteractive(doc: VellDocument): string;
+
+export function renderToFragment(doc: VellDocument): DocumentFragment;
+```
+
+## Quick Start
+
+```typescript
+import { parse } from '@solez-ai/vell';
+import { render, renderInteractive } from '@solez-ai/vell-renderer-html';
+
+const source = `
+= My Document
+@var count = 0
+Count: @{count}
+@[Slider](min=0 max=10 bind=count label="Count")
+`;
+
+const result = parse(source);
+if (result.errors.length === 0) {
+  const html = renderInteractive(result.document);
+  console.log(html); // Full HTML with embedded reactive runtime
+}
+```
+
+## HTML Output Structure
+
+The renderer produces a complete document wrapped in the standard HTML5 skeleton:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>My Document</title>
+    <!-- reactive runtime script tag, if renderInteractive was used -->
+  </head>
+  <body>
+    <!-- rendered block nodes -->
+    <!-- footnotes section, if any footnotes were defined -->
+  </body>
+</html>
+```
+
+The `lang` attribute is set from `doc.metadata.lang` when present, and the `<title>` tag is populated from `doc.metadata.title`.
+
+## Features
+
+### MathML for Math Expressions
+
+The renderer includes a built-in LaTeX-to-MathML converter. Inline math (`$...$`) and block math (`$$...$$`) are both converted to native MathML, which modern browsers render without any external JavaScript library.
+
+```vell
+The quadratic formula is $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$.
+
+$$
+\int_0^\infty e^{-x^2} \, dx = \frac{\sqrt{\pi}}{2}
+$$
+```
+
+**Supported LaTeX commands include:**
+
+- **Greek letters** — 24 lowercase, all uppercase, 5 variant forms (`\varepsilon`, `\vartheta`, `\varrho`, `\varsigma`, `\varphi`), plus dotless `\imath`, `\jmath`, `\ell`
+- **Operators** — `\sum`, `\prod`, `\coprod`, `\int`, `\iint`, `\iiint`, `\oint`, `\nabla`, `\partial`, `\infty`, `\times`, `\div`, `\pm`, `\mp`, `\cdot`, `\circ`, `\ast`, `\star`, `\otimes`, `\oplus`, `\ominus`, `\oslash`, `\odot`, `\bullet`
+- **Relations** — `\equiv`, `\approx`, `\sim`, `\simeq`, `\cong`, `\propto`, `\varpropto`, `\asymp`, `\doteq`, `\neq`, `\le`, `\ge`, `\leqq`, `\geqq`, `\ll`, `\gg`, `\prec`, `\succ`, `\preceq`, `\succeq`
+- **Sets** — `\subset`, `\supset`, `\subseteq`, `\supseteq`, `\nsubseteq`, `\subsetneq`, `\cap`, `\cup`, `\setminus`, `\emptyset`, `\varnothing`, `\complement`, `\in`, `\notin`, `\ni`
+- **Arrows** — All standard single, double, and long arrows; `\implies`, `\impliedby`, `\iff`, `\mapsto`, `\longmapsto`, `\hookrightarrow`
+- **Logic** — `\forall`, `\exists`, `\nexists`, `\neg`, `\lor`, `\land`, `\top`, `\bot`, `\vdash`, `\dashv`, `\mid`, `\models`
+- **Functions** — All trig, inverse trig, hyperbolic, log, and common functions; `\operatorname` for custom names
+- **Font commands** — `\mathbb`, `\mathcal`, `\mathfrak`, `\mathscr`, `\mathrm`, `\mathbf`, `\mathit`, `\mathsf`, `\mathtt`, `\textbf`, `\textit`
+- **Accents** — `\hat`, `\tilde`, `\bar`, `\dot`, `\ddot`, `\vec` (including dotless `\imath`/`\jmath` variants)
+- **Decorations** — `\boxed`, `\cancel`, `\bcancel`, `\xcancel`, `\underline`, `\overline`, `\overset`, `\underset`
+- **Constructions** — `\frac`, `\cfrac`, `\sqrt`, `\sqrt[n]`, `\binom`, `\pmod`, `\displaystyle`
+- **Extensible arrows** — `\xrightarrow{text}`, `\xleftarrow{text}`
+- **Special scripts** — `\substack`, `\prescript`, `\sideset`, `\intertext`
+- **Bra-ket** — `\bra`, `\ket`, `\braket`
+- **amssymb extras** — `\aleph`, `\beth`, `\gimel`, `\daleth`, `\Bbbk`, `\mho`, `\Finv`, `\Game`, `\eth`, `\hbar`, `\hslash`, `\pounds`, `\checkmark`, `\square`, `\lozenge`, `\blacksquare`, `\complement`, `\circledast`, `\ltimes`, `\rtimes`, `\uplus`, `\sqcap`, `\sqcup`, `\curlyvee`, `\diagdown`, `\diagup`, `\dag`, `\ddag`, and more
+- **Environments** — `pmatrix`, `bmatrix`, `Bmatrix`, `vmatrix`, `Vmatrix`, `smallmatrix`, `cases`, `aligned`, `gathered`, `gather`, `align`, `flalign`, `multline`, `split`
+
+For a complete command reference with usage examples, see the [Math Language Reference](/language/math).
+
+### KaTeX Polyfill
+
+For browsers that do not support MathML natively, the renderer automatically detects MathML support on page load and, if missing, loads KaTeX from CDN to re-render all math elements. This polyfill is transparent — no configuration or extra JavaScript imports are needed.
+
+### Footnotes
+
+The renderer collects all `FootnoteDefinition` nodes in a pre-pass and renders them as a numbered `<ol>` inside a `<section class="footnotes">` at the end of the document body. Each footnote reference in the body text becomes a linked superscript that points to its corresponding entry.
+
+```vell
+This claim needs a citation.[^1]
+
+[^1]: See the referenced paper for full details.
+```
+
+Produces:
+
+```html
+<!-- In body: -->
+<sup><a href="#fn-1" id="fnref-1">[1]</a></sup>
+
+<!-- At end of body: -->
+<section class="footnotes" role="doc-footnotes">
+  <h2>Footnotes</h2>
+  <ol>
+    <li id="fn-1">
+      <span class="fn-marker">^1</span>
+      <p>See the referenced paper for full details.</p>
+      <a href="#fnref-1" aria-label="Back to reference">↩</a>
+    </li>
+  </ol>
+</section>
+```
+
+### Cross-Reference Resolution
+
+Numbered equations created with `@[Equation]` and theorem environments (`@[Theorem]`, `@[Lemma]`, etc.) can be labeled and referenced anywhere in the document using `@[Ref]`. The renderer performs a pre-pass to collect all labels and assign display text, so references work even when the target appears later in the document.
+
+```vell
+@[Equation](source="E = mc^2" label=e:mass-energy)
+
+As shown in @[Ref](label=e:mass-energy), energy and mass are equivalent.
+```
+
+Resolved references render as `<a href="#eq-e:mass-energy" class="vell-ref">(1)</a>`. Unresolved references render as `<span class="unresolved-ref">[?label]</span>` so broken cross-references are visible rather than silently dropped.
+
+### Table of Contents, List of Figures, List of Tables
+
+Use the `@[Toc]`, `@[Lof]`, and `@[Lot]` directives to insert auto-generated navigation lists anywhere in the document:
+
+```vell
+@[Toc]
+@[Lof]
+@[Lot]
+```
+
+The renderer collects headings, `@[Figure]` directives, and table nodes during the pre-pass and produces linked `<nav>` elements at the positions where you placed the directives.
+
+### Interactive Runtime
+
+When you call `renderInteractive`, the renderer embeds a small reactive runtime as an inline `<script defer>` tag. The runtime wires up `@var` declarations, `@{name}` interpolations, `@for` loops, `@if` blocks, and interactive form directives like `@[Slider]`, `@[Input]`, `@[Checkbox]`, and `@[Select]` so they respond to user interaction without any additional JavaScript libraries.
+
+```typescript
+import { parse } from '@solez-ai/vell';
+import { renderInteractive } from '@solez-ai/vell-renderer-html';
+
+const source = `
+= Interactive Demo
+
+@var temperature = 20
+
+Current temperature: @{temperature}°C
+
+@[Slider](min=-10 max=40 bind=temperature label="Temperature")
+`;
+
+const result = parse(source);
+if (result.errors.length === 0) {
+  const html = renderInteractive(result.document);
+  // Serve html — the slider updates the displayed temperature in real time
+}
+```
+
+<Note>
+  `@for` and `@if` blocks in a `render()` call (without the interactive runtime) render as `<div class="vell-for">` and `<div class="vell-if">` containers with `data-` attributes. The reactive runtime is what makes them evaluate against live variable values.
+</Note>
+
+The interactive runtime also supports:
+
+- `@[On](event=... action=...)` for constrained variable updates
+- `@[Run]` and executable code fences for sandboxed JavaScript cells
+- `@[Notebook]` for grouping prose and cells
+- `@[Chart](bind=data)` for reactive chart updates
+
+<Warning>
+  Computed variable expressions execute in the parent page context. Use
+  `renderInteractive()` only with trusted or reviewed Vell source.
+</Warning>
+
+### Extension Fallback
+
+The renderer never crashes on an unknown `@[org/Name]` extension. Instead, it renders the extension as a labeled `<div>` wrapper and recursively renders any block body children so the content remains accessible:
+
+```html
+<div class="vell-extension" data-name="org/Widget">
+  <!-- rendered children here -->
+</div>
+```
+
+To add first-class support for extensions, install `@solez-ai/vell-extensions` and see the [extensions documentation](/extensions/overview).
+
+## URL Sanitization
+
+All `href` and `src` attribute values pass through a sanitization step before being written to the output. The renderer accepts `http:`, `https:`, and `mailto:` URLs, relative paths, and fragment identifiers. It rejects any URL that starts with a dangerous scheme:
+
+| Rejected scheme | Reason |
+|---|---|
+| `javascript:` | XSS execution vector |
+| `data:text/html` | XSS execution vector |
+| `vbscript:` | IE-specific XSS vector |
+| `file:` | Local filesystem access |
+
+Rejected URLs are replaced with an empty string, which browsers treat as a no-op rather than navigating to a dangerous destination.
+
+## Rendering Multiple Documents
+
+Because `render` and `renderInteractive` are pure functions that accept a `VellDocument` and return a string, you can call them in parallel across a batch of documents with no shared state:
+
+```typescript
+import { parse } from '@solez-ai/vell';
+import { render } from '@solez-ai/vell-renderer-html';
+import { readFileSync, writeFileSync } from 'fs';
+
+const files = ['intro.vl', 'guide.vl', 'reference.vl'];
+
+for (const file of files) {
+  const source = readFileSync(file, 'utf8');
+  const result = parse(source);
+
+  if (result.errors.length === 0) {
+    const html = render(result.document);
+    writeFileSync(file.replace('.vl', '.html'), html);
+  } else {
+    console.error(`Parse errors in ${file}:`, result.errors);
+  }
+}
+```
+
+## Internationalization (i18n) & Accessibility
+
+Vell renderers include built-in support for multilingual documents, right-to-left scripts, high-contrast accessibility theming, and East Asian (CJK) typography.
+
+### Language and Direction
+
+When you set a `lang` attribute via `@Meta(lang=...)`, the renderer automatically:
+
+1. Sets the `lang` attribute on the `<html>` element (e.g., `<html lang="fr-CA">`)
+2. Infers the text direction from the language code — Right-to-Left (RTL) for Arabic, Hebrew, Persian, Urdu, and other RTL scripts — and sets `dir="rtl"` or `dir="ltr"` accordingly
+
+```vell
+@[Meta](title="وثيقة عربية" lang=ar)
+
+= مرحبا بالعالم
+
+هذا نص باللغة العربية.
+```
+
+Produces:
+
+```html
+<!doctype html>
+<html lang="ar" dir="rtl">
+  ...
+</html>
+```
+
+The following RTL languages are detected automatically: Arabic (`ar`), Aramaic (`arc`), Balochi (`bcc`), Bakhtiari (`bqi`), Central Kurdish (`ckb`), Divehi (`dv`), Persian (`fa`), Gilaki (`glk`), Hausa (`ha`), Hebrew (`he`), Khowar (`khw`), Kashmiri (`ks`), Kurdish (`ku`), Mazanderani (`mzn`), N'Ko (`nqo`), Punjabi (`pa`), Pashto (`ps`), Sindhi (`sd`), Uyghur (`ug`), Urdu (`ur`), and Yiddish (`yi`).
+
+<Tip>
+  Regional variants are handled automatically: `ar-SA` (Saudi Arabic) and `fa-IR` (Iranian Persian) both detect as RTL because the renderer strips the region suffix before checking.
+</Tip>
+
+### High-Contrast Theme
+
+When a user's operating system or browser is set to **high-contrast mode** (`prefers-contrast: high`), Vell's CSS automatically switches to a high-contrast theme:
+
+- **Black-on-white text** — `#000` on `#fff` for maximum contrast
+- **Bold underlines on links** — All links (`a` elements) get a solid underline
+- **Thick borders** — Tables, code blocks, input fields, and themed containers get `2px` borders instead of subtle shading
+- **Solid backgrounds** — Cards, admonitions, and diagram containers use white backgrounds with black borders instead of the default tinted backgrounds
+
+This ensures Vell documents remain readable for users who require high contrast, without requiring any author action — the CSS is embedded in the default stylesheet.
+
+### CJK Typography
+
+For documents written in Chinese, Japanese, or Korean, the renderer includes optimized font-family stacks and typographic adjustments:
+
+| Language | Body font stack | Line height |
+|---|---|---|
+| Chinese (zh) | `'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif` | `1.9` |
+| Japanese (ja) | `'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif` | `1.9` |
+| Korean (ko) | `'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif` | `1.9` |
+
+Monospace/code fonts also use CJK-optimized stacks (`'Noto Sans Mono CJK SC'`, `'Source Han Sans SC'`), and heading levels (`h1`–`h3`) get subtle letter-spacing adjustments (`0.03em`–`0.05em`) for better readability in East Asian scripts.
+
+Use the `lang` attribute on `@Meta` to activate the correct font stack:
+
+```vell
+@[Meta](title="中文文档" lang=zh)
+
+= 你好，世界
+
+这是一份用中文撰写的文档。
+```
+
+<Warning>
+  CJK font stacks reference commonly-installed system fonts. On systems without these fonts (e.g., a fresh Linux install without CJK font packages), the `sans-serif` fallback is used, which may render CJK characters with lower quality.
+</Warning>
+
+---
+
+## CSS Classes Reference
+
+The renderer uses consistent CSS class names you can target in a stylesheet:
+
+| Class | Element | Description |
+|---|---|---|
+| `.vell-admonition` | `<blockquote>` | Admonition block (NOTE, TIP, etc.) |
+| `.vell-equation` | `<div>` | Numbered equation wrapper |
+| `.vell-theorem` | `<div>` | Theorem/Lemma/Definition environment |
+| `.vell-ref` | `<a>` | Resolved cross-reference link |
+| `.unresolved-ref` | `<span>` | Unresolved label indicator |
+| `.vell-extension` | `<div>` | Unknown extension fallback |
+| `.footnotes` | `<section>` | Footnotes section at document end |
+| `.vell-toc` | `<nav>` | Table of contents |
+| `.vell-lof` | `<nav>` | List of figures |
+| `.vell-lot` | `<nav>` | List of tables |
+| `.vell-index` | `<nav>` | Generated alphabetical index |
+| `.vell-glossary` | `<section>` | Generated glossary |
+| `.vell-book-section` | `<section>` / `<div>` | Semantic book container |
+| `.vell-cell` | `<div>` | Executable code cell |
+| `.vell-cell-output` | `<pre>` | Cell output region |
+| `.vell-notebook` | `<section>` | Notebook container |
+| `.vell-live-chart-row` | `<div>` | Reactive chart row |
+
+<Tip>
+  Add `color: #2b6cb0; text-decoration: none;` to `.vell-ref` and `color: #e53e3e; font-style: italic;` to `.unresolved-ref` to match the recommended cross-reference styling from the Vell renderer guide.
+</Tip>

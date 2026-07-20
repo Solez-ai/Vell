@@ -1,0 +1,378 @@
+---
+title: "Vell CLI Reference: Parse, Format, Render, Validate"
+sidebarTitle: "CLI"
+description: "Complete reference for the Vell command-line interface. Parse documents to AST JSON, format, render to HTML/PDF/slides, and validate with diagnostics."
+---
+
+The Vell CLI is your primary entry point for working with `.vl` documents outside of an editor. Every subcommand reads from a file path you supply or falls back to stdin when no path is given, and writes to stdout unless you specify an output path with `-o`. This makes each command composable with standard Unix pipelines.
+
+## Installation
+
+For a repository checkout, install the `vell` binary directly from the local crate:
+
+```bash
+cargo install --path crates/vell-cli
+```
+
+If you are building from the Vell repository instead, you can install directly from the local crate:
+
+```bash
+cargo install --path crates/vell-cli
+```
+
+## Command overview
+
+| Command | What it does |
+|---|---|
+| `vell parse [input]` | Parse a `.vl` file and print the AST as JSON |
+| `vell fmt [input] [--check]` | Format source to canonical style |
+| `vell render html [input] [-o output]` | Render to a complete HTML5 document |
+| `vell render pdf [input] [-o output]` | Render to PDF-optimized HTML |
+| `vell render slides [input] [-o output]` | Render to a reveal.js presentation |
+| `vell render epub [input] [output]` | Render to EPUB 3 |
+| `vell render docx [input] -o output.docx` | Render to Office Open XML |
+| `vell render latex [input] [-o output.tex]` | Render to standalone LaTeX |
+| `vell render jats [input] [-o output.xml]` | Render to JATS 1.3 XML |
+| `vell watch [input] [--format] [--serve] [--port]` | Watch files and auto-rebuild on changes |
+| `vell validate [input]` | Validate and print diagnostics |
+
+---
+
+## `vell parse`
+
+`vell parse` reads a Vell document, builds the AST, and serializes it to pretty-printed JSON on stdout. Use this to inspect what the parser produces, to feed downstream tooling, or to debug unexpected rendering behaviour.
+
+<CodeGroup>
+```bash File input
+vell parse document.vl
+```
+```bash Stdin
+cat document.vl | vell parse
+```
+</CodeGroup>
+
+The JSON output mirrors the internal `Document` structure, with each node carrying a `span` containing `start` and `end` byte offsets into the original source. If the document contains a parse error, the error message is written to stderr and the process exits with code `1`.
+
+<Note>
+`vell parse` is the right tool to verify that your document's syntax is valid before passing it to other commands. A clean parse (exit code `0`) means the AST is well-formed.
+</Note>
+
+---
+
+## `vell fmt`
+
+`vell fmt` reformats a Vell document to canonical style and prints the result to stdout. The formatter is **idempotent**: running it twice in a row always produces identical output, so you can rely on it in version-controlled projects without noise in diffs.
+
+<CodeGroup>
+```bash Format and print to stdout
+vell fmt document.vl
+```
+```bash Format in place (overwrite file)
+vell fmt document.vl > document.vl
+```
+```bash Read from stdin
+echo "=  My Title" | vell fmt
+```
+```bash CI check mode
+vell fmt document.vl --check
+```
+</CodeGroup>
+
+### `--check` flag
+
+Pass `--check` to verify that a file is already formatted without writing anything. The command exits with code `0` when no changes are needed, or code `1` when formatting would produce a different result — ideal for CI pipelines.
+
+```bash
+# In a CI script:
+vell fmt docs/report.vl --check || exit 1
+```
+
+<Warning>
+`vell fmt` writes formatted output to **stdout**, not back to the input file. To format in place, redirect the output: `vell fmt file.vl > file.vl`. Be aware that shell redirection truncates the file before `vell fmt` finishes reading it on some systems — use a temporary file or a wrapper script for safety.
+</Warning>
+
+### What gets formatted
+
+The formatter applies the following rules to produce canonical Vell source:
+
+<Accordion title="Heading markers">
+All headings use `=` signs with exactly one space before the heading text. Inconsistent spacing or over-indented markers are normalized.
+
+```vell
+=  Messy Title     → = Messy Title
+===Section         → === Section
+```
+</Accordion>
+
+<Accordion title="Paragraph word-wrapping">
+Prose paragraphs are re-wrapped at a maximum of **100 characters** per line. Inline math expressions (`$...$`) are kept atomic and never split across lines.
+</Accordion>
+
+<Accordion title="Table column alignment">
+Pipe-delimited tables are re-rendered with auto-computed column widths. Every column is padded to the width of its widest cell so columns align visually.
+
+```vell
+| Name | Age |           | Name  | Age |
+|---|---|           →   |-------|-----|
+| Alice | 30 |           | Alice | 30  |
+| Bob | 25 |             | Bob   | 25  |
+```
+</Accordion>
+
+<Accordion title="Code block style">
+The language tag on fenced code blocks is normalized to lowercase. Trailing whitespace inside code blocks is trimmed.
+
+```vell
+```Rust        →  ```rust
+```
+</Accordion>
+
+<Accordion title="Directive formatting">
+Directives use canonical property ordering and consistent brace placement. Child content is indented by two spaces.
+</Accordion>
+
+<Accordion title="General rules">
+- No trailing whitespace on any line
+- Exactly one blank line between top-level blocks
+- File ends with a single newline character
+</Accordion>
+
+---
+
+## `vell render html`
+
+`vell render html` produces a self-contained HTML5 document with embedded CSS. The rendered output includes heading anchors, MathML for math expressions, cross-reference resolution, footnotes, diagram rendering, and reactive variable attributes.
+
+<CodeGroup>
+```bash Print to stdout
+vell render html report.vl
+```
+```bash Write to file
+vell render html report.vl -o report.html
+```
+```bash Pipeline from stdin
+cat report.vl | vell render html -o report.html
+```
+</CodeGroup>
+
+The command also processes `@[Include]` directives before parsing, merging referenced files into the document. Circular includes are detected and reported as errors.
+
+### i18n & Accessibility
+
+The HTML renderer automatically reads the `lang` attribute from `@Meta(lang=...)` and:
+
+- Sets both `lang` and `dir` on the `<html>` element (RTL for Arabic, Hebrew, Persian, Urdu, etc.)
+- Embeds a high-contrast CSS theme that activates when the user's system is in high-contrast mode
+- Applies CJK-optimized font stacks and typography for Chinese, Japanese, and Korean documents
+
+<Tip>
+Open the output file directly in your browser for instant preview. All CSS is embedded in a `<style>` block, so the file is fully self-contained with no external dependencies beyond Mermaid.js and MathJax CDN links where used.
+</Tip>
+
+---
+
+## `vell render pdf`
+
+`vell render pdf` generates HTML optimized for print and browser-based PDF conversion. It does not emit PDF bytes. It adds a `@media print` stylesheet, a running page header, and an auto-generated, indented table of contents at the start of the document.
+
+<CodeGroup>
+```bash Print to stdout
+vell render pdf report.vl
+```
+```bash Write to file
+vell render pdf report.vl -o report-print.html
+```
+</CodeGroup>
+
+The HTML output can be converted to PDF using your browser's **Print → Save as PDF** feature or a headless browser:
+
+```bash
+vell render pdf report.vl -o report.html
+# Headless Chrome (requires Chrome 59+):
+google-chrome --headless --print-to-pdf=report.pdf report.html
+```
+
+### PDF-specific features
+
+- **Auto-generated TOC** — All headings are scanned and rendered as an indented, hyperlinked table of contents on a separate page before the document body.
+- **A4 page margins** — 2.54 cm (1 inch) margins on all sides via `@page` rules.
+- **Page breaks** — `page-break-before: always` on `h1` and `h2`; `page-break-inside: avoid` on tables, code blocks, blockquotes, images, and equations.
+- **Running header** — Document title appears at the top of every printed page.
+- **URL printing** — External links append their `href` in parentheses so printed copies remain useful.
+- **Slide suppression** — `@[Slide]` content is hidden (`display: none`) in print output.
+
+---
+
+## `vell render slides`
+
+`vell render slides` produces a self-contained reveal.js slide deck. Each `@[Slide]` directive in your document becomes a `<section>` element; content that appears before the first `@[Slide]` directive is automatically promoted to a title slide.
+
+## Additional publishing formats
+
+Use the remaining render subcommands for publication workflows.
+
+```bash
+vell render epub book.vl book.epub
+vell render docx book.vl -o book.docx
+vell render latex book.vl -o book.tex
+vell render jats article.vl -o article.xml
+```
+
+- `epub` creates an EPUB 3 archive through the TypeScript EPUB renderer.
+- `docx` creates a native Office Open XML document.
+- `latex` creates a standalone `.tex` document.
+- `jats` creates JATS 1.3 article XML.
+
+These are baseline exporters. Review the [publishing format capability matrix](/rendering/publishing) before relying on images, tables, references, bibliography data, or complex page layout.
+
+<CodeGroup>
+```bash Print to stdout
+vell render slides talk.vl
+```
+```bash Write to file
+vell render slides talk.vl -o talk.html
+```
+</CodeGroup>
+
+```vell Example slide document
+@[Meta](title="My Talk")
+
+= My Talk
+
+@[Slide] {
+  == Introduction
+
+  Welcome to the presentation.
+}
+
+@[Slide] {
+  == Key Points
+
+  - Point one
+  - Point two
+}
+```
+
+### Slide deck features
+
+- **reveal.js from CDN** — No local dependencies. The output loads reveal.js 5.0.5 from jsDelivr.
+- **Hash-based URLs** — Each slide has a unique URL hash for direct linking.
+- **Navigation controls** — Arrow keys, on-screen buttons, and touch/swipe gestures.
+- **Slide number indicator** — Current / total slide count in the corner.
+- **Progress bar** — Visual progress indicator at the bottom.
+- **Smooth transitions** — `slide` transition by default.
+
+<Note>
+If your document contains no `@[Slide]` directives, the entire document is wrapped in a single slide so any `.vl` file can be presented immediately.
+</Note>
+
+---
+
+## `vell watch`
+
+`vell watch` monitors a `.vl` file for changes and automatically rebuilds the output every time you save. It is the ideal companion for authoring: keep the command running in a terminal, and your rendered output stays up to date without manual re-runs.
+
+<CodeGroup>
+```bash Watch and print HTML to stdout
+vell watch document.vl
+```
+```bash Watch and write to a file
+vell watch document.vl -o output.html
+```
+```bash Watch and serve with live-reload on port 3000
+vell watch document.vl --serve
+```
+```bash Watch with live-reload on a custom port
+vell watch document.vl --serve --port 8080
+```
+```bash Watch with PDF format
+vell watch document.vl --format pdf -o out.pdf
+```
+</CodeGroup>
+
+### File watching & debouncing
+
+The command sets up a recursive file watcher on the source directory. When you save the main file or any of its dependencies, the watcher detects the change and triggers a rebuild. A configurable debounce interval (default 500 ms) prevents multiple rapid saves from triggering cascading rebuilds.
+
+```bash
+# Adjust debounce for very large documents
+vell watch document.vl --debounce-ms 2000
+```
+
+### Dependency watching (`@[Include]`)
+
+`vell watch` automatically detects `@[Include](path="...")` directives in your source file and adds each included file to its watch list. When you modify an included file, the main document is rebuilt immediately — no need to re-run the command.
+
+After each rebuild, the watch list is refreshed to catch newly added or removed includes. This allows you to add new `@[Include]` directives while the watcher is running.
+
+### Live-reload server (`--serve`)
+
+Pass `--serve` (or `--serve --port 8080` for a custom port) to start a tiny HTTP server alongside the file watcher. The server serves the latest rendered HTML with an injected auto-reload script that polls for changes every second. When a rebuild completes, all connected browser tabs refresh automatically.
+
+```bash
+vell watch document.vl --serve
+# Output:
+# [vell watch] Live preview at http://localhost:3000/
+```
+
+The server binds to `127.0.0.1` and serves a single page (the rendered document) with no extra dependencies — no Node.js, no build tools, no configuration files.
+
+### Supported formats
+
+`vell watch` supports the same output formats as `vell render`:
+
+| `--format` | Output type | Live-reload support |
+|---|---|---|
+| `html` (default) | Complete HTML5 document | ✅ |
+| `pdf` | PDF-optimized HTML with print CSS | ❌ |
+| `slides` | reveal.js slide deck | ✅ |
+| `epub` | EPUB 3 via Node.js renderer | ❌ |
+
+<Note>
+The live-reload server (--serve) only works with HTML-based formats (html, slides). For PDF and EPUB output, use the file watcher without --serve.
+</Note>
+
+---
+
+## `vell validate`
+
+`vell validate` checks a document for errors and warnings without producing any rendered output. Diagnostics are written to stderr. The process exits with code `0` when the document parses successfully (even if warnings are present), and code `1` when there is a parse error that prevents the document from being parsed at all.
+
+<CodeGroup>
+```bash Validate a file
+vell validate document.vl
+```
+```bash Validate from stdin
+cat document.vl | vell validate
+```
+</CodeGroup>
+
+### Diagnostics reported
+
+- **Parse errors** — Malformed syntax, unterminated delimiters, and invalid indentation.
+- **Undefined variable references** — Uses of `@{name}` where no `@var name` declaration exists. These are reported as warnings because variables may be provided at runtime. They do not cause a non-zero exit code.
+- **Structural warnings** — Malformed table definitions and ill-formed directive blocks.
+
+Each diagnostic line includes the error code, message, and a suggestion where one is available. Diagnostics also link to the online reference at `https://vell-lang.dev/docs/diagnostics#vellN` where `N` is the numeric error code.
+
+<Tip>
+Run `vell validate` in your CI pipeline to catch document errors before deployment. Combine it with `vell fmt --check` to enforce both correctness and consistent style.
+</Tip>
+
+---
+
+## Stdin and stdout behaviour
+
+Every `vell` command follows the same convention for I/O:
+
+<Steps>
+  <Step title="Input">
+    Supply a file path as the first positional argument. If you omit it, the command reads from **stdin**. This lets you pipe documents through `vell` in shell pipelines.
+  </Step>
+  <Step title="Output">
+    `vell render html`, `vell render pdf`, and `vell render slides` write to **stdout** by default. Pass `-o <path>` to write to a file instead. `vell parse`, `vell fmt`, and `vell validate` always write to stdout (or stderr for errors).
+  </Step>
+  <Step title="Exit codes">
+    All commands exit with code `0` on success and `1` on error. `vell fmt --check` exits with `1` when the file would be reformatted. `vell validate` exits with `0` even when warnings are present — it only exits `1` on a parse error.
+  </Step>
+</Steps>

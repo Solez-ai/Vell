@@ -1,0 +1,92 @@
+---
+title: "Publishing format exporters"
+description: "Export Vell to EPUB, DOCX, LaTeX, JATS XML, slides, and print-optimized HTML, with exact capability and fidelity notes."
+---
+
+Vell provides several publishing targets through the CLI and TypeScript packages. Each target preserves the same document AST, but output fidelity differs by format.
+
+## Command summary
+
+```bash
+vell render pdf report.vl -o report-print.html
+vell render slides talk.vl -o talk.html
+vell render epub book.vl book.epub
+vell render docx book.vl -o book.docx
+vell render latex paper.vl -o paper.tex
+vell render jats article.vl -o article.xml
+```
+
+## Capability matrix
+
+| Feature | Print HTML | EPUB | DOCX | LaTeX | JATS |
+|---|---:|---:|---:|---:|---:|
+| Headings and paragraphs | Yes | Yes | Yes | Yes | Yes |
+| Lists | Yes | Yes | Basic | Yes | Yes |
+| Tables | Yes | Yes | Limited | Basic | Limited |
+| Math | MathML | MathML/source | Source text | LaTeX source | `tex-math` |
+| Images | Yes | Yes | Not yet | Basic | Limited |
+| Cross-references | Links | Partial | Not yet | Partial | Not yet |
+| Index and glossary | Yes | Rendered content | Text fallback | Partial | Text fallback |
+| Interactive controls | Static controls | Static | Static | Omitted/fallback | Omitted/fallback |
+
+## Print-optimized HTML
+
+`vell render pdf` is named for its intended workflow, but it currently emits HTML with print CSS, page margins, headers, footers, and page-break rules.
+
+```bash
+vell render pdf report.vl -o report-print.html
+```
+
+Open the result in a browser and print it to PDF. If you need PDF bytes directly in Node.js, use `@solez-ai/vell-renderer-pdf`.
+
+## EPUB
+
+The EPUB renderer uses `@solez-ai/vell-renderer-epub` and JSZip. It creates an EPUB 3 archive with package metadata, navigation, CSS, and chapter files.
+
+Validate release artifacts with EPUBCheck. Test the result in at least two reading systems because CSS and MathML support differ.
+
+## DOCX
+
+The DOCX exporter creates a valid minimal Office Open XML package. It currently prioritizes readable text over visual fidelity.
+
+Preserved today:
+
+- Paragraph text
+- Heading levels
+- Basic list text
+- Code and math source
+- Nested directive body text
+
+Not yet preserved completely:
+
+- Images and media relationships
+- Rich inline styling
+- Table layout
+- Footnotes and citations
+- Cross-reference fields and page numbers
+- Custom fonts, themes, headers, and page geometry
+
+## LaTeX
+
+The LaTeX exporter creates a standalone article document with common math, links, images, and table packages.
+
+Always compile the generated file in CI when LaTeX is part of your release pipeline. Documents using advanced directives may require manual template or package changes.
+
+## JATS XML
+
+The JATS exporter targets JATS 1.3-oriented article XML. JATS consumers often use different DTD variants and additional house rules.
+
+Before submission:
+
+1. Validate against the exact DTD required by the recipient.
+2. Verify section nesting and article metadata.
+3. Check figure, table, citation, and formula requirements.
+4. Apply publisher-specific identifiers and controlled vocabulary.
+
+## Slides
+
+`vell render slides` produces reveal.js HTML. `@[Slide]` blocks become slide sections. The output references reveal.js assets from a CDN, so offline distribution should vendor those assets first.
+
+## Book directives
+
+The publishing renderers recognize `@[Book]`, `@[Part]`, `@[Chapter]`, `@[Appendix]`, `@[Foreword]`, and `@[Preface]`. Targets without first-class book structures preserve the title and child content as a semantic section or text fallback.

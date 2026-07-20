@@ -1,1 +1,85 @@
-{"name":"vell-vscode","displayName":"Vell","version":"0.1.0","author":"Samin Yeasar","license":"AGPL-3.0-or-later","engines":{"vscode":"^1.85.0"},"activationEvents":["onLanguage:vell"],"main":"dist/extension.js","contributes":{"languages":[{"id":"vell","aliases":["Vell"],"extensions":[".vl"],"icon":{"light":"../../logo-no-bg.png","dark":"../../logo-no-bg.png"}}],"grammars":[{"language":"vell","scopeName":"source.vell","path":"./syntaxes/vell.tmLanguage.json"}],"commands":[{"command":"vell.formatDocument","title":"Vell: Format Document"},{"command":"vell.exportHtml","title":"Vell: Export to HTML"}]},"scripts":{"build":"tsc -p tsconfig.json","typecheck":"tsc -p tsconfig.json --noEmit","test":"tsc -p tsconfig.json --noEmit"},"dependencies":{"vscode-languageclient":"^9.0.0"},"devDependencies":{"@types/vscode":"^1.85.0","typescript":"^5.0.0"}}
+{
+  "name": "@solez-ai/vell-vscode",
+  "displayName": "Vell",
+  "description": "Vell language support — syntax highlighting, LSP integration, diagnostics, and more",
+  "version": "0.1.0",
+  "author": "Samin Yeasar",
+  "publisher": "solez-ai",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/samin/vell.git"
+  },
+  "bugs": {
+    "url": "https://github.com/samin/vell/issues"
+  },
+  "homepage": "https://vell-lang.dev",
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Linters"
+  ],
+  "galleryBanner": {
+    "color": "#1a202c",
+    "theme": "dark"
+  },
+  "icon": "../../logo-no-bg.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [
+    "onLanguage:vell"
+  ],
+  "main": "dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "vell",
+        "aliases": ["Vell", "vell"],
+        "extensions": [".vl"],
+        "icon": {
+          "light": "../../logo-no-bg.png",
+          "dark": "../../logo-no-bg.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "vell",
+        "scopeName": "source.vell",
+        "path": "./syntaxes/vell.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "vell.formatDocument",
+        "title": "Vell: Format Document"
+      },
+      {
+        "command": "vell.exportHtml",
+        "title": "Vell: Export to HTML"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json --noEmit",
+    "vscode:prepublish": "tsc -p tsconfig.json",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^3.0.0"
+  },
+  "vsce": {
+    "dependencies": true,
+    "useYarn": false,
+    "yarn": false
+  }
+}

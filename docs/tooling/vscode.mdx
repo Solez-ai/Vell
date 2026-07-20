@@ -1,0 +1,159 @@
+---
+title: "Vell VS Code Extension: Syntax Highlighting and LSP"
+sidebarTitle: "VS Code"
+description: "Install the Vell VS Code extension for syntax highlighting, LSP-powered completions, diagnostics, hover, go-to-definition, and HTML export for .vl files."
+---
+
+The Vell VS Code extension (`vell-vscode`) adds first-class support for `.vl` files to Visual Studio Code. It provides a TextMate grammar for syntax highlighting and connects to the `vell-lsp` server to bring the full set of LSP-powered editor features to every `.vl` document you open. The extension targets VS Code **1.85.0 and later**.
+
+## Installation
+
+The Vell VS Code extension is available on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=solez-ai.vell-vscode). Install it directly from VS Code:
+
+1. Open VS Code
+2. Open the Extensions view (`Ctrl+Shift+X`)
+3. Search for **"Vell"**
+4. Click **Install**
+
+Or install from the command line:
+
+```bash
+code --install-extension solez-ai.vell-vscode
+```
+
+### Building from Source
+
+To build the extension from the repository (for development or custom builds):
+
+```bash
+cd packages/vell-vscode
+npm run build
+# Package the extension (requires vsce):
+npx vsce package
+code --install-extension solez-ai-vell-vscode-0.1.0.vsix
+```
+
+<Steps>
+  <Step title="Ensure vell-lsp is in your PATH">
+    The extension launches `vell-lsp` as a subprocess. Build it from the Vell repository and add it to your `PATH`:
+
+    ```bash
+    cargo build --release -p vell-lsp
+    # Add target/release to PATH, or copy the binary:
+    cp target/release/vell-lsp ~/.local/bin/
+    ```
+
+    If `vell-lsp` is not found on your `PATH`, LSP activation fails and syntax highlighting from the TextMate grammar remains available.
+  </Step>
+</Steps>
+
+## Activation
+
+The extension activates automatically when you open any file with the `.vl` extension. It registers the `vell` language ID with VS Code, so you can also select **Vell** from the language picker in the status bar to enable the extension on any open file.
+
+---
+
+## Syntax highlighting
+
+The extension includes a full TextMate grammar (`vell.tmLanguage.json`) that gives `.vl` files immediate syntax colouring in any VS Code colour theme. The following constructs are highlighted:
+
+| Construct | Scope |
+|---|---|
+| Headings (`= Title`, `== Section`, …) | Heading colour from the active theme |
+| Bold (`*text*`) | Bold / strong emphasis |
+| Italic (`/text/`) | Italic / emphasis |
+| Inline code (`` `code` ``) | Code span |
+| Math (`$...$`, `$$...$$`) | String or markup scope |
+| Directives (`@[Name](...)`) | Function / keyword |
+| Variable declarations (`@var name = value`) | Variable declaration |
+| Variable interpolations (`@{name}`) | Variable reference |
+| Control keywords (`@for`, `@if`, `else`) | Keyword control |
+| Link URLs (`[text](url)`) | Link / underline |
+| Image sources (`![alt](src)`) | Link / underline |
+
+<Note>
+TextMate grammar colouring is available immediately on install and requires no `vell-lsp` connection. LSP semantic tokens layer additional precision on top when the language server is running.
+</Note>
+
+---
+
+## LSP features in VS Code
+
+When `vell-lsp` is running, every feature documented in the [LSP Server](/tooling/lsp) guide is available inside VS Code:
+
+- **Inline diagnostics** — Parse errors and undefined variable warnings appear as red/yellow squiggles with hover messages.
+- **Completions** — `@` triggers directive, variable, admonition, and math symbol completions via IntelliSense.
+- **Hover** — Hover over variables, links, images, math, and directives for contextual information.
+- **Go to Definition** — `F12` on `@{varName}` or `[^footnote]` navigates to the declaration.
+- **Find All References** — Right-click → Find All References on a `@var` declaration or usage.
+- **Rename Symbol** — `F2` on a variable name renames the declaration and all usages in one step.
+- **Format Document** — `Shift+Alt+F` (Windows/Linux) or `Shift+Option+F` (macOS) formats the document to canonical style.
+- **Folding** — Click the fold gutter arrows to collapse headings, code blocks, directives, and more.
+- **Outline panel** — The Explorer's Outline view shows headings, variables, directives, and footnotes as a navigable tree.
+- **Code actions** — Lightbulb (`Ctrl+.`) offers wrap-in-heading, add `@[Meta]`, convert to list, and add missing `@var` actions.
+- **Inlay hints** — Type annotations appear inline on `@var` declarations.
+- **Color picker** — Hex color literals display an inline swatch; click it to open the color picker.
+- **Code lenses** — Reference counts appear above `@var` declarations.
+- **Signature help** — Parameter hints appear as you type inside `@[Directive](`.
+- **Document links** — Ctrl-click (Cmd-click on macOS) links and image sources to open them in a browser.
+- **On-type formatting** — Automatic indentation on Enter and `}` keeps your code tidy as you type.
+
+---
+
+## Commands
+
+The extension contributes two commands to the Command Palette (`Ctrl+Shift+P`):
+
+<Accordion title="Vell: Format Document">
+**Command ID:** `vell.formatDocument`
+
+Formats the active `.vl` document to canonical style using `vell-fmt` via the LSP server. This is equivalent to triggering VS Code's built-in **Format Document** action and respects your editor's format-on-save setting.
+
+```
+Ctrl+Shift+P → Vell: Format Document
+```
+
+You can also bind this to a keyboard shortcut in your `keybindings.json`:
+
+```json
+{
+  "key": "ctrl+shift+i",
+  "command": "vell.formatDocument",
+  "when": "editorLangId == vell"
+}
+```
+</Accordion>
+
+<Accordion title="Vell: Export to HTML">
+**Command ID:** `vell.exportHtml`
+
+Opens a new editor tab containing the current document's source text with HTML syntax highlighting applied. It is a source-inspection helper, not a Vell-to-HTML renderer.
+
+```
+Ctrl+Shift+P → Vell: Export to HTML
+```
+
+<Note>
+This command uses the active editor's current in-memory text. Save your file first if you want the tab to reflect your latest changes.
+</Note>
+</Accordion>
+
+---
+
+## Configuration
+
+The current extension starts the literal `vell-lsp` command and does not yet expose a configurable server path. Put the binary on your `PATH` or use a wrapper command with that name.
+
+---
+
+## Requirements
+
+| Requirement | Version |
+|---|---|
+| Visual Studio Code | `^1.85.0` |
+| `vell-lsp` binary | Latest build from the Vell repository |
+| Node.js (for building from source) | `^18.0.0` |
+
+<Tip>
+If the extension activates but the LSP features are not working, open the **Output** panel (`Ctrl+Shift+U`) and select **Vell Language Server** from the dropdown. Any startup errors from `vell-lsp` appear there.
+</Tip>

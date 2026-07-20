@@ -13,7 +13,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Cursor, Read, Write};
 use std::path::PathBuf;
 use vell_core::*;
 pub mod watch;
@@ -199,6 +199,42 @@ pub fn cmd_render_slides(input: &Option<PathBuf>, output: &Option<PathBuf>) -> R
     }
 }
 
+/// Render LaTeX command.
+pub fn cmd_render_latex(input: &Option<PathBuf>, output: &Option<PathBuf>) -> Result<(), String> {
+    let source = read_source(input)?;
+    let resolved = resolve_includes(&source, input)?;
+    let doc = parse_document(&resolved).map_err(|e| format!("Parse error: {}", e))?;
+    write_text_output(&render_document_latex(&doc), output)
+}
+
+/// Render JATS XML command.
+pub fn cmd_render_jats(input: &Option<PathBuf>, output: &Option<PathBuf>) -> Result<(), String> {
+    let source = read_source(input)?;
+    let resolved = resolve_includes(&source, input)?;
+    let doc = parse_document(&resolved).map_err(|e| format!("Parse error: {}", e))?;
+    write_text_output(&render_document_jats(&doc), output)
+}
+
+/// Render DOCX command.
+pub fn cmd_render_docx(input: &Option<PathBuf>, output: &PathBuf) -> Result<(), String> {
+    let source = read_source(input)?;
+    let resolved = resolve_includes(&source, input)?;
+    let doc = parse_document(&resolved).map_err(|e| format!("Parse error: {}", e))?;
+    let bytes = render_document_docx(&doc)?;
+    fs::write(output, bytes).map_err(|e| format!("Failed to write '{}': {}", output.display(), e))
+}
+
+fn write_text_output(content: &str, output: &Option<PathBuf>) -> Result<(), String> {
+    match output {
+        Some(path) => fs::write(path, content)
+            .map_err(|e| format!("Failed to write '{}': {}", path.display(), e)),
+        None => {
+            println!("{}", content);
+            Ok(())
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // HTML renderer
 // ---------------------------------------------------------------------------
@@ -222,13 +258,19 @@ pub fn cmd_render_epub(
         if cwd_candidate.join("cli.js").exists() {
             cwd_candidate
         } else if let Ok(exe) = std::env::current_exe() {
-                let mut probe = exe;
-                loop {
-                    let candidate = probe.join("packages").join("vell-renderer-epub");
-                    if candidate.join("cli.js").exists() { break candidate; }
-                    if !probe.pop() { break cwd; }
+            let mut probe = exe;
+            loop {
+                let candidate = probe.join("packages").join("vell-renderer-epub");
+                if candidate.join("cli.js").exists() {
+                    break candidate;
                 }
-        } else { cwd }
+                if !probe.pop() {
+                    break cwd;
+                }
+            }
+        } else {
+            cwd
+        }
     };
     let cli_script = pkg_dir.join("cli.js");
     if !cli_script.exists() {
@@ -239,15 +281,19 @@ pub fn cmd_render_epub(
     }
     let temp_dir = std::env::temp_dir();
     let temp_ast = temp_dir.join(format!("vell-epub-{}.json", std::process::id()));
-    std::fs::write(&temp_ast, &ast_json)
-        .map_err(|e| format!("Failed to write temp AST: {}", e))?;
+    std::fs::write(&temp_ast, &ast_json).map_err(|e| format!("Failed to write temp AST: {}", e))?;
     let output_path = if let Some(out) = output {
         out.to_string_lossy().to_string()
     } else {
-        temp_dir.join(format!("vell-output-{}.epub", std::process::id())).to_string_lossy().to_string()
+        temp_dir
+            .join(format!("vell-output-{}.epub", std::process::id()))
+            .to_string_lossy()
+            .to_string()
     };
     let status = std::process::Command::new("node")
-        .arg(&cli_script).arg(&temp_ast).arg(&output_path)
+        .arg(&cli_script)
+        .arg(&temp_ast)
+        .arg(&output_path)
         .status()
         .map_err(|e| format!("Failed to run EPUB renderer: {} (is Node.js installed?)", e))?;
     if !status.success() {
@@ -256,14 +302,18 @@ pub fn cmd_render_epub(
     }
     if output.is_none() {
         use std::io::Write;
-        std::io::stdout().write_all(&std::fs::read(&output_path).map_err(|e| format!("Failed to read EPUB: {}", e))?)
+        std::io::stdout()
+            .write_all(
+                &std::fs::read(&output_path).map_err(|e| format!("Failed to read EPUB: {}", e))?,
+            )
             .map_err(|e| format!("Failed to write EPUB to stdout: {}", e))?;
     }
     let _ = std::fs::remove_file(&temp_ast);
-    if output.is_none() { let _ = std::fs::remove_file(&output_path); }
+    if output.is_none() {
+        let _ = std::fs::remove_file(&output_path);
+    }
     Ok(())
 }
-
 
 /// Resolves @[Include](path="...") directives by reading and merging referenced files.
 /// Resolves @[Include](path="...") directives by reading and merging referenced files.
@@ -547,6 +597,8 @@ thread_local! {
     static RENDER_TOC_ENTRIES: RefCell<Vec<(u8, String, String)>> = const { RefCell::new(Vec::new()) };
     static RENDER_LOF_ENTRIES: RefCell<Vec<(String, String)>> = const { RefCell::new(Vec::new()) };
     static RENDER_LOT_ENTRIES: RefCell<Vec<(String, String)>> = const { RefCell::new(Vec::new()) };
+    static RENDER_INDEX_ENTRIES: RefCell<Vec<(String, String)>> = const { RefCell::new(Vec::new()) };
+    static RENDER_GLOSSARY_ENTRIES: RefCell<Vec<(String, String, String)>> = const { RefCell::new(Vec::new()) };
     static RENDER_BIBLIOGRAPHY: RefCell<Option<vell_core::bibliography::Bibliography>> = const { RefCell::new(None) };
 }
 
@@ -555,12 +607,17 @@ fn html_lang_dir_attrs(lang: Option<&str>) -> String {
     if let Some(l) = lang {
         let dir = if is_rtl_language(l) { "rtl" } else { "ltr" };
         format!(" lang=\"{}\" dir=\"{}\"", escape_html(l), dir)
-    } else { String::new() }
+    } else {
+        String::new()
+    }
 }
 
 /// Detect if a language code is a right-to-left (RTL) language.
 fn is_rtl_language(lang: &str) -> bool {
-    let rtl_langs = ["ar","arc","bcc","bqi","ckb","dv","fa","glk","ha","he","khw","ks","ku","mzn","nqo","pa","ps","sd","ug","ur","uz","yi"];
+    let rtl_langs = [
+        "ar", "arc", "bcc", "bqi", "ckb", "dv", "fa", "glk", "ha", "he", "khw", "ks", "ku", "mzn",
+        "nqo", "pa", "ps", "sd", "ug", "ur", "uz", "yi",
+    ];
     let base = lang.split('-').next().unwrap_or(lang).to_lowercase();
     rtl_langs.contains(&base.as_str())
 }
@@ -574,6 +631,8 @@ pub fn render_document(doc: &Document) -> String {
     RENDER_TOC_ENTRIES.with(|e| *e.borrow_mut() = toc_entries);
     RENDER_LOF_ENTRIES.with(|e| *e.borrow_mut() = lof_entries);
     RENDER_LOT_ENTRIES.with(|e| *e.borrow_mut() = lot_entries);
+    RENDER_INDEX_ENTRIES.with(|e| *e.borrow_mut() = collect_index_entries(doc));
+    RENDER_GLOSSARY_ENTRIES.with(|e| *e.borrow_mut() = collect_glossary_entries(doc));
 
     let mut html = String::new();
     let title = doc.metadata.title.as_deref().unwrap_or("Vell Document");
@@ -614,6 +673,8 @@ pub fn render_document(doc: &Document) -> String {
     RENDER_TOC_ENTRIES.with(|e| e.borrow_mut().clear());
     RENDER_LOF_ENTRIES.with(|e| e.borrow_mut().clear());
     RENDER_LOT_ENTRIES.with(|e| e.borrow_mut().clear());
+    RENDER_INDEX_ENTRIES.with(|e| e.borrow_mut().clear());
+    RENDER_GLOSSARY_ENTRIES.with(|e| e.borrow_mut().clear());
     RENDER_BIBLIOGRAPHY.with(|b| *b.borrow_mut() = None);
     html
 }
@@ -624,6 +685,8 @@ pub fn render_document_pdf(doc: &Document) -> String {
     RENDER_TOC_ENTRIES.with(|e| *e.borrow_mut() = collect_toc_entries_vec(doc));
     RENDER_LOF_ENTRIES.with(|e| *e.borrow_mut() = collect_lof_entries(doc));
     RENDER_LOT_ENTRIES.with(|e| *e.borrow_mut() = collect_lot_entries(doc));
+    RENDER_INDEX_ENTRIES.with(|e| *e.borrow_mut() = collect_index_entries(doc));
+    RENDER_GLOSSARY_ENTRIES.with(|e| *e.borrow_mut() = collect_glossary_entries(doc));
 
     let mut html = String::new();
     let title = doc.metadata.title.as_deref().unwrap_or("Vell Document");
@@ -691,6 +754,8 @@ pub fn render_document_slides(doc: &Document) -> String {
     RENDER_TOC_ENTRIES.with(|e| *e.borrow_mut() = collect_toc_entries_vec(doc));
     RENDER_LOF_ENTRIES.with(|e| *e.borrow_mut() = collect_lof_entries(doc));
     RENDER_LOT_ENTRIES.with(|e| *e.borrow_mut() = collect_lot_entries(doc));
+    RENDER_INDEX_ENTRIES.with(|e| *e.borrow_mut() = collect_index_entries(doc));
+    RENDER_GLOSSARY_ENTRIES.with(|e| *e.borrow_mut() = collect_glossary_entries(doc));
 
     let mut slides_html = String::new();
     let title = doc.metadata.title.as_deref().unwrap_or("Vell Presentation");
@@ -913,6 +978,121 @@ fn collect_lot_entries(doc: &Document) -> Vec<(String, String)> {
     entries
 }
 
+fn collect_index_entries(doc: &Document) -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    for node in &doc.children {
+        collect_term_entries(node, &mut entries, None);
+    }
+    entries.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+    entries.dedup_by(|a, b| a.0 == b.0);
+    entries
+}
+
+fn collect_glossary_entries(doc: &Document) -> Vec<(String, String, String)> {
+    let mut terms = Vec::new();
+    for node in &doc.children {
+        collect_term_entries(node, &mut Vec::new(), Some(&mut terms));
+    }
+    terms.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+    terms.dedup_by(|a, b| a.0 == b.0);
+    terms
+}
+
+fn collect_term_entries(
+    node: &Node,
+    index: &mut Vec<(String, String)>,
+    mut glossary: Option<&mut Vec<(String, String, String)>>,
+) {
+    match node {
+        Node::Directive {
+            name,
+            props,
+            children,
+            ..
+        } => {
+            let term = props.get("term").and_then(|value| match value {
+                PropValue::String(value) => Some(value.trim().to_string()),
+                _ => None,
+            });
+            if let Some(term) = term.filter(|value| !value.is_empty()) {
+                let id = format!("{}-{}", name.to_lowercase(), slugify_text(&term));
+                if name == "Index" {
+                    index.push((term, id));
+                } else if name == "Glossary" {
+                    let definition = props
+                        .get("definition")
+                        .and_then(|value| match value {
+                            PropValue::String(value) => Some(value.clone()),
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| extract_plain_text(children));
+                    if let Some(entries) = glossary.as_deref_mut() {
+                        entries.push((term, definition, id));
+                    }
+                }
+            }
+            collect_term_children(children, index, glossary.as_deref_mut());
+        }
+        Node::Blockquote { children, .. } | Node::ForLoop { children, .. } => {
+            collect_term_children(children, index, glossary.as_deref_mut());
+        }
+        Node::FootnoteDefinition { children, .. } => {
+            collect_term_children(children, index, glossary.as_deref_mut());
+        }
+        Node::List { items, .. } => {
+            for item in items {
+                collect_term_children(&item.children, index, glossary.as_deref_mut());
+            }
+        }
+        Node::IfBlock {
+            consequent,
+            alternate,
+            ..
+        } => {
+            collect_term_children(consequent, index, glossary.as_deref_mut());
+            if let Some(children) = alternate {
+                collect_term_children(children, index, glossary);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_term_children(
+    children: &[Node],
+    index: &mut Vec<(String, String)>,
+    mut glossary: Option<&mut Vec<(String, String, String)>>,
+) {
+    for child in children {
+        collect_term_entries(child, index, glossary.as_deref_mut());
+    }
+}
+
+fn extract_plain_text(nodes: &[Node]) -> String {
+    nodes
+        .iter()
+        .filter_map(|node| match node {
+            Node::Paragraph { children, .. } | Node::Heading { children, .. } => {
+                Some(format_inline_nodes(children))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn slugify_text(value: &str) -> String {
+    let slug = value
+        .to_lowercase()
+        .chars()
+        .map(|ch| if ch.is_alphanumeric() { ch } else { '-' })
+        .collect::<String>();
+    slug.split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
 /// Formats a slice of inline nodes into a plain text string.
 fn format_inline_nodes(children: &[InlineNode]) -> String {
     let mut text = String::new();
@@ -934,6 +1114,358 @@ fn format_inline_nodes(children: &[InlineNode]) -> String {
         }
     }
     text
+}
+
+/// Renders a Vell document as a standalone LaTeX document.
+pub fn render_document_latex(doc: &Document) -> String {
+    let mut body = String::new();
+    for node in &doc.children {
+        render_latex_node(node, &mut body);
+    }
+    let title = latex_escape(doc.metadata.title.as_deref().unwrap_or("Vell Document"));
+    let author = latex_escape(doc.metadata.author.as_deref().unwrap_or(""));
+    format!("\\documentclass{{article}}\n\\usepackage[utf8]{{inputenc}}\n\\usepackage{{amsmath,amssymb,hyperref,graphicx,longtable}}\n\\title{{{title}}}\n\\author{{{author}}}\n\\begin{{document}}\n\\maketitle\n{body}\\end{{document}}\n")
+}
+
+fn render_latex_node(node: &Node, output: &mut String) {
+    match node {
+        Node::Heading {
+            level, children, ..
+        } => {
+            let command = match level {
+                1 => "section",
+                2 => "subsection",
+                3 => "subsubsection",
+                _ => "paragraph",
+            };
+            output.push_str(&format!(
+                "\\{}{{{}}}\n",
+                command,
+                latex_escape(&format_inline_nodes(children))
+            ));
+        }
+        Node::Paragraph { children, .. } => output.push_str(&format!(
+            "{}\n\n",
+            latex_escape(&format_inline_nodes(children))
+        )),
+        Node::Blockquote { children, .. } => {
+            output.push_str("\\begin{quote}\n");
+            for child in children {
+                render_latex_node(child, output);
+            }
+            output.push_str("\\end{quote}\n");
+        }
+        Node::CodeBlock { source, .. } => output.push_str(&format!(
+            "\\begin{{verbatim}}\n{}\\end{{verbatim}}\n",
+            source
+        )),
+        Node::MathBlock { source, .. } => output.push_str(&format!("\\[{}\\]\n", source)),
+        Node::List { ordered, items, .. } => {
+            output.push_str(if *ordered {
+                "\\begin{enumerate}\n"
+            } else {
+                "\\begin{itemize}\n"
+            });
+            for item in items {
+                output.push_str("\\item ");
+                for child in &item.children {
+                    render_latex_node(child, output);
+                }
+            }
+            output.push_str(if *ordered {
+                "\\end{enumerate}\n"
+            } else {
+                "\\end{itemize}\n"
+            });
+        }
+        Node::Table { headers, rows, .. } => {
+            let columns = headers.len().max(1);
+            output.push_str(&format!(
+                "\\begin{{longtable}}{{{}}}\n",
+                "l".repeat(columns)
+            ));
+            output.push_str(
+                &headers
+                    .iter()
+                    .map(|cell| latex_escape(&format_inline_nodes(&cell.children)))
+                    .collect::<Vec<_>>()
+                    .join(" & "),
+            );
+            output.push_str(" \\\\\n\\hline\n");
+            for row in rows {
+                output.push_str(
+                    &row.iter()
+                        .map(|cell| latex_escape(&format_inline_nodes(&cell.children)))
+                        .collect::<Vec<_>>()
+                        .join(" & "),
+                );
+                output.push_str(" \\\\\n");
+            }
+            output.push_str("\\end{longtable}\n");
+        }
+        Node::HorizontalRule { .. } => output.push_str("\\hrulefill\n"),
+        Node::Directive {
+            name,
+            props,
+            children,
+            ..
+        } => {
+            match name.as_str() {
+                "Equation" => {
+                    if let Some(PropValue::String(source)) = props.get("source") {
+                        output.push_str(&format!(
+                            "\\begin{{equation}}\n{}\n\\end{{equation}}\n",
+                            source
+                        ));
+                    }
+                }
+                "Figure" => {
+                    if let Some(PropValue::String(src)) = props.get("src") {
+                        output.push_str(&format!("\\begin{{figure}}[h]\n\\centering\n\\includegraphics[width=\\linewidth]{{{}}}\n", latex_escape(src)));
+                    }
+                    if let Some(PropValue::String(caption)) = props.get("caption") {
+                        output.push_str(&format!("\\caption{{{}}}\n", latex_escape(caption)));
+                    }
+                    output.push_str("\\end{figure}\n");
+                }
+                "Part" => {
+                    if let Some(PropValue::String(title)) = props.get("title") {
+                        output.push_str(&format!("\\part{{{}}}\n", latex_escape(title)));
+                    }
+                }
+                "Chapter" | "Appendix" => {
+                    if let Some(PropValue::String(title)) = props.get("title") {
+                        output.push_str(&format!("\\section{{{}}}\n", latex_escape(title)));
+                    }
+                }
+                "Toc" => output.push_str("\\tableofcontents\n"),
+                "Index" if !props.contains_key("term") => output.push_str("\\printindex\n"),
+                _ => {}
+            }
+            for child in children {
+                render_latex_node(child, output);
+            }
+        }
+        Node::ForLoop { children, .. }
+        | Node::FootnoteDefinition { children, .. }
+        | Node::Extension { children, .. } => {
+            for child in children {
+                render_latex_node(child, output);
+            }
+        }
+        Node::IfBlock { consequent, .. } => {
+            for child in consequent {
+                render_latex_node(child, output);
+            }
+        }
+        Node::DefinitionList { items, .. } => {
+            for item in items {
+                output.push_str(&format!(
+                    "\\textbf{{{}}} ",
+                    latex_escape(&format_inline_nodes(&item.term))
+                ));
+                for child in &item.definition {
+                    render_latex_node(child, output);
+                }
+            }
+        }
+        Node::ReferenceDefinition { .. } | Node::VarDeclaration { .. } => {}
+    }
+}
+
+fn latex_escape(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| match ch {
+            '\\' => "\\textbackslash{}".to_string(),
+            '{' => "\\{".to_string(),
+            '}' => "\\}".to_string(),
+            '$' => "\\$".to_string(),
+            '&' => "\\&".to_string(),
+            '%' => "\\%".to_string(),
+            '#' => "\\#".to_string(),
+            '_' => "\\_".to_string(),
+            '^' => "\\^{}".to_string(),
+            '~' => "\\~{}".to_string(),
+            _ => ch.to_string(),
+        })
+        .collect()
+}
+
+/// Renders a Vell document as JATS 1.3 XML.
+pub fn render_document_jats(doc: &Document) -> String {
+    let title = escape_xml(doc.metadata.title.as_deref().unwrap_or("Vell Document"));
+    let mut body = String::new();
+    for node in &doc.children {
+        render_jats_node(node, &mut body);
+    }
+    format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE article PUBLIC \"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD v1.3 20210610//EN\" \"JATS-archivearticle1-3.dtd\">\n<article article-type=\"other\"><front><article-meta><title-group><article-title>{title}</article-title></title-group></article-meta></front><body>{body}</body></article>\n")
+}
+
+fn render_jats_node(node: &Node, output: &mut String) {
+    match node {
+        Node::Heading {
+            level, children, ..
+        } => output.push_str(&format!(
+            "<sec sec-type=\"level-{}\"><title>{}</title></sec>",
+            level,
+            escape_xml(&format_inline_nodes(children))
+        )),
+        Node::Paragraph { children, .. } => output.push_str(&format!(
+            "<p>{}</p>",
+            escape_xml(&format_inline_nodes(children))
+        )),
+        Node::Blockquote { children, .. } => {
+            output.push_str("<disp-quote>");
+            for child in children {
+                render_jats_node(child, output);
+            }
+            output.push_str("</disp-quote>");
+        }
+        Node::CodeBlock { source, .. } => output.push_str(&format!(
+            "<code language=\"text\">{}</code>",
+            escape_xml(source)
+        )),
+        Node::MathBlock { source, .. } => output.push_str(&format!(
+            "<disp-formula><tex-math><![CDATA[{}]]></tex-math></disp-formula>",
+            source.replace("]]>", "]] >")
+        )),
+        Node::List { ordered, items, .. } => {
+            output.push_str(if *ordered {
+                "<list list-type=\"order\">"
+            } else {
+                "<list list-type=\"bullet\">"
+            });
+            for item in items {
+                output.push_str("<list-item>");
+                for child in &item.children {
+                    render_jats_node(child, output);
+                }
+                output.push_str("</list-item>");
+            }
+            output.push_str("</list>");
+        }
+        Node::Directive {
+            name,
+            children,
+            props,
+            ..
+        } if name == "Figure" => {
+            output.push_str("<fig>");
+            if let Some(PropValue::String(caption)) = props.get("caption") {
+                output.push_str(&format!(
+                    "<caption><p>{}</p></caption>",
+                    escape_xml(caption)
+                ));
+            }
+            for child in children {
+                render_jats_node(child, output);
+            }
+            output.push_str("</fig>");
+        }
+        Node::Directive { children, .. }
+        | Node::Extension { children, .. }
+        | Node::ForLoop { children, .. }
+        | Node::FootnoteDefinition { children, .. } => {
+            for child in children {
+                render_jats_node(child, output);
+            }
+        }
+        Node::IfBlock { consequent, .. } => {
+            for child in consequent {
+                render_jats_node(child, output);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn escape_xml(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+/// Renders a Vell document to a minimal Office Open XML DOCX archive.
+pub fn render_document_docx(doc: &Document) -> Result<Vec<u8>, String> {
+    let mut document_body = String::new();
+    for node in &doc.children {
+        render_docx_node(node, &mut document_body);
+    }
+    let document_xml = format!("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>{document_body}<w:sectPr/></w:body></w:document>");
+    let cursor = Cursor::new(Vec::new());
+    let mut archive = zip::ZipWriter::new(cursor);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    let files = [
+        ("[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>".to_string()),
+        ("_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>".to_string()),
+        ("word/document.xml", document_xml),
+    ];
+    for (path, content) in files {
+        archive
+            .start_file(path, options)
+            .map_err(|e| e.to_string())?;
+        archive
+            .write_all(content.as_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    archive
+        .finish()
+        .map(|cursor| cursor.into_inner())
+        .map_err(|e| e.to_string())
+}
+
+fn render_docx_node(node: &Node, output: &mut String) {
+    match node {
+        Node::Heading {
+            level, children, ..
+        } => docx_paragraph(
+            output,
+            &format_inline_nodes(children),
+            Some(&format!("Heading{}", level)),
+        ),
+        Node::Paragraph { children, .. } => {
+            docx_paragraph(output, &format_inline_nodes(children), None)
+        }
+        Node::CodeBlock { source, .. } | Node::MathBlock { source, .. } => {
+            docx_paragraph(output, source, Some("IntenseQuote"))
+        }
+        Node::List { items, .. } => {
+            for item in items {
+                let text = extract_plain_text(&item.children);
+                docx_paragraph(output, &format!("• {}", text), None);
+            }
+        }
+        Node::Blockquote { children, .. }
+        | Node::ForLoop { children, .. }
+        | Node::FootnoteDefinition { children, .. }
+        | Node::Extension { children, .. }
+        | Node::Directive { children, .. } => {
+            for child in children {
+                render_docx_node(child, output);
+            }
+        }
+        Node::IfBlock { consequent, .. } => {
+            for child in consequent {
+                render_docx_node(child, output);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn docx_paragraph(output: &mut String, text: &str, style: Option<&str>) {
+    let properties = style
+        .map(|style| format!("<w:pPr><w:pStyle w:val=\"{}\"/></w:pPr>", escape_xml(style)))
+        .unwrap_or_default();
+    output.push_str(&format!(
+        "<w:p>{properties}<w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>",
+        escape_xml(text)
+    ));
 }
 
 /// Creates a URL-safe slug from inline children (e.g. heading text).
@@ -1069,7 +1601,6 @@ img { max-width: 100%; height: auto; }\n\
   @page { @bottom-center { content: counter(page); font-size: 9pt; color: #666; } }\n\
 }\n\
 </style>\n";
-
 
 const VELL_CSS_A11Y: &str = "\n\
 /* Phase 19: High contrast theme */\n\
@@ -1685,6 +2216,19 @@ fn render_directive(
                 html.push_str(&format!("<meta data-vell-data=\"{}\">\n", source));
             }
         }
+        "Button" => {
+            let label = props
+                .get("label")
+                .and_then(|value| match value {
+                    PropValue::String(value) => Some(value.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| extract_plain_text(children));
+            html.push_str(&format!(
+                "<button type=\"button\" class=\"vell-button\">{}</button>",
+                escape_html(&label)
+            ));
+        }
         // Phase 10: Chart rendering (inline SVG bar chart)
         "Chart" => {
             let chart_type = match props.get("type") {
@@ -1884,6 +2428,110 @@ fn render_directive(
             }
             html.push_str("</ul>\n");
             html.push_str("</nav>\n");
+        }
+        "Book" | "Part" | "Chapter" | "Appendix" | "Foreword" | "Preface" => {
+            let class = name.to_lowercase();
+            let title = props.get("title").and_then(|value| match value {
+                PropValue::String(value) => Some(value),
+                _ => None,
+            });
+            html.push_str(&format!(
+                "<section class=\"vell-book-section vell-{}\">\n",
+                class
+            ));
+            if let Some(title) = title {
+                html.push_str(&format!("<h2>{}</h2>\n", escape_html(title)));
+            }
+            for child in children {
+                render_node(child, html, _depth + 1, eq_counter, thm_counter, labels);
+            }
+            html.push_str("</section>\n");
+        }
+        "Index" => {
+            let term = props
+                .get("term")
+                .and_then(|value| match value {
+                    PropValue::String(value) => Some(value.trim()),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            if term.is_empty() {
+                html.push_str(
+                    "<nav class=\"vell-index\" aria-label=\"Index\"><h2>Index</h2><ol>\n",
+                );
+                for (term, id) in RENDER_INDEX_ENTRIES.with(|entries| entries.borrow().clone()) {
+                    html.push_str(&format!(
+                        "<li><a href=\"#{}\">{}</a></li>\n",
+                        escape_html(&id),
+                        escape_html(&term)
+                    ));
+                }
+                html.push_str("</ol></nav>\n");
+            } else {
+                html.push_str(&format!(
+                    "<span id=\"index-{}\" class=\"vell-index-marker\" data-term=\"{}\"></span>",
+                    slugify_text(term),
+                    escape_html(term)
+                ));
+            }
+        }
+        "Glossary" => {
+            let term = props
+                .get("term")
+                .and_then(|value| match value {
+                    PropValue::String(value) => Some(value.trim()),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            if term.is_empty() {
+                html.push_str("<section class=\"vell-glossary\"><h2>Glossary</h2><dl>\n");
+                for (term, definition, id) in
+                    RENDER_GLOSSARY_ENTRIES.with(|entries| entries.borrow().clone())
+                {
+                    html.push_str(&format!(
+                        "<dt id=\"{}\">{}</dt><dd>{}</dd>\n",
+                        escape_html(&id),
+                        escape_html(&term),
+                        escape_html(&definition)
+                    ));
+                }
+                html.push_str("</dl></section>\n");
+            } else {
+                let definition = props
+                    .get("definition")
+                    .and_then(|value| match value {
+                        PropValue::String(value) => Some(value.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| extract_plain_text(children));
+                html.push_str(&format!(
+                    "<dfn id=\"glossary-{}\" title=\"{}\">{}</dfn>",
+                    slugify_text(term),
+                    escape_html(&definition),
+                    escape_html(term)
+                ));
+            }
+        }
+        "PageRef" => {
+            let label = props
+                .get("label")
+                .and_then(|value| match value {
+                    PropValue::String(value) => Some(value.as_str()),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            if let Some(target) = labels.get(label) {
+                html.push_str(&format!(
+                    "<a href=\"#{}\" class=\"vell-page-ref\">{}</a>",
+                    escape_html(&target.anchor_id),
+                    escape_html(&target.display_text)
+                ));
+            } else {
+                html.push_str(&format!(
+                    "<span class=\"unresolved-ref\">[?{}]</span>",
+                    escape_html(label)
+                ));
+            }
         }
 
         // Phase 10: Function plot rendering
@@ -3021,14 +3669,8 @@ mod tests {
             "@[Theorem](name=\"A\") {\n  First.\n}\n\n@[Theorem](name=\"B\") {\n  Second.\n}\n";
         let doc = parse_document(src).unwrap();
         let html = render_document(&doc);
-        assert!(
-            html.find("Theorem 1").is_some(),
-            "first theorem should be 1"
-        );
-        assert!(
-            html.find("Theorem 2").is_some(),
-            "second theorem should be 2"
-        );
+        assert!(html.contains("Theorem 1"), "first theorem should be 1");
+        assert!(html.contains("Theorem 2"), "second theorem should be 2");
     }
 
     #[test]
@@ -3626,5 +4268,39 @@ mod tests {
             html.contains("Phase 10: Native Diagrams"),
             "should contain page title"
         );
+    }
+
+    #[test]
+    fn render_index_glossary_and_book_sections() {
+        let source = "@[Book](title=\"Manual\") {\n  @[Chapter](title=\"Start\") {\n    @[Index](term=\"Vell\")\n    @[Glossary](term=\"AST\" definition=\"Abstract syntax tree\")\n  }\n}\n@[Index]\n@[Glossary]\n";
+        let doc = parse_document(source).unwrap();
+        let html = render_document(&doc);
+        assert!(html.contains("vell-book-section vell-book"));
+        assert!(html.contains("href=\"#index-vell\""));
+        assert!(html.contains("Abstract syntax tree"));
+    }
+
+    #[test]
+    fn render_page_ref_uses_label_target() {
+        let doc =
+            parse_document("@[Equation](label=e:test source=\"x=1\")\n@[PageRef](label=e:test)\n")
+                .unwrap();
+        let html = render_document_pdf(&doc);
+        assert!(html.contains("class=\"vell-page-ref\""));
+        assert!(html.contains("href=\"#eq-e:test\""));
+    }
+
+    #[test]
+    fn render_latex_jats_and_docx_outputs() {
+        let doc = parse_document("= Export Test\n\nHello *Vell*.\n\n$$\nx^2\n$$\n").unwrap();
+        let latex = render_document_latex(&doc);
+        assert!(latex.contains("\\documentclass{article}"));
+        assert!(latex.contains("\\section{Export Test}"));
+        let jats = render_document_jats(&doc);
+        assert!(jats.contains("<article article-type=\"other\">"));
+        assert!(jats.contains("<disp-formula>"));
+        let docx = render_document_docx(&doc).unwrap();
+        assert!(docx.starts_with(b"PK"));
+        assert!(docx.len() > 500);
     }
 }

@@ -1,0 +1,332 @@
+/* vell-math-comprehensive.vl
+ *
+ * Comprehensive test fixture for the Vell LaTeX→MathML converter.
+ * Exercises every implemented command: Greek, operators, relations,
+ * sets, arrows, logic, accents, fonts, decorations, environments,
+ * and amssymb extras.
+ *
+ * Each section is a heading followed by inline or block math that
+ * exercises a category of commands.
+ */
+
+= Greek Letters
+
+Lowercase: $\alpha \beta \gamma \delta \epsilon \zeta \eta \theta \iota \kappa \lambda \mu \nu \xi \omicron \pi \rho \sigma \tau \upsilon \phi \chi \psi \omega$.
+
+Variants: $\varepsilon \vartheta \varrho \varsigma \varphi$.
+
+Uppercase: $\Gamma \Delta \Theta \Lambda \Xi \Pi \Sigma \Phi \Psi \Omega$.
+
+Dotless: $\imath \jmath \ell$.
+
+== Large Operators
+
+$\sum_{i=1}^n \prod_{j=1}^m \coprod_{i} \int_a^b \iint_D \iiint_V \oint_C \bigcup \bigcap \bigsqcup$.
+
+$\nabla \partial \infty$.
+
+== Binary Operators
+
+$+ - \times \div \pm \mp \cdot \circ \ast \star \otimes \oplus \ominus \oslash \odot \bullet$.
+
+$\ltimes \rtimes \uplus \sqcap \sqcup \curlyvee \circledast$.
+
+== Relations
+
+$\equiv \approx \sim \simeq \cong \propto \varpropto \asymp \doteq \neq \le \ge \leqq \geqq \ll \gg$.
+
+$\prec \succ \preceq \succeq$.
+
+== Set Symbols
+
+$\subset \supset \subseteq \supseteq \nsubseteq \subsetneq \cap \cup \setminus \emptyset \varnothing \complement$.
+
+$\in \notin \ni$.
+
+== Arrows
+
+$\rightarrow \leftarrow \Rightarrow \Leftarrow \leftrightarrow \Leftrightarrow \implies \impliedby \iff$.
+
+$\uparrow \downarrow \updownarrow \mapsto \longmapsto \hookrightarrow$.
+
+$\longrightarrow \longleftarrow \Longrightarrow \Longleftarrow \Longleftrightarrow$.
+
+== Logic
+
+$\forall \exists \nexists \neg \lor \land \top \bot \vdash \dashv \mid \models$.
+
+== Dots and Delimiters
+
+$\cdots \ldots \vdots \ddots$.
+
+Fences: $\lfloor x \rfloor \lceil y \rceil \langle z \rangle \lvert a \rvert$.
+
+Punctuation: $\colon \prime \degree \percent \angles \flat \sharp \natural$.
+
+Negation: $\not\equiv \not\subset \notin \not\le \not\ge \not\approx$.
+
+Left/Right: $\left(\frac{a}{b}\right) \left[x\right] \left\{\frac{1}{2}\right\}$.
+
+== Functions
+
+Trig: $\sin x \cos x \tan x \cot x \sec x \csc x$.
+
+Inverse: $\arcsin x \arccos x \arctan x$.
+
+Hyperbolic: $\sinh x \cosh x \tanh x$.
+
+Logs: $\log x \ln x$.
+
+Others: $\det A \dim V \lim_{x\to 0} \max_i \min_j \sup S \inf T \exp x \deg f \arg z \ker T \hom G \gcd(a,b) \Pr(E)$.
+
+== Geometry
+
+$\triangle \angle \parallel \perp \therefore \because$.
+
+== Accents
+
+$\hat{x} \tilde{x} \bar{x} \dot{x} \ddot{x} \vec{v}$.
+
+Dotless with accents: $\hat{\imath} \vec{\jmath}$.
+
+== Font Commands
+
+Blackboard: $\mathbb{R} \mathbb{C} \mathbb{Q} \mathbb{Z} \mathbb{N}$.
+
+Calligraphic: $\mathcal{F} \mathcal{G} \mathcal{H}$.
+
+Fraktur: $\mathfrak{g} \mathfrak{sl}_n \mathfrak{su}_2$.
+
+Script: $\mathscr{L} \mathscr{O}$.
+
+Roman: $\mathrm{E} \mathrm{Re} \mathrm{Im}$.
+
+Bold: $\mathbf{v} \mathbf{x} \mathbf{A}$.
+
+Italic: $\mathit{abc}$.
+
+Sans: $\mathsf{set}$.
+
+Typewriter: $\mathtt{code}$.
+
+Variants: $\textbf{bold} \textit{italic} \Bbbk$.
+
+== Decorations
+
+$\boxed{x} \cancel{y} \bcancel{z} \xcancel{w} \underline{a} \overline{b}$.
+
+Stretchy: $\overset{*}{x} \underset{*}{x}$.
+
+== Named Operators
+
+$\operatorname{argmin}_{x} f(x) \quad \operatorname{span}\{v_1,\dots,v_n\}$.
+
+== Special Symbols
+
+$\Re \Im \aleph \beth \gimel \daleth \mho \Finv \Game \eth \hbar \hslash \pounds \S \P \checkmark$.
+
+== Bra-Ket (Physics)
+
+$\bra{\psi} \ket{\phi} \braket{\psi|\phi}$.
+
+== Constructions
+
+Fraction: $\frac{a}{b}$.
+
+Continued: $\frac{1}{1+\frac{1}{x}}$.
+
+Continued fraction: $\cfrac{1}{1+\cfrac{1}{2+\cfrac{1}{3}}}$.
+
+Radicals: $\sqrt{x} \sqrt[3]{y} \sqrt{\frac{a}{b}}$.
+
+Binomial: $\binom{n}{k} \binom{n}{k}\binom{r}{s}$.
+
+== Extensible Arrows
+
+$x \xrightarrow{text} y$ and $a \xleftarrow{label} b$.
+
+== Stacked Subscripts
+
+$\sum_{\substack{i<j\\ j>k}} a_{ij}$.
+
+== Prescript and Sideset
+
+$\prescript{a}{b}{C}$ and $\prescript{1}{2}{X}$.
+
+Sideset with operator: $\sideset{_a^b}{_c^d}\sum_{n=1}^{\infty} a_n$.
+
+Sideset with product: $\sideset{}{^\ast}\prod_{k=1}^N x_k$.
+
+== Intertext
+
+Text in aligned environments uses $\intertext{inline text}$.
+
+== Modulo
+
+$x \equiv y \pmod{n}$ and $a \equiv b \pmod{m}$.
+
+== Displaystyle
+
+$\displaystyle \sum_{i=1}^n \frac{1}{i^2}$.
+
+= Block Math Examples
+
+== Summation
+
+$$
+\sum_{i=1}^n \frac{1}{i^2} = \frac{\pi^2}{6}
+$$
+
+== Gaussian Integral
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}
+$$
+
+== Quadratic Formula
+
+$$
+x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+$$
+
+== Matrix (pmatrix)
+
+$$
+\begin{pmatrix}
+a_{11} & a_{12} & a_{13} \\
+a_{21} & a_{22} & a_{23} \\
+a_{31} & a_{32} & a_{33}
+\end{pmatrix}
+$$
+
+== Piecewise (cases)
+
+$$
+f(x) = \begin{cases}
+x^2 & \text{if } x \ge 0 \\
+-x^2 & \text{if } x < 0
+\end{cases}
+$$
+
+== Aligned Equations
+
+$$
+\begin{aligned}
+x &= a + b + c \\
+y &= d + e + f
+\end{aligned}
+$$
+
+== Matrix (bmatrix)
+
+$$
+\begin{bmatrix}
+1 & 0 \\
+0 & 1
+\end{bmatrix}
+$$
+
+== Braces Matrix
+
+$$
+\begin{Bmatrix}
+a & b \\
+c & d
+\end{Bmatrix}
+$$
+
+== Vertical Bar Matrix
+
+$$
+\begin{vmatrix}
+a & b \\
+c & d
+\end{vmatrix}
+$$
+
+== Gather Environment
+
+$$
+\begin{gathered}
+x + y = z \\
+a + b = c
+\end{gathered}
+$$
+
+== Multline
+
+$$
+\begin{multline}
+a + b + c + d \\
++ e + f + g
+\end{multline}
+$$
+
+== Einstein's Equation
+
+$$
+\boxed{E = mc^2}
+$$
+
+== Cancellation
+
+$$
+\cancel{y} = \cancel{mx + b}
+$$
+
+== Align with Multiple Columns
+
+$$
+\begin{align}
+x &= y & a &= b \\
+u &= v & p &= q
+\end{align}
+$$
+
+== Flalign (Full Width Align)
+
+$$
+\begin{flalign}
+x + y &= z & a &= b \\
+u + v &= w & p &= q
+\end{flalign}
+$$
+
+== Gathered (Single Column Centered)
+
+$$
+\begin{gathered}
+x + y = z \\
+a + b = c
+\end{gathered}
+$$
+
+== Small Matrix (Inline)
+
+Small matrix: $\begin{smallmatrix} a & b \\ c & d \end{smallmatrix}$.
+
+= Font Display
+
+== Blackboard Bold
+
+$\mathbb{ABCDEFGHIJKLMNOPQRSTUVWXYZ}$
+
+== Calligraphic
+
+$\mathcal{ABCDEFGHIJKLMNOPQRSTUVWXYZ}$
+
+== Fraktur
+
+$\mathfrak{ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz}$
+
+== Roman
+
+$\mathrm{ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz}$
+
+== Bold
+
+$\mathbf{ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz}$
+
+== Script
+
+$\mathscr{ABCDEFGHIJKLMNOPQRSTUVWXYZ}$

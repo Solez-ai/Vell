@@ -1,0 +1,267 @@
+---
+title: "Install Vell: CLI, npm Packages, and VS Code Extension"
+sidebarTitle: "Installation"
+description: "Install the Vell CLI with Cargo, add JavaScript packages via npm, and set up the VS Code extension. Covers all supported environments and runtimes."
+---
+
+Vell ships as a suite of components — a Rust CLI, a family of npm packages, a VS Code extension, and a WebAssembly module for browser use. Install only the components you need. All packages are at version **0.1.0**.
+
+## Rust CLI
+
+The `vell-cli` crate is the canonical command-line interface for Vell. It provides `vell parse`, `vell fmt`, `vell render`, and `vell validate` — all the tools you need to work with `.vl` files in a terminal or CI pipeline.
+
+### Prerequisites
+
+- **Rust stable** — Install via [rustup](https://rustup.rs). Vell requires the latest stable toolchain (edition 2021).
+
+Check your Rust version before proceeding:
+
+```bash
+rustc --version
+# rustc 1.78.0 (or later)
+```
+
+### Install
+
+From a repository checkout:
+
+```bash
+cargo install --path crates/vell-cli
+cargo install --path crates/vell-lsp
+```
+
+Verify the installation:
+
+```bash
+vell --version
+# vell 0.1.0
+```
+
+<Note>
+  The first install compiles all dependencies from source, which may take a few minutes. Cargo caches compiled crates, so updates are faster.
+</Note>
+
+### Available CLI Commands
+
+| Command | Description |
+|---|---|
+| `vell parse <file>` | Parse a `.vl` file and print the AST as JSON |
+| `vell fmt <file>` | Format source to canonical style (idempotent) |
+| `vell render html <file>` | Render to HTML5 with MathML |
+| `vell render pdf <file>` | Render print-optimized HTML for browser-to-PDF workflows |
+| `vell render slides <file>` | Render to a reveal.js slide deck |
+| `vell render epub <file> <output>` | Render to EPUB 3 |
+| `vell render docx <file> -o <output>` | Render to DOCX |
+| `vell render latex <file> -o <output>` | Render to LaTeX |
+| `vell render jats <file> -o <output>` | Render to JATS XML |
+| `vell validate <file>` | Print diagnostics and exit non-zero on errors |
+
+All commands accept an optional `-o <path>` flag to write output to a file, and read from stdin when no input file is given.
+
+---
+
+## Node.js / npm Packages
+
+Vell's TypeScript packages wrap the compiled WebAssembly core and provide typed APIs for parsing and rendering. They work in Node.js 20 or later and in any modern browser that supports WebAssembly.
+
+### Core Parser: `@solez-ai/vell`
+
+The `@solez-ai/vell` package is the typed wrapper around the Rust reference parser's WASM interface. The package ships a pre-compiled `.wasm` binary, so you can import and initialize the parser directly without a separate build step:
+
+```typescript
+import init, { parse } from '@solez-ai/vell';
+
+await init();
+const result = parse('= Hello, world!');
+```
+
+If you need to build the WASM module from source (e.g., for a custom or development build), run `wasm-pack` and register the generated module with `setWasmModule()`:
+
+<CodeGroup>
+```bash npm
+npm install @solez-ai/vell
+```
+
+```bash pnpm
+pnpm add @solez-ai/vell
+```
+
+```bash yarn
+yarn add @solez-ai/vell
+```
+</CodeGroup>
+
+### HTML Renderer: `@solez-ai/vell-renderer-html`
+
+Renders a Vell AST to HTML5 with MathML equations, cross-reference resolution, footnotes, diagram rendering, and URL sanitization.
+
+<CodeGroup>
+```bash npm
+npm install @solez-ai/vell-renderer-html
+```
+
+```bash pnpm
+pnpm add @solez-ai/vell-renderer-html
+```
+
+```bash yarn
+yarn add @solez-ai/vell-renderer-html
+```
+</CodeGroup>
+
+### PDF Renderer: `@solez-ai/vell-renderer-pdf`
+
+Renders a Vell AST directly to PDF using [pdfkit](http://pdfkit.org/). Useful for server-side PDF generation without a headless browser.
+
+<CodeGroup>
+```bash npm
+npm install @solez-ai/vell-renderer-pdf
+```
+
+```bash pnpm
+pnpm add @solez-ai/vell-renderer-pdf
+```
+
+```bash yarn
+yarn add @solez-ai/vell-renderer-pdf
+```
+</CodeGroup>
+
+### Extensions Library: `@solez-ai/vell-extensions`
+
+Provides the extension registry API and base types for building custom directives. Install this when you want to create or consume namespaced `@[org/Name]` extensions.
+
+<CodeGroup>
+```bash npm
+npm install @solez-ai/vell-extensions
+```
+
+```bash pnpm
+pnpm add @solez-ai/vell-extensions
+```
+
+```bash yarn
+yarn add @solez-ai/vell-extensions
+```
+</CodeGroup>
+
+### Install All Packages at Once
+
+If you want the full JavaScript toolchain in a single command:
+
+<CodeGroup>
+```bash npm
+npm install @solez-ai/vell @solez-ai/vell-renderer-html @solez-ai/vell-renderer-pdf @solez-ai/vell-extensions
+```
+
+```bash pnpm
+pnpm add @solez-ai/vell @solez-ai/vell-renderer-html @solez-ai/vell-renderer-pdf @solez-ai/vell-extensions
+```
+
+```bash yarn
+yarn add @solez-ai/vell @solez-ai/vell-renderer-html @solez-ai/vell-renderer-pdf @solez-ai/vell-extensions
+```
+</CodeGroup>
+
+---
+
+## VS Code Extension
+
+The `vell-vscode` extension adds syntax highlighting and full LSP integration to Visual Studio Code. It connects to the `vell-lsp` server to provide diagnostics, completions, hover documentation, go-to-definition, references, rename, semantic tokens, code actions, inlay hints, and more.
+
+### Build and install a VSIX
+
+The repository does not currently include marketplace publication metadata. Build a VSIX from `packages/vell-vscode`, then install it manually:
+
+```bash
+npm install
+npm run build --workspace @solez-ai/vell-vscode
+npx @vscode/vsce package --cwd packages/vell-vscode
+code --install-extension packages/vell-vscode/solez-ai-vell-vscode-0.1.0.vsix
+```
+
+Or, inside VS Code: open the Extensions panel, click the `⋯` menu at the top right, choose **Install from VSIX…**, and select the file.
+
+<Tip>
+  After installing the extension, open any `.vl` file to get syntax highlighting. Language-server features require the `vell-lsp` executable on your `PATH`. The extension starts `vell-lsp`; it does not bundle the server binary.
+</Tip>
+
+---
+
+## WASM in the Browser
+
+The same parser that runs in Node.js also runs directly in the browser via WebAssembly. Install `@solez-ai/vell` into your front-end project, then import and initialize the parser directly — the package ships a pre-compiled WASM binary loaded automatically:
+
+<CodeGroup>
+```bash npm
+npm install @solez-ai/vell @solez-ai/vell-renderer-html
+```
+
+```bash pnpm
+pnpm add @solez-ai/vell @solez-ai/vell-renderer-html
+```
+
+```bash yarn
+yarn add @solez-ai/vell @solez-ai/vell-renderer-html
+```
+</CodeGroup>
+
+```typescript
+import init, { parseOrThrow } from '@solez-ai/vell';
+import { render } from '@solez-ai/vell-renderer-html';
+
+await init();
+
+const source = `= Hello, browser!\n\nThis is $E = mc^2$ rendered client-side.\n`;
+const document = parseOrThrow(source);
+const html = render(document);
+
+document.getElementById("output")!.innerHTML = html;
+```
+
+### Custom WASM Build
+
+For development builds or custom modifications, build the WASM module from source and register it with `setWasmModule()`:
+
+```bash
+wasm-pack build crates/vell-wasm --target bundler --out-dir target/vell-wasm-pkg
+```
+
+```typescript
+import init, * as wasm from "../../target/vell-wasm-pkg/vell_wasm.js";
+import { parseOrThrow, setWasmModule } from "@solez-ai/vell";
+import { render } from "@solez-ai/vell-renderer-html";
+
+await init();
+setWasmModule(wasm);
+
+const source = `= Hello, browser!\n\nThis is $E = mc^2$ rendered client-side.\n`;
+const document = parseOrThrow(source);
+const html = render(document);
+
+document.getElementById("output")!.innerHTML = html;
+```
+
+---
+
+## Package Summary
+
+| Package | Version | Environment | Description |
+|---|---|---|---|
+| `vell-cli` (Cargo) | 0.1.0 | Terminal / CI | Parse, format, render, validate |
+| `@solez-ai/vell` | 0.1.0 | Node.js / Browser | Typed wrapper around WASM parser (ships pre-compiled `.wasm` binary) |
+| `@solez-ai/vell-renderer-html` | 0.1.0 | Node.js / Browser | HTML5 renderer with MathML |
+| `@solez-ai/vell-renderer-pdf` | 0.1.0 | Node.js | Direct AST-to-PDF via pdfkit |
+| `@solez-ai/vell-extensions` | 0.1.0 | Node.js / Browser | Extension registry and base types |
+| `vell-vscode` | 0.1.0 | VS Code | Syntax highlighting + LSP client |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Write and render your first `.vl` document end-to-end.
+  </Card>
+  <Card title="Language Reference" icon="book" href="/language/syntax">
+    Learn the full Vell syntax — directives, math, variables, and more.
+  </Card>
+</CardGroup>

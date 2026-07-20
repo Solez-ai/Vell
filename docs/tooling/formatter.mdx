@@ -1,0 +1,194 @@
+---
+title: "Formatting Vell Documents with the vell fmt Command"
+sidebarTitle: "Formatter"
+description: "The Vell formatter produces canonical, idempotent source formatting. Use vell fmt to auto-format documents and vell fmt --check in CI to enforce style."
+---
+
+The Vell formatter transforms any valid `.vl` document into a single canonical representation. Every formatting decision — heading spacing, table column widths, paragraph line length, code block style — is deterministic and derived from the parsed AST, not from heuristic text manipulation. Because the formatter works through the AST, it is **idempotent**: running `vell fmt` on already-formatted output always produces byte-for-byte identical output.
+
+## Basic usage
+
+```bash
+vell fmt document.vl
+```
+
+The formatted source is written to **stdout**. To update the file in place, redirect the output:
+
+```bash
+vell fmt document.vl > document.vl
+```
+
+<Warning>
+On some shells, redirecting to the same file truncates it before `vell fmt` finishes reading. Use a temporary file to be safe:
+
+```bash
+vell fmt document.vl > document.vl.tmp && mv document.vl.tmp document.vl
+```
+</Warning>
+
+You can also pipe source through the formatter:
+
+```bash
+cat document.vl | vell fmt
+```
+
+## CI enforcement with `--check`
+
+Pass `--check` to verify that a file is already formatted without writing anything. This is the right mode for CI pipelines: the command exits `0` if the file is correctly formatted, or `1` if formatting would change it.
+
+```bash
+# Fail the build if any document is not formatted
+vell fmt docs/report.vl --check
+vell fmt docs/guide.vl --check
+```
+
+<Tip>
+Add a `vell fmt --check` step to your pull request CI workflow so that contributors cannot merge unformatted documents. Pair it with `vell validate` to enforce both style and correctness in a single pipeline stage.
+</Tip>
+
+---
+
+## What the formatter changes
+
+### Heading spacing
+
+Heading markers use `=` signs separated from the heading text by exactly one space. Inconsistent spacing, extra `=` characters, or stray whitespace are all normalized.
+
+```vell Before
+=  Messy  Title
+===Section Without Space
+```
+
+```vell After
+= Messy Title
+=== Section Without Space
+```
+
+### Table column alignment
+
+Pipe-delimited tables are re-rendered with auto-computed column widths. Each column is padded to the width of its widest cell — including the header — so all columns align visually when viewed in a monospace font.
+
+```vell Before
+| Name | Age | Location |
+|---|---|---|
+| Alice | 30 | New York |
+| Bob | 25 | SF |
+```
+
+```vell After
+| Name  | Age | Location |
+|-------|-----|----------|
+| Alice | 30  | New York |
+| Bob   | 25  | SF       |
+```
+
+The separator row is also resized to match column widths.
+
+### Paragraph word-wrapping
+
+Prose paragraphs are re-wrapped so that no line exceeds **100 characters**. The formatter splits on whitespace boundaries and never breaks in the middle of a word.
+
+Inline math expressions (`` $...$ ``) are treated as atomic units: the formatter keeps an entire `$...$` expression on one line rather than splitting it at a `$` boundary. This prevents a line from beginning with `=` or another block-introducing character after a wrap.
+
+<Note>
+The 100-character limit applies only to prose paragraphs. Code blocks, math blocks, and table cells are not re-wrapped — their content is preserved verbatim.
+</Note>
+
+### Code block style
+
+The language tag on fenced code blocks is normalized to lowercase. Trailing whitespace inside the code body is trimmed, and the closing ` ``` ` fence is always placed on its own line with no trailing spaces.
+
+```vell Before
+```Rust
+fn main() {  
+    println!("hello");  
+}
+```
+
+```vell After
+```rust
+fn main() {
+    println!("hello");
+}
+```
+
+### Directive formatting
+
+Directives are formatted with a consistent structure: the name and properties on the opening line, child content indented by two spaces, and the closing `}` at the original indentation level. Empty directives (no children) are written on a single line.
+
+```vell Before
+@[Figure](  src="photo.jpg"   caption="A photo"  )
+```
+
+```vell After
+@[Figure](src="photo.jpg" caption="A photo")
+```
+
+```vell Before (block directive)
+@[Theorem](name="Pythagoras") {
+a² + b² = c²
+}
+```
+
+```vell After (block directive)
+@[Theorem](name="Pythagoras") {
+  a² + b² = c²
+}
+```
+
+### General rules
+
+The formatter enforces a set of document-level rules on every run:
+
+| Rule | Details |
+|---|---|
+| No trailing whitespace | Every line is right-trimmed before output |
+| Single blank line between blocks | Exactly one empty line separates top-level nodes |
+| Trailing newline | The output always ends with a single `\n` |
+| List marker normalization | Unordered items use `-`; ordered items use `1.`, `2.`, etc. |
+| `@for` / `@if` indentation | Loop and conditional bodies are indented two spaces |
+| Horizontal rules | Always written as `---` regardless of the original marker used |
+
+---
+
+## Idempotency guarantee
+
+The formatter satisfies the idempotency property:
+
+```
+format(parse(format(parse(source)))) == format(parse(source))
+```
+
+In plain terms: if you run `vell fmt` twice on the same source, both runs produce identical bytes. This is verified automatically by the formatter's test suite across all built-in fixtures and spec examples.
+
+Idempotency means:
+
+- **No diff noise in VCS** — Once a file has been formatted once, subsequent `vell fmt` runs produce no diff.
+- **Safe in pre-commit hooks** — You can run `vell fmt` unconditionally on every commit without risk of infinite re-formatting loops.
+- **Trustworthy `--check`** — A file that passes `vell fmt --check` will continue to pass it until its content changes.
+
+---
+
+## Editor integration
+
+The formatter integrates with editors through the LSP server. When your editor triggers a **format document** action (for example via a keyboard shortcut or a format-on-save setting), the LSP server delegates to the same `vell-fmt` library that powers the CLI.
+
+<Steps>
+  <Step title="Enable format-on-save in VS Code">
+    Add the following to your VS Code settings:
+
+    ```json
+    "[vell]": {
+      "editor.formatOnSave": true
+    }
+    ```
+  </Step>
+  <Step title="Trigger manually">
+    Open any `.vl` file and run **Format Document** from the Command Palette (`Ctrl+Shift+P` → `Format Document`), or use the **Vell: Format Document** command.
+  </Step>
+  <Step title="Use in other LSP-compatible editors">
+    Any editor with LSP support can invoke formatting via the standard `textDocument/formatting` request. The LSP server responds with a list of text edits that bring the document into canonical form.
+  </Step>
+</Steps>
+
+See the [LSP Server](/tooling/lsp) page for full details on editor integration, and the [VS Code Extension](/tooling/vscode) page for VS Code-specific configuration.

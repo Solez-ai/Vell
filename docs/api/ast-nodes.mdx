@@ -1,0 +1,1012 @@
+---
+title: "Vell AST Node Reference: All Block and Inline Nodes"
+sidebarTitle: "AST Nodes"
+description: "Complete reference for every Vell AST node: Heading, Paragraph, CodeBlock, MathBlock, List, Table, Directive, Extension, and all inline nodes with fields."
+---
+
+Every Vell AST node is a JSON object with at least two fields: a `"type"` string discriminator that identifies the node kind, and a `"span"` object recording its byte offsets in the original source. All remaining fields are specific to each node type and are documented below. Nodes are divided into two categories — **block nodes**, which form the document's structural skeleton, and **inline nodes**, which appear inside block containers and carry textual content and markup.
+
+<Note>
+  All `span` fields follow the `{ start, end }` convention documented in the [AST Overview](/api/ast-overview#span). `start` is inclusive and `end` is exclusive, both in bytes.
+</Note>
+
+---
+
+## Block Nodes
+
+Block nodes appear as direct children of the document root or as nested content inside other block nodes (for example, inside `Blockquote`, `FootnoteDefinition`, or `ForLoop`).
+
+### Heading
+
+Represents a section heading at depth 1–6, equivalent to `=` through `======` in Vell syntax.
+
+<ResponseField name="type" type='"Heading"' required />
+
+<ResponseField name="level" type="integer" required>
+  Heading depth. `1` is the highest (document title); `6` is the deepest. Maps to HTML `<h1>`–`<h6>`.
+</ResponseField>
+
+<ResponseField name="children" type="InlineNode[]" required>
+  The heading text with inline markup applied.
+</ResponseField>
+
+<ResponseField name="id" type="string | null" required>
+  A slugified anchor identifier derived from the heading text. Use this to generate `#fragment` links. `null` when no slug can be derived.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Heading",
+  "level": 2,
+  "children": [
+    { "type": "Text", "value": "Getting Started", "span": { "start": 3, "end": 18 } }
+  ],
+  "id": "getting-started",
+  "span": { "start": 0, "end": 19 }
+}
+```
+
+---
+
+### Paragraph
+
+Represents a block of prose text. The most common block node; every run of inline content that is not part of another structure becomes a `Paragraph`.
+
+<ResponseField name="type" type='"Paragraph"' required />
+
+<ResponseField name="children" type="InlineNode[]" required>
+  The paragraph's inline content, including `Text`, `Bold`, `Link`, and any other inline nodes.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Paragraph",
+  "children": [
+    { "type": "Text", "value": "This is ", "span": { "start": 0, "end": 8 } },
+    {
+      "type": "Bold",
+      "children": [{ "type": "Text", "value": "bold", "span": { "start": 9, "end": 13 } }],
+      "span": { "start": 8, "end": 14 }
+    },
+    { "type": "Text", "value": " text.", "span": { "start": 14, "end": 20 } }
+  ],
+  "span": { "start": 0, "end": 20 }
+}
+```
+
+---
+
+### Blockquote
+
+Represents a quoted block introduced by `>` prefixes. When the GitHub-style `> [!TYPE]` admonition syntax is used, `admonition_type` is set to the keyword.
+
+<ResponseField name="type" type='"Blockquote"' required />
+
+<ResponseField name="children" type="Node[]" required>
+  The parsed block content inside the quote. May contain any block node type.
+</ResponseField>
+
+<ResponseField name="admonition_type" type="string | null" required>
+  Admonition kind when `> [!TYPE]` syntax is used. One of `"NOTE"`, `"WARNING"`, `"TIP"`, `"INFO"`, or `"DANGER"`. `null` for plain blockquotes.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+<Tabs>
+  <Tab title="Plain blockquote">
+    ```json
+    {
+      "type": "Blockquote",
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [{ "type": "Text", "value": "Quoted content.", "span": { "start": 2, "end": 17 } }],
+          "span": { "start": 2, "end": 17 }
+        }
+      ],
+      "admonition_type": null,
+      "span": { "start": 0, "end": 18 }
+    }
+    ```
+  </Tab>
+  <Tab title="Admonition">
+    ```json
+    {
+      "type": "Blockquote",
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [{ "type": "Text", "value": "Back up your data first.", "span": { "start": 13, "end": 37 } }],
+          "span": { "start": 13, "end": 37 }
+        }
+      ],
+      "admonition_type": "WARNING",
+      "span": { "start": 0, "end": 38 }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+### CodeBlock
+
+Represents a fenced code block delimited by triple backticks. The `source` field contains the raw code exactly as written — no inline parsing is performed.
+
+<ResponseField name="type" type='"CodeBlock"' required />
+
+<ResponseField name="lang" type="string | null" required>
+  The language identifier from the opening fence (e.g., `"rust"`, `"typescript"`). `null` when no language is specified.
+</ResponseField>
+
+<ResponseField name="source" type="string" required>
+  The raw code content between the fences. No escaping is applied; this is the literal text.
+</ResponseField>
+
+<ResponseField name="executable" type="boolean" required>
+  `true` when the code block is marked as executable with Vell's `!` fence modifier.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "CodeBlock",
+  "lang": "rust",
+  "source": "fn main() {\n    println!(\"Hello, Vell!\");\n}",
+  "executable": false,
+  "span": { "start": 0, "end": 52 }
+}
+```
+
+---
+
+### MathBlock
+
+Represents a display-mode math block delimited by `$$`. The `source` field is raw LaTeX — no parsing or validation is performed by Vell.
+
+<ResponseField name="type" type='"MathBlock"' required />
+
+<ResponseField name="source" type="string" required>
+  Raw LaTeX content between the `$$` delimiters.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "MathBlock",
+  "source": "\\int_0^1 x^2 \\, dx = \\frac{1}{3}",
+  "span": { "start": 0, "end": 42 }
+}
+```
+
+---
+
+### List
+
+Represents an ordered (`1.`, `2.`, …) or unordered (`-`, `*`) list. Each list item is a `ListItem` object (see [Supporting Types](#supporting-types)).
+
+<ResponseField name="type" type='"List"' required />
+
+<ResponseField name="ordered" type="boolean" required>
+  `true` for ordered lists, `false` for unordered (bullet) lists.
+</ResponseField>
+
+<ResponseField name="start" type="integer | null" required>
+  The starting counter value for ordered lists (e.g., `1`). `null` for unordered lists.
+</ResponseField>
+
+<ResponseField name="items" type="ListItem[]" required>
+  The list items in source order.
+
+  <Expandable title="ListItem fields">
+    <ResponseField name="children" type="Node[]" required>
+      Block content of the item. Typically a single `Paragraph`, but may contain nested lists, blockquotes, and other blocks for loose lists.
+    </ResponseField>
+    <ResponseField name="checked" type="boolean | null" required>
+      Task-list checkbox state. `true` = checked, `false` = unchecked, `null` = not a task item.
+    </ResponseField>
+    <ResponseField name="span" type="Span" required />
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "List",
+  "ordered": true,
+  "start": 1,
+  "items": [
+    {
+      "children": [
+        {
+          "type": "Paragraph",
+          "children": [{ "type": "Text", "value": "First item", "span": { "start": 3, "end": 13 } }],
+          "span": { "start": 3, "end": 13 }
+        }
+      ],
+      "checked": null,
+      "span": { "start": 0, "end": 14 }
+    }
+  ],
+  "span": { "start": 0, "end": 14 }
+}
+```
+
+---
+
+### Table
+
+Represents a pipe table or grid table with a header row and zero or more body rows.
+
+<ResponseField name="type" type='"Table"' required />
+
+<ResponseField name="headers" type="TableCell[]" required>
+  The cells of the header row.
+
+  <Expandable title="TableCell fields">
+    <ResponseField name="children" type="InlineNode[]" required>
+      Inline content of the cell.
+    </ResponseField>
+    <ResponseField name="colspan" type="integer" required>
+      Number of columns this cell spans. `1` for normal cells.
+    </ResponseField>
+    <ResponseField name="rowspan" type="integer" required>
+      Number of rows this cell spans. `1` for normal cells.
+    </ResponseField>
+    <ResponseField name="align" type='"Left" | "Center" | "Right" | null' required>
+      Cell alignment. `null` when unspecified.
+    </ResponseField>
+    <ResponseField name="span" type="Span" required />
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="rows" type="TableCell[][]" required>
+  Body rows. Each element is an array of `TableCell` objects with the same shape as header cells.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Table",
+  "headers": [
+    { "children": [{ "type": "Text", "value": "Name", "span": { "start": 2, "end": 6 } }], "colspan": 1, "rowspan": 1, "align": null, "span": { "start": 2, "end": 6 } },
+    { "children": [{ "type": "Text", "value": "Score", "span": { "start": 9, "end": 14 } }], "colspan": 1, "rowspan": 1, "align": "Right", "span": { "start": 9, "end": 14 } }
+  ],
+  "rows": [
+    [
+      { "children": [{ "type": "Text", "value": "Alice", "span": { "start": 32, "end": 37 } }], "colspan": 1, "rowspan": 1, "align": null, "span": { "start": 32, "end": 37 } },
+      { "children": [{ "type": "Text", "value": "99", "span": { "start": 40, "end": 42 } }], "colspan": 1, "rowspan": 1, "align": "Right", "span": { "start": 40, "end": 42 } }
+    ]
+  ],
+  "span": { "start": 0, "end": 48 }
+}
+```
+
+---
+
+### HorizontalRule
+
+Represents a thematic break (`---` in Vell syntax). This node carries no fields beyond `type` and `span`.
+
+<ResponseField name="type" type='"HorizontalRule"' required />
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "HorizontalRule", "span": { "start": 0, "end": 3 } }
+```
+
+---
+
+### DefinitionList
+
+Represents a list of term–definition pairs.
+
+<ResponseField name="type" type='"DefinitionList"' required />
+
+<ResponseField name="items" type="DefinitionItem[]" required>
+  The term–definition pairs in source order.
+
+  <Expandable title="DefinitionItem fields">
+    <ResponseField name="term" type="InlineNode[]" required>
+      Inline content of the term being defined.
+    </ResponseField>
+    <ResponseField name="definition" type="Node[]" required>
+      Block content of the definition. Typically a single `Paragraph`.
+    </ResponseField>
+    <ResponseField name="span" type="Span" required />
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "DefinitionList",
+  "items": [
+    {
+      "term": [{ "type": "Text", "value": "AST", "span": { "start": 0, "end": 3 } }],
+      "definition": [
+        {
+          "type": "Paragraph",
+          "children": [{ "type": "Text", "value": "Abstract Syntax Tree.", "span": { "start": 7, "end": 28 } }],
+          "span": { "start": 7, "end": 28 }
+        }
+      ],
+      "span": { "start": 0, "end": 29 }
+    }
+  ],
+  "span": { "start": 0, "end": 29 }
+}
+```
+
+---
+
+### ReferenceDefinition
+
+Represents a link reference definition (`[id]: url "title"`). These nodes define the targets for `LinkRef` and `ImageRef` inline nodes and are typically not rendered directly.
+
+<ResponseField name="type" type='"ReferenceDefinition"' required />
+
+<ResponseField name="id" type="string" required>
+  The reference identifier, as used in `[text][id]` or `![alt][id]` syntax.
+</ResponseField>
+
+<ResponseField name="url" type="string" required>
+  The target URL.
+</ResponseField>
+
+<ResponseField name="title" type="string | null" required>
+  Optional title text shown on hover. `null` when omitted.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "ReferenceDefinition",
+  "id": "vell",
+  "url": "https://vell-lang.org",
+  "title": "The Vell Language",
+  "span": { "start": 0, "end": 44 }
+}
+```
+
+---
+
+### FootnoteDefinition
+
+Represents the body of a footnote, introduced by `[^marker]:` syntax. Its `marker` value is matched by `FootnoteRef` inline nodes.
+
+<ResponseField name="type" type='"FootnoteDefinition"' required />
+
+<ResponseField name="marker" type="string" required>
+  The footnote identifier. Matches the `marker` field on `FootnoteRef` nodes.
+</ResponseField>
+
+<ResponseField name="children" type="Node[]" required>
+  Block content of the footnote body.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "FootnoteDefinition",
+  "marker": "one",
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [{ "type": "Text", "value": "See also the appendix.", "span": { "start": 8, "end": 30 } }],
+      "span": { "start": 8, "end": 30 }
+    }
+  ],
+  "span": { "start": 0, "end": 31 }
+}
+```
+
+---
+
+### VarDeclaration
+
+Represents a `@var` declaration that binds a name to a JSON value. Declared variables become available for `VarInterpolation` inline nodes and in directive props.
+
+<ResponseField name="type" type='"VarDeclaration"' required />
+
+<ResponseField name="name" type="string" required>
+  The variable identifier.
+</ResponseField>
+
+<ResponseField name="value" type="any JSON value" required>
+  The variable's initial value. May be a string, number, boolean, `null`, object, or array.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "VarDeclaration",
+  "name": "threshold",
+  "value": 42,
+  "span": { "start": 0, "end": 22 }
+}
+```
+
+---
+
+### ForLoop
+
+Represents a `@for` loop block. The body in `children` is the template content that is repeated for each element in the iterable at render time.
+
+<ResponseField name="type" type='"ForLoop"' required />
+
+<ResponseField name="variable" type="string" required>
+  The loop variable name (bound to each element on each iteration).
+</ResponseField>
+
+<ResponseField name="iterable" type="string" required>
+  The name of the variable that holds the collection to iterate over.
+</ResponseField>
+
+<ResponseField name="children" type="Node[]" required>
+  The block template nodes rendered once per iteration.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "ForLoop",
+  "variable": "item",
+  "iterable": "items",
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [
+        { "type": "Text", "value": "Item: ", "span": { "start": 28, "end": 34 } },
+        { "type": "VarInterpolation", "name": "item", "span": { "start": 34, "end": 42 } }
+      ],
+      "span": { "start": 28, "end": 42 }
+    }
+  ],
+  "span": { "start": 0, "end": 45 }
+}
+```
+
+---
+
+### IfBlock
+
+Represents a `@if`/`else` conditional block. Only one branch is rendered at a time based on the evaluated `condition`.
+
+<ResponseField name="type" type='"IfBlock"' required />
+
+<ResponseField name="condition" type="string" required>
+  The raw condition expression string (e.g., `"@{count} > 0"`).
+</ResponseField>
+
+<ResponseField name="consequent" type="Node[]" required>
+  Block content rendered when the condition evaluates to truthy.
+</ResponseField>
+
+<ResponseField name="alternate" type="Node[] | null" required>
+  Block content rendered when the condition evaluates to falsy. `null` when no `else` branch is present.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "IfBlock",
+  "condition": "@{count} > 0",
+  "consequent": [
+    {
+      "type": "Paragraph",
+      "children": [{ "type": "Text", "value": "Count is positive.", "span": { "start": 22, "end": 40 } }],
+      "span": { "start": 22, "end": 40 }
+    }
+  ],
+  "alternate": [
+    {
+      "type": "Paragraph",
+      "children": [{ "type": "Text", "value": "Count is zero or negative.", "span": { "start": 50, "end": 76 } }],
+      "span": { "start": 50, "end": 76 }
+    }
+  ],
+  "span": { "start": 0, "end": 78 }
+}
+```
+
+<Note>
+  The `consequent` field holds the `then` branch content and `alternate` holds the `else` branch content.
+</Note>
+
+---
+
+### Directive
+
+Represents a recognized built-in Vell directive such as `@[Figure](...)`, `@[Meta](...)`, or `@[Code](...)`. Directives are processed by the renderer; unknown directive names are emitted as `Extension` nodes instead.
+
+<ResponseField name="type" type='"Directive"' required />
+
+<ResponseField name="name" type="string" required>
+  The directive name (e.g., `"Figure"`, `"Meta"`, `"Tabs"`).
+</ResponseField>
+
+<ResponseField name="props" type="Record<string, PropValue>" required>
+  Key-value properties passed in the directive's `(...)` argument list.
+</ResponseField>
+
+<ResponseField name="children" type="Node[]" required>
+  Optional block body content from the directive's `{ ... }` braces. Empty array when no body is present.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Directive",
+  "name": "Figure",
+  "props": {
+    "src": "chart.png",
+    "caption": "Quarterly Data",
+    "width": 800
+  },
+  "children": [],
+  "span": { "start": 0, "end": 58 }
+}
+```
+
+---
+
+### Extension
+
+Represents a namespaced or unrecognized directive that the parser does not handle as a built-in. Extension nodes are always preserved in the AST, even if the renderer does not know how to process them. This ensures forward compatibility: new directives introduced in future Vell versions arrive as `Extension` nodes in older renderers.
+
+<ResponseField name="type" type='"Extension"' required />
+
+<ResponseField name="name" type="string" required>
+  The full directive name, including any namespace prefix (e.g., `"myorg/Widget"`).
+</ResponseField>
+
+<ResponseField name="props" type="Record<string, PropValue>" required>
+  Key-value properties from the directive's `(...)` argument list.
+</ResponseField>
+
+<ResponseField name="children" type="Node[]" required>
+  Optional block body content. Empty array when no body is present.
+</ResponseField>
+
+<ResponseField name="raw_source" type="string" required>
+  The complete, verbatim source text of the extension directive. Use this to pass the directive through to a downstream processor that understands it.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Extension",
+  "name": "myorg/Widget",
+  "props": { "data": 42, "theme": "dark" },
+  "children": [],
+  "raw_source": "@[myorg/Widget](data=42 theme=\"dark\")",
+  "span": { "start": 0, "end": 37 }
+}
+```
+
+<Tip>
+  If you are building a renderer, check for `Extension` nodes and emit a `<!-- unknown extension: {name} -->` comment (or equivalent) rather than silently dropping content. This helps document authors catch typos in directive names.
+</Tip>
+
+---
+
+## Inline Nodes
+
+Inline nodes are always found inside a block container's `children` array. They may nest: `Bold` may contain `Italic`, which may contain `Code`, and so on.
+
+### Text
+
+Plain, unformatted text. The most common inline node.
+
+<ResponseField name="type" type='"Text"' required />
+<ResponseField name="value" type="string" required>The literal text content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "Text", "value": "Hello, world!", "span": { "start": 0, "end": 13 } }
+```
+
+---
+
+### Bold
+
+Strong emphasis. In Vell syntax, text wrapped in `*asterisks*`.
+
+<ResponseField name="type" type='"Bold"' required />
+<ResponseField name="children" type="InlineNode[]" required>The emphasized content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Bold",
+  "children": [{ "type": "Text", "value": "important", "span": { "start": 1, "end": 10 } }],
+  "span": { "start": 0, "end": 11 }
+}
+```
+
+---
+
+### Italic
+
+Standard emphasis. In Vell syntax, text wrapped in `/slashes/`.
+
+<ResponseField name="type" type='"Italic"' required />
+<ResponseField name="children" type="InlineNode[]" required>The emphasized content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Italic",
+  "children": [{ "type": "Text", "value": "emphasis", "span": { "start": 1, "end": 9 } }],
+  "span": { "start": 0, "end": 10 }
+}
+```
+
+---
+
+### Underline
+
+Underlined content. In Vell syntax, text wrapped in `_underscores_`.
+
+<ResponseField name="type" type='"Underline"' required />
+<ResponseField name="children" type="InlineNode[]" required>The underlined content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Underline",
+  "children": [{ "type": "Text", "value": "underline", "span": { "start": 1, "end": 10 } }],
+  "span": { "start": 0, "end": 11 }
+}
+```
+
+---
+
+### Strikethrough
+
+Struck-through content. In Vell syntax, text wrapped in `~tildes~`.
+
+<ResponseField name="type" type='"Strikethrough"' required />
+<ResponseField name="children" type="InlineNode[]" required>The struck-through content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Strikethrough",
+  "children": [{ "type": "Text", "value": "removed", "span": { "start": 1, "end": 8 } }],
+  "span": { "start": 0, "end": 9 }
+}
+```
+
+---
+
+### Code
+
+Inline code. In Vell syntax, text wrapped in `` `backticks` ``. The `value` field contains the raw code without inline parsing.
+
+<ResponseField name="type" type='"Code"' required />
+<ResponseField name="value" type="string" required>The raw inline code content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "Code", "value": "fn main()", "span": { "start": 0, "end": 11 } }
+```
+
+---
+
+### Superscript
+
+Superscript content. In Vell syntax, text wrapped in `^carets^`.
+
+<ResponseField name="type" type='"Superscript"' required />
+<ResponseField name="children" type="InlineNode[]" required>The superscript content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Superscript",
+  "children": [{ "type": "Text", "value": "2", "span": { "start": 1, "end": 2 } }],
+  "span": { "start": 0, "end": 3 }
+}
+```
+
+---
+
+### Subscript
+
+Subscript content. In Vell syntax, text wrapped in `,,double-commas,,`.
+
+<ResponseField name="type" type='"Subscript"' required />
+<ResponseField name="children" type="InlineNode[]" required>The subscript content.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Subscript",
+  "children": [{ "type": "Text", "value": "n", "span": { "start": 2, "end": 3 } }],
+  "span": { "start": 0, "end": 5 }
+}
+```
+
+---
+
+### Link
+
+An inline hyperlink. In Vell syntax: `[link text](https://example.com "optional title")`.
+
+<ResponseField name="type" type='"Link"' required />
+<ResponseField name="href" type="string" required>The target URL.</ResponseField>
+<ResponseField name="title" type="string | null" required>Optional hover title. `null` when omitted.</ResponseField>
+<ResponseField name="children" type="InlineNode[]" required>The link text with inline markup.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Link",
+  "href": "https://vell-lang.org",
+  "title": "Vell Language",
+  "children": [{ "type": "Text", "value": "Vell", "span": { "start": 1, "end": 5 } }],
+  "span": { "start": 0, "end": 40 }
+}
+```
+
+---
+
+### LinkRef
+
+A reference-style link. In Vell syntax: `[link text][ref-id]`. The `id` is resolved against `ReferenceDefinition` block nodes.
+
+<ResponseField name="type" type='"LinkRef"' required />
+<ResponseField name="id" type="string" required>The reference definition identifier to resolve.</ResponseField>
+<ResponseField name="children" type="InlineNode[]" required>The link text with inline markup.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "LinkRef",
+  "id": "vell",
+  "children": [{ "type": "Text", "value": "Vell", "span": { "start": 1, "end": 5 } }],
+  "span": { "start": 0, "end": 12 }
+}
+```
+
+---
+
+### Image
+
+An inline image. In Vell syntax: `![alt text](src "optional title")`.
+
+<ResponseField name="type" type='"Image"' required />
+<ResponseField name="src" type="string" required>The image source URL or path.</ResponseField>
+<ResponseField name="alt" type="string" required>Alt text for accessibility.</ResponseField>
+<ResponseField name="title" type="string | null" required>Optional hover title. `null` when omitted.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "Image",
+  "src": "/images/diagram.png",
+  "alt": "System diagram",
+  "title": "Architecture overview",
+  "span": { "start": 0, "end": 55 }
+}
+```
+
+---
+
+### ImageRef
+
+A reference-style image. In Vell syntax: `![alt text][ref-id]`.
+
+<ResponseField name="type" type='"ImageRef"' required />
+<ResponseField name="id" type="string" required>The reference definition identifier to resolve.</ResponseField>
+<ResponseField name="alt" type="string" required>Alt text for accessibility.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "ImageRef",
+  "id": "logo",
+  "alt": "Vell logo",
+  "span": { "start": 0, "end": 16 }
+}
+```
+
+---
+
+### MathInline
+
+Inline math with raw LaTeX content, delimited by single `$dollar signs$`.
+
+<ResponseField name="type" type='"MathInline"' required />
+<ResponseField name="source" type="string" required>Raw LaTeX content between the `$` delimiters.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "MathInline", "source": "E = mc^2", "span": { "start": 0, "end": 10 } }
+```
+
+---
+
+### VarInterpolation
+
+A variable interpolation that evaluates to the current value of a declared variable at render time. In Vell syntax: `@{variableName}`.
+
+<ResponseField name="type" type='"VarInterpolation"' required />
+<ResponseField name="name" type="string" required>The variable name to look up and interpolate.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "VarInterpolation", "name": "count", "span": { "start": 0, "end": 8 } }
+```
+
+---
+
+### InlineComponent
+
+An inline directive component. In Vell syntax: `@[ComponentName](prop=value)`. Used for inline-level custom components rather than block-level directives.
+
+<ResponseField name="type" type='"InlineComponent"' required />
+<ResponseField name="name" type="string" required>The component name.</ResponseField>
+<ResponseField name="props" type="Record<string, PropValue>" required>Key-value properties.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{
+  "type": "InlineComponent",
+  "name": "Badge",
+  "props": { "color": "green", "label": "stable" },
+  "span": { "start": 0, "end": 32 }
+}
+```
+
+---
+
+### Citation
+
+A bibliographic citation reference. In Vell syntax: `[[citationKey]]`.
+
+<ResponseField name="type" type='"Citation"' required />
+<ResponseField name="key" type="string" required>The citation key, matched against your bibliography source.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "Citation", "key": "smith2023", "span": { "start": 0, "end": 13 } }
+```
+
+---
+
+### FootnoteRef
+
+A footnote reference. In Vell syntax: `[^marker]`. Matched against `FootnoteDefinition` block nodes by `marker`.
+
+<ResponseField name="type" type='"FootnoteRef"' required />
+<ResponseField name="marker" type="string" required>The footnote identifier, matched against a `FootnoteDefinition` with the same `marker`.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "FootnoteRef", "marker": "one", "span": { "start": 0, "end": 6 } }
+```
+
+---
+
+### SoftBreak
+
+A soft line break — a newline within a paragraph that is typically rendered as a space in HTML output. In Vell syntax, a single newline inside a paragraph produces a `SoftBreak`.
+
+<ResponseField name="type" type='"SoftBreak"' required />
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "SoftBreak", "span": { "start": 10, "end": 11 } }
+```
+
+---
+
+### HardBreak
+
+A hard line break — a forced newline rendered as `<br>` in HTML output. In Vell syntax, a trailing backslash or two or more trailing spaces before a newline produce a `HardBreak`.
+
+<ResponseField name="type" type='"HardBreak"' required />
+<ResponseField name="span" type="Span" required />
+
+```json
+{ "type": "HardBreak", "span": { "start": 10, "end": 12 } }
+```
+
+---
+
+## Supporting Types
+
+These types appear as field values on node objects but are not nodes themselves — they do not have a `type` discriminator.
+
+### Span
+
+Every node's `span` field is a `Span` object.
+
+<ResponseField name="start" type="integer" required>
+  Inclusive start byte offset in the source string.
+</ResponseField>
+
+<ResponseField name="end" type="integer" required>
+  Exclusive end byte offset. The source slice for this node is `source[start..end]`.
+</ResponseField>
+
+---
+
+### ListItem
+
+Used in `List.items`.
+
+<ResponseField name="children" type="Node[]" required>Block content of the list item.</ResponseField>
+<ResponseField name="checked" type="boolean | null" required>`true`/`false` for task-list items; `null` for regular items.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+---
+
+### TableCell
+
+Used in `Table.headers` and `Table.rows`.
+
+<ResponseField name="children" type="InlineNode[]" required>Inline content of the cell.</ResponseField>
+<ResponseField name="colspan" type="integer" required>Number of columns the cell spans. Minimum `1`.</ResponseField>
+<ResponseField name="rowspan" type="integer" required>Number of rows the cell spans. Minimum `1`.</ResponseField>
+<ResponseField name="align" type='"Left" | "Center" | "Right" | null' required>Column alignment. `null` when unspecified.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+---
+
+### DefinitionItem
+
+Used in `DefinitionList.items`.
+
+<ResponseField name="term" type="InlineNode[]" required>Inline content of the term.</ResponseField>
+<ResponseField name="definition" type="Node[]" required>Block content of the definition.</ResponseField>
+<ResponseField name="span" type="Span" required />
+
+---
+
+### PropValue
+
+`PropValue` is the type of values in `Directive.props`, `Extension.props`, and `InlineComponent.props`. It is serialized as untagged JSON — the JSON representation determines the Vell type:
+
+| JSON representation | Vell type | Example |
+|---|---|---|
+| `"a string"` | `String` | `caption="Quarterly Data"` |
+| `42` or `3.14` | `Number` | `width=800` |
+| `true` or `false` | `Bool` | `executable=true` |
+| `null` | `Null` | `title=null` |
+| `"@{varName}"` | `Variable` reference | `count=@{threshold}` |
+
+<Note>
+  Variable references in prop values (e.g., `"@{threshold}"`) are stored as plain strings in the JSON. Your renderer is responsible for detecting the `@{...}` pattern and resolving it against the document's variable scope.
+</Note>
+
+---
+
+### Alignment
+
+Used in `TableCell.align`.
+
+```
+"Left" | "Center" | "Right"
+```
+
+Alignment values are serialized as `"Left"`, `"Center"`, or `"Right"` — capitalized. This is different from the lowercase CSS `text-align` values, so you will need to map these when generating HTML.

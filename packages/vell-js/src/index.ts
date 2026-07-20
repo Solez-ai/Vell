@@ -1,7 +1,36 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Samin Yeasar
 
-import { getWasmModule } from "./wasm";
+import { getWasmModule } from "./wasm.js";
+import type { VellWasmModule } from "./wasm.js";
+
+// Re-export WASM types
+export type { VellWasmModule } from "./wasm.js";
+export { setWasmModule, getWasmModule, initWasm, isWasmLoaded } from "./wasm.js";
+
+// Re-export extension registry
+export {
+  registerPlugin,
+  unregisterPlugin,
+  getPlugins,
+  getDirectiveRenderer,
+  getInlineRenderer,
+  runBeforeRenderHooks,
+  runAfterRenderHooks,
+} from "./registry.js";
+export type {
+  ExtensionPlugin,
+  ExtensionRenderer,
+  InlineComponentRenderer,
+} from "./registry.js";
+
+// Re-export search index
+export { generateSearchIndex } from "./search.js";
+export type { SearchEntry, SearchIndex } from "./search.js";
+
+// Re-export feed generators
+export { generateRssFeed, generateAtomFeed } from "./feed.js";
+export type { FeedOptions } from "./feed.js";
 
 /** Source span in byte offsets. */
 export interface Span { start: number; end: number }
@@ -26,7 +55,7 @@ export function parse(source: string): ParseResult { return JSON.parse(getWasmMo
 export function parseOrThrow(source: string): VellDocument { const result = parse(source); if (!result.document) { throw new Error(result.errors[0]?.message ?? "Unable to parse Vell source"); } return result.document; }
 /** Returns validation diagnostics. */
 export function validate(source: string): ParseError[] { return JSON.parse(getWasmModule().validate(source)) as ParseError[]; }
-/** Formats source with the currently installed formatter integration. */
-export function format(source: string): string { return source.endsWith("\n") ? source : `${source}\n`; }
+/** Formats source with the canonical Rust formatter. */
+export function format(source: string): string { return getWasmModule().format_source(source); }
 /** Returns parser version. */
 export function getVersion(): string { return getWasmModule().get_version(); }

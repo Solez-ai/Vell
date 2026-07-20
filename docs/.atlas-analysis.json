@@ -1,0 +1,143 @@
+{
+  "projectType": "framework",
+  "projectName": "Vell",
+  "projectDescription": "Vell is a next-generation document markup language that combines Markdown's readability with LaTeX's expressive power, featuring a deterministic AST, reactive variables, directives, math support, and a full toolchain including CLI, LSP server, WASM bindings, HTML/PDF renderers, and VS Code extension.",
+  "theme": "luma",
+  "primaryColor": "#6C63FF",
+  "lightColor": "#EEF0FF",
+  "darkColor": "#1A1730",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Language",
+            "pages": [
+              "language/syntax",
+              "language/inline",
+              "language/tables",
+              "language/math",
+              "language/variables",
+              "language/directives"
+            ]
+          },
+          {
+            "group": "Tooling",
+            "pages": [
+              "tooling/cli",
+              "tooling/formatter",
+              "tooling/lsp",
+              "tooling/vscode"
+            ]
+          },
+          {
+            "group": "Rendering",
+            "pages": [
+              "rendering/html",
+              "rendering/pdf",
+              "rendering/overview"
+            ]
+          },
+          {
+            "group": "Extensions",
+            "pages": [
+              "extensions/overview",
+              "extensions/built-in",
+              "extensions/authoring"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "JavaScript / WASM",
+            "pages": [
+              "api/vell-js",
+              "api/wasm-bindings"
+            ]
+          },
+          {
+            "group": "Renderers",
+            "pages": [
+              "api/renderer-html",
+              "api/renderer-pdf"
+            ]
+          },
+          {
+            "group": "AST",
+            "pages": [
+              "api/ast-overview",
+              "api/ast-nodes",
+              "api/ast-schema"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "AI & Design",
+        "groups": [
+          {
+            "group": "Agent Guide",
+            "pages": [
+              "agent/overview",
+              "agent/architecture",
+              "agent/design"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Human-readable syntax — headings, bold, italic, links, lists, tables with familiar Markdown-like notation",
+    "Deterministic PEG grammar — every valid input has exactly one parse tree (O(n) linear time)",
+    "Versioned AST — same source always produces the same abstract syntax tree",
+    "LaTeX math support — inline ($...$) and block ($$...$$) rendered as MathML",
+    "Reactive variables — @var declarations, @{name} interpolation, @for loops, @if conditionals",
+    "30+ built-in directives — @[Meta], @[Figure], @[Equation], @[Theorem], @[Diagram], @[Chart], @[Slide], and more",
+    "Extension system — namespaced @[org/Name](props) for custom plugins and third-party integrations",
+    "Full CLI toolchain — vell parse, vell fmt, vell render html/pdf/slides, vell validate",
+    "Idempotent formatter — canonical, auto-formatting for .vl files",
+    "Full LSP server — diagnostics, completions, hover, go-to-definition, rename, semantic tokens, and 14+ more features",
+    "WebAssembly bindings — run the Rust parser in any browser or Node.js environment",
+    "HTML5 renderer — complete AST-to-HTML5 with MathML, footnotes, cross-references, interactive runtime",
+    "PDF renderer — direct AST-to-PDF using pdfkit (no HTML intermediate)",
+    "VS Code extension — syntax highlighting, LSP integration, format and export commands",
+    "Bibliography support — BibTeX and YAML-style inline references with APA, IEEE, Chicago, Nature citation styles"
+  ],
+  "publicApiSurface": [
+    "vell parse [input] — print AST as JSON",
+    "vell fmt [input] [--check] — format to canonical style",
+    "vell render html [input] [-o output] — render to HTML5",
+    "vell render pdf [input] [-o output] — render to PDF-optimized HTML",
+    "vell render slides [input] [-o output] — render to reveal.js slides",
+    "vell validate [input] — print diagnostics",
+    "@solez-ai/vell: parse(source) → ParseResult",
+    "@solez-ai/vell: parseOrThrow(source) → VellDocument",
+    "@solez-ai/vell: validate(source) → ParseError[]",
+    "@solez-ai/vell: format(source) → string",
+    "@solez-ai/vell: getVersion() → string",
+    "@solez-ai/vell: setWasmModule(module) — install WASM implementation",
+    "@solez-ai/vell-renderer-html: render(doc, options?) → string",
+    "@solez-ai/vell-renderer-html: renderInteractive(doc) → string",
+    "@solez-ai/vell-renderer-html: renderToFragment(doc) → DocumentFragment",
+    "@solez-ai/vell-renderer-pdf: renderToPdfBuffer(doc) → Uint8Array",
+    "@solez-ai/vell-extensions: register(name, adapter) — register extension adapter",
+    "@solez-ai/vell-extensions: renderExtension(node, context) — render extension node",
+    "WASM: parse(source) → JsValue (AST JSON or error)",
+    "WASM: parse_to_json(source) → string ({document, errors, warnings})",
+    "WASM: validate(source) → JsValue (diagnostics array)",
+    "WASM: get_version() → string"
+  ]
+}

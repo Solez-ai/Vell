@@ -1,0 +1,322 @@
+---
+title: "Vell Block Syntax: Headings, Lists, and Blockquotes"
+sidebarTitle: "Block Syntax"
+description: "Complete reference for Vell's block-level syntax: headings, paragraphs, lists, blockquotes, admonitions, code fences, definition lists, and more."
+---
+
+Block elements are the structural backbone of every Vell document. Each block begins at the start of a line and extends until it meets a blank line or a different block type. Because Vell uses a formal PEG grammar, every valid `.vl` file produces exactly one parse tree — there are no rendering flavors or edge cases to worry about.
+
+## Headings
+
+Use one or more `=` characters followed by a single space and the heading text. The count of `=` markers maps directly to the HTML heading level, from `<h1>` through `<h6>`.
+
+```vell
+= Document Title       (h1)
+== Section             (h2)
+=== Subsection         (h3)
+==== Sub-subsection    (h4)
+===== Deep heading     (h5)
+====== Deepest heading (h6)
+```
+
+<Note>
+The space between the `=` markers and the heading text is required. A heading like `=Title` is not valid and will be parsed as a paragraph.
+</Note>
+
+**Rules to keep in mind:**
+
+- The first level-1 heading in a document sets the document's `title` metadata automatically.
+- Heading text may contain inline markup — bold, italic, inline code, math, and more.
+- Each heading automatically receives a slugified `id` attribute (for example, `== Quick Start` becomes `id="quick-start"`) so you can link to it directly with `#quick-start`.
+
+---
+
+## Paragraphs
+
+A paragraph is any sequence of inline content that does not begin with a recognized block marker. Separate paragraphs from each other — and from other block types — with a blank line.
+
+```vell
+This is the first paragraph. It can contain *bold*, /italic/,
+and other inline elements across multiple source lines.
+
+This is the second paragraph. The blank line above ends the first.
+```
+
+A single paragraph can span multiple source lines; Vell joins the lines with a space when rendering. To start a new paragraph, you must insert a blank line.
+
+<Tip>
+Paragraphs cannot start with `=`, `>`, `` ` ``, `- `, `|`, `+`, `:`, `@`, `[`, or a digit followed by `. `. If your paragraph text starts with one of those characters, reword the opening or escape the character with a backslash.
+</Tip>
+
+---
+
+## Blockquotes
+
+Prefix each line of a blockquote with `>`. An optional space after `>` is recommended for readability.
+
+```vell
+> This is a blockquote.
+> It can span multiple lines.
+>
+> You can include multiple paragraphs inside one blockquote.
+```
+
+The content after `>` is itself parsed as a full Vell document, so you can nest any block type inside a blockquote — paragraphs, lists, code blocks, even other blockquotes.
+
+---
+
+## Admonitions
+
+Admonitions are visually styled callouts built on top of blockquote syntax. Place the admonition type on the first line using `> [!TYPE]`, then follow with the body on subsequent `>` prefixed lines.
+
+```vell
+> [!NOTE]
+> This note provides useful supplementary information.
+
+> [!TIP]
+> Use the `vell fmt` command to auto-format your documents.
+
+> [!WARNING]
+> Circular `@[Include]` references will cause an error.
+
+> [!IMPORTANT]
+> The space between `=` markers and heading text is required.
+
+> [!CAUTION]
+> Changing document structure unexpectedly may break downstream tooling.
+```
+
+<Tabs>
+  <Tab title="NOTE">
+    ```vell
+    > [!NOTE]
+    > Notes highlight neutral information the reader should be aware of.
+    ```
+  </Tab>
+  <Tab title="TIP">
+    ```vell
+    > [!TIP]
+    > Tips share optional shortcuts or best practices.
+    ```
+  </Tab>
+  <Tab title="WARNING">
+    ```vell
+    > [!WARNING]
+    > Warnings flag potential problems or gotchas.
+    ```
+  </Tab>
+  <Tab title="IMPORTANT">
+    ```vell
+    > [!IMPORTANT]
+    > Important callouts highlight critical information.
+    ```
+  </Tab>
+  <Tab title="CAUTION">
+    ```vell
+    > [!CAUTION]
+    > Caution blocks require the reader to proceed carefully.
+    ```
+  </Tab>
+</Tabs>
+
+**Supported admonition types:** `NOTE`, `TIP`, `WARNING`, `IMPORTANT`, `CAUTION`
+
+The `> [!TYPE]` declaration must appear on its own line. All subsequent `>` lines form the body.
+
+---
+
+## Code Fences
+
+Fenced code blocks open with three backticks (`` ``` ``) optionally followed by a language identifier, and close with three backticks on their own line. The examples below show how code fences look inside a `.vl` file.
+
+A Rust code block with the `rust` language tag:
+
+```rust
+fn main() {
+    println!("Hello, Vell!");
+}
+```
+
+A Python code block with the `python` language tag:
+
+```python
+def hello():
+    print("Hello, Vell!")
+```
+
+A plain monospace block with no language tag — just open with ` ``` ` and close with ` ``` `.
+
+Content inside a fenced code block is treated as literal text. No inline parsing occurs, so you can freely write `*asterisks*` and `$math$` inside a code fence without triggering markup.
+
+<Note>
+The language identifier is passed through to syntax highlighters. Use standard identifiers like `rust`, `python`, `javascript`, `bash`, `json`, etc.
+</Note>
+
+---
+
+## Horizontal Rules
+
+Insert a horizontal rule (a `<hr>` element) with three or more consecutive hyphens on their own line.
+
+```vell
+Some content above.
+
+---
+
+Some content below.
+```
+
+The rule must stand alone on its line and contain only `-` characters (no spaces or other text).
+
+---
+
+## Ordered Lists
+
+Create an ordered list with a number followed by `. ` (digit, period, space):
+
+```vell
+1. Install Vell from the releases page.
+2. Create a new file called `hello.vl`.
+3. Run `vell render html hello.vl` to compile.
+```
+
+The numbers you write in the source become the `start` value on the list node, but renderers typically auto-number list items sequentially starting from the first value.
+
+**Nested ordered lists** use 2-space indentation:
+
+```vell
+1. First item
+  1. Sub-item A
+  2. Sub-item B
+2. Second item
+```
+
+---
+
+## Unordered Lists
+
+Create an unordered list with `- ` (hyphen, space):
+
+```vell
+- Deterministic parsing via PEG grammar
+- Versioned, portable AST
+- LaTeX-quality math via MathML
+- Extensible directive system
+```
+
+**Nested unordered lists** also use 2-space indentation per level:
+
+```vell
+- Fruit
+  - Apples
+    - Fuji
+    - Gala
+  - Bananas
+- Vegetables
+```
+
+<Tip>
+You can mix ordered and unordered lists at different nesting levels.
+</Tip>
+
+---
+
+## Definition Lists
+
+Definition lists pair a term with one or more lines of definition. Use `:: ` to introduce the term, then indent the definition on the following line(s):
+
+```vell
+:: AST
+   Abstract Syntax Tree — the structured output produced by
+   the Vell parser from a `.vl` source file.
+
+:: PEG Grammar
+   Parsing Expression Grammar — a formal grammar that guarantees
+   linear-time, deterministic parsing with no ambiguity.
+
+:: Directive
+   An `@[Name](props)` block that extends Vell's vocabulary
+   without modifying the core grammar.
+```
+
+Each `:: term` line starts a new definition item. The definition text must be indented by at least 3 spaces (to sit past the `:: ` prefix column).
+
+---
+
+## Reference Definitions
+
+Reference definitions declare named URL targets that can be used in link and image references elsewhere in the document. They produce no output of their own.
+
+```vell
+[vell-repo]: https://github.com/Solez-ai/Vell
+[logo]: /images/vell-logo.png "Vell Logo"
+[spec]: https://example.com/vell-spec "Language Specification"
+```
+
+The syntax is `[id]: url` with an optional `"title"` string. Once defined, use the reference with `[text][id]` for links or `![alt][id]` for images (see [Inline Elements](/language/inline)).
+
+---
+
+## Footnote Definitions
+
+Footnote definitions provide the content shown at the bottom of a document (or page, in PDF output) for a corresponding footnote reference. They produce no inline output at their declaration site.
+
+```vell
+[^disclaimer]: Results may vary depending on system configuration.
+[^ref-1]: Einstein, A. (1905). *On the Electrodynamics of Moving Bodies*.
+[^complex]: This footnote contains *inline markup* and can be
+            quite long if needed.
+```
+
+Pair each definition with an inline `[^marker]` reference in your text (see [Inline Elements](/language/inline)). The markers are arbitrary strings — use numbers, short words, or descriptive keys.
+
+---
+
+## Complete Block-Level Example
+
+The following snippet shows every block type working together in a single document:
+
+```vell
+= Vell Feature Overview
+
+This paragraph introduces the document. It contains *bold*
+and /italic/ text alongside `inline code`.
+
+== Installation
+
+1. Download the latest release for your platform.
+2. Add the `vell` binary to your `PATH`.
+3. Verify with `vell --version`.
+
+== Core Concepts
+
+- *Deterministic* — one source always produces identical output.
+- *Extensible* — directives add power without grammar changes.
+- *Reactive* — variables make documents dynamic.
+
+=== Definitions
+
+:: Block Element
+   A structural unit that occupies one or more full lines.
+
+:: Inline Element
+   A run of text markup nested inside a block element.
+
+== Blockquote Example
+
+> Vell bridges the gap between Markdown's simplicity
+> and LaTeX's expressive power.
+
+> [!TIP]
+> Run `vell fmt` before committing to keep sources canonical.
+
+== Code Example
+
+A fenced code block with a `rust` language tag goes here, containing your Rust source.
+
+---
+
+[vell-site]: https://example.com/vell "Vell Homepage"
+
+[^one]: See the language specification for full grammar details.
+```

@@ -1,0 +1,101 @@
+---
+title: "Vell WASM bindings"
+sidebarTitle: "WASM bindings"
+description: "Build and use the low-level vell-wasm parser, validator, formatter, and version API."
+---
+
+The `vell-wasm` Rust crate exposes the canonical parser and formatter through `wasm-bindgen`. The `@solez-ai/vell` npm package now ships a pre-compiled WASM binary, so you can use the parser directly without a separate build step.
+
+<Tip>
+  The WASM binary is bundled inside the npm package and loaded automatically. Call `await init()` before any parsing function to initialize the module.
+</Tip>
+
+To build the WASM module from source (for development or custom builds), use `wasm-pack`:
+
+## Build the module
+
+Install `wasm-pack`, then build from the repository root.
+
+```bash
+cargo install wasm-pack
+wasm-pack build crates/vell-wasm --target bundler --out-dir target/vell-wasm-pkg
+```
+
+For direct browser loading, use `--target web`. For a Node.js-only build, use `--target nodejs`.
+
+## Register it with `@solez-ai/vell`
+
+```typescript
+import init, * as wasm from '../../target/vell-wasm-pkg/vell_wasm.js';
+import { parse, setWasmModule } from '@solez-ai/vell';
+
+await init();
+setWasmModule(wasm);
+
+const result = parse('= Hello\n\nWorld.');
+```
+
+The generated module must expose `parse_to_json`, `validate`, `get_version`, and `format_source`.
+
+## Exports
+
+### `parse(source)`
+
+```typescript
+function parse(source: string): JsValue
+```
+
+Returns a serialized document JSON string on success. Throws a serialized parse error on failure. Most applications should use the typed wrapper's `parse()` or `parseOrThrow()` instead.
+
+### `parse_to_json(source)`
+
+```typescript
+function parse_to_json(source: string): string
+```
+
+Returns JSON with a stable envelope:
+
+```typescript
+{
+  document: VellDocument | null;
+  errors: ParseError[];
+  warnings: ParseError[];
+}
+```
+
+### `validate(source)`
+
+```typescript
+function validate(source: string): JsValue
+```
+
+Returns a JSON string containing parser diagnostics.
+
+### `format_source(source)`
+
+```typescript
+function format_source(source: string): string
+```
+
+Parses the source and returns canonical formatter output. It throws a JavaScript error value when parsing fails.
+
+### `get_version()`
+
+```typescript
+function get_version(): string
+```
+
+Returns the version compiled into `vell-wasm`.
+
+## Runtime contract
+
+```typescript
+interface VellWasmModule {
+  parse_to_json(source: string): string;
+  validate(source: string): string;
+  get_version(): string;
+  format_source(source: string): string;
+}
+```
+
+Keep the generated WASM artifact and `@solez-ai/vell` wrapper on matching versions. Add a startup assertion with `getVersion()` when your deployment builds them separately.

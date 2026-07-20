@@ -1,0 +1,188 @@
+---
+title: "AI Agent Guide: Working with Vell Programmatically"
+sidebarTitle: "Overview"
+description: "Orientation for AI agents using Vell. Covers the repository map, key invariants, and practical guidance for generating valid .vl documents."
+---
+
+Vell is a human-readable markup language that produces a **stable, versioned Abstract Syntax Tree (AST)**. Unlike Markdown, where tooling must re-parse raw source text, every piece of Vell tooling — formatters, renderers, LSP servers, and export pipelines — operates exclusively on that AST. The source syntax and the AST are two separate contracts: the source contract governs how humans write `.vl` files, while the AST contract governs how programs consume parsed documents. This separation is fundamental. If you are building a tool on top of Vell, you work with the AST, not with raw source text.
+
+<Note>
+The canonical entry point for programmatic access is the WASM API exposed by `vell-wasm` and wrapped by `packages/vell-js`. The internal Rust APIs in `vell-core` are not considered stable across versions. Always target the WASM boundary.
+</Note>
+
+## Repository Map
+
+Understanding where each concern lives is the first step to working effectively with the Vell codebase.
+
+<CardGroup cols={2}>
+  <Card title="crates/vell-core" icon="cube">
+    The reference parser. Defines AST node types (`ast.rs`), the lexer (`lexer.rs`), the PEG-derived recursive descent parser (`parser.rs`), error types (`error.rs`), bibliography management (`bibliography.rs`), and tests with fixture files. This crate has no dependencies on rendering or editor crates.
+  </Card>
+  <Card title="crates/vell-cli" icon="terminal">
+    The command-line interface. Exposes `vell parse`, `vell fmt`, `vell render html`, and `vell validate` subcommands. Delegates all logic to `vell-core`, `vell-fmt`, and the renderer packages.
+  </Card>
+  <Card title="crates/vell-fmt" icon="paintbrush">
+    The canonical formatter. Takes a `Document` AST and produces normalized Vell source text. Depends only on `vell-core`. Formatting is deterministic and idempotent.
+  </Card>
+  <Card title="crates/vell-lsp" icon="code">
+    The Language Server Protocol server. Provides diagnostics, hover documentation, completions, go-to-definition, references, rename, and formatting for `.vl` files in any LSP-compatible editor.
+  </Card>
+  <Card title="crates/vell-wasm" icon="globe">
+    WebAssembly bindings built with `wasm-bindgen`. Exposes `parse`, `parse_to_json`, `validate`, and `get_version` to JavaScript. The stable public API surface.
+  </Card>
+  <Card title="packages/vell-js" icon="js">
+    A TypeScript wrapper around the WASM binary. Provides fully typed `ParseResult`, `VellDocument`, and `ParseError` interfaces. The correct dependency for any JavaScript or TypeScript project consuming Vell.
+  </Card>
+  <Card title="packages/vell-renderer-html" icon="code">
+    The HTML5 renderer. Consumes a `VellDocument` AST object and produces an HTML string or DOM fragment. Handles all node types, URL sanitization, HTML escaping, MathML conversion, and footnote collection.
+  </Card>
+  <Card title="packages/vell-renderer-pdf" icon="file">
+    The PDF renderer. Produces PDF output directly from the AST using `pdfkit`. Not an HTML-to-PDF pipeline — it is a direct AST-to-PDF renderer.
+  </Card>
+  <Card title="packages/vell-extensions" icon="puzzle">
+    The extension registry. Contains the `ExtensionAdapter` interface, the `register` / `renderExtension` API, and a curated set of built-in extension adapters (YouTube, Vimeo, Chart, Mermaid, Callout, Map).
+  </Card>
+  <Card title="packages/vell-vscode" icon="window">
+    The VS Code extension. Provides syntax highlighting via a TextMate grammar, connects to the `vell-lsp` server, and exposes format and export commands.
+  </Card>
+  <Card title="spec/" icon="book">
+    The normative specification. Contains `grammar.peg` (the formal PEG grammar), `ast-schema.json` (JSON Schema draft-07 for the AST), and annotated `.vl` example files.
+  </Card>
+  <Card title="docs/" icon="newspaper">
+    Implementation guides. Contains the Language Reference, AST Reference, Renderer Guide, and Extension Authoring guide. These documents target human developers and are authoritative for behavior questions.
+  </Card>
+</CardGroup>
+
+## Key Invariants
+
+These rules are non-negotiable. Every tool, agent, or automated pipeline working with Vell must respect them.
+
+<Accordion title="The parser never panics">
+All parse functions return `Result<Node, ParseError>`. There are no `unwrap()` or `expect()` calls in `vell-core` or `vell-fmt`. If input is malformed, the parser returns a structured `ParseError` with a source span, a human-readable message, and an optional fix suggestion. Your code should always handle the error case.
+</Accordion>
+
+<Accordion title="The formatter is idempotent">
+Formatting an already-formatted document produces byte-for-byte identical output. This means you can safely run `vell fmt` in a pre-commit hook or CI pipeline without risk of infinite diffs. If you modify an AST and re-serialize it, run the formatter exactly once; running it twice must not change the result.
+</Accordion>
+
+<Accordion title="Renderers must not fail on unknown nodes">
+The AST may contain `Extension` nodes for namespaced or unrecognized directives. Renderers must never throw or crash when encountering an unknown `type` field. The correct behavior is to render the node's `children` recursively, or emit a neutral placeholder. This is what enables forward compatibility: a document authored with a future Vell feature can still be rendered by an older renderer.
+</Accordion>
+
+<Accordion title="Increment AST schema version for breaking changes">
+The `version` field on the `Document` root node is currently `1`. If you change the shape of any existing node — renaming a field, changing a field's type, or removing a field — you must increment this version. Adding new optional fields or new node types does not require a version bump. The constant `AST_VERSION` in `crates/vell-core/src/ast.rs` is the source of truth.
+</Accordion>
+
+<Accordion title="All user-supplied strings are untrusted">
+Every string value that originates from a `.vl` document — `Text.value`, `Link.href`, `Image.src`, directive property values — must be treated as untrusted input before rendering. Renderers apply `escapeHtml()` to all text content and `sanitizeUrl()` to all URL fields. The `sanitizeUrl` function rejects `javascript:`, `data:`, `vbscript:`, and `file:` schemes. Do not bypass these checks, even in internal tooling.
+</Accordion>
+
+## Generating Valid Vell Documents
+
+If you are an LLM or automated tool generating `.vl` source files, the following rules will prevent the most common generation errors.
+
+### Headings use `=` markers, not `#`
+
+Vell headings use one or more `=` characters as the level prefix, not the `#` character used by Markdown.
+
+```vell
+= Top-level Heading
+== Second-level Heading
+=== Third-level Heading
+```
+
+A single `=` produces an `h1`. Each additional `=` increments the heading level up to `h6`.
+
+### Inline syntax differences from Markdown
+
+Several inline delimiters differ from Markdown conventions:
+
+| Element       | Vell Syntax     | Markdown Syntax   |
+|---------------|-----------------|-------------------|
+| Italic        | `/italic/`      | `*italic*`        |
+| Bold          | `*bold*`        | `**bold**`        |
+| Underline     | `_underline_`   | *(no standard)*   |
+| Strikethrough | `~strike~`      | `~~strike~~`      |
+| Superscript   | `^super^`       | *(no standard)*   |
+| Subscript     | `,,sub,,`       | *(no standard)*   |
+
+<Warning>
+Italic in Vell uses `/` delimiters, not `*`. Generating `*text*` will produce **bold**, not italic. This is the most common generation mistake.
+</Warning>
+
+### Always declare `@var` before using `@{name}` references
+
+Variable declarations must appear in document order before any interpolation that references them. The parser tracks scope from top to bottom. Referencing an undeclared variable produces a warning diagnostic, not an error, but the behavior is undefined in reactive rendering contexts.
+
+```vell
+@var name = "Vell"
+@var items = ["simple", "expressive", "extensible"]
+
+Welcome to @{name}! This language is:
+
+@for feature in @{items} {
+  - @{feature}
+}
+```
+
+### Directive syntax: `@[Name](props) { body }`
+
+All directives — built-in and custom — use the same syntax. The props list is a space-separated sequence of `key=value` pairs. Values can be bare words, quoted strings, numbers, booleans, or variable references.
+
+```vell
+@[Meta](title="My Document" author="You" date=2026-01-15)
+
+@[Figure](src="chart.png" caption="Quarterly revenue")
+
+@[myorg/Widget](data=@{dataset} interactive=true) {
+  Fallback content for renderers that do not support this extension.
+}
+```
+
+<Tip>
+Custom extension names must contain a `/` separator (`namespace/Name`). Names without a `/` are treated as built-in directives. If you are generating extension usage, always include a namespace to avoid collisions with future built-in directives.
+</Tip>
+
+### Code blocks use triple backticks with a language identifier
+
+````vell
+```rust
+fn main() {
+    println!("Hello, Vell!");
+}
+```
+````
+
+The language identifier is optional but strongly recommended for correct syntax highlighting and renderer behavior.
+
+### Math uses LaTeX syntax
+
+Inline math is delimited by single `$` signs. Block math uses `$$` on its own line as both the opening and closing delimiter.
+
+```vell
+The formula $E = mc^2$ is inline.
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+```
+
+The parser captures raw LaTeX source and stores it verbatim in `MathInline.source` or `MathBlock.source` AST nodes. The renderer is responsible for converting LaTeX to MathML or another target format.
+
+## Build and Validation Commands
+
+When working with the Vell source tree, use these commands to verify your changes:
+
+<CodeGroup>
+```bash Rust
+cargo check --workspace
+cargo test --workspace
+cargo fmt --all
+cargo clippy --all -- -D warnings
+```
+
+```bash JavaScript / TypeScript
+pnpm install
+pnpm build
+```
+</CodeGroup>

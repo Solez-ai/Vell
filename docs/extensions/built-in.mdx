@@ -1,0 +1,315 @@
+---
+title: "Built-in Vell Extensions: YouTube, Charts, and More"
+sidebarTitle: "Built-in Extensions"
+description: "Use @solez-ai/vell-extensions for built-in adapters: YouTube and Vimeo embeds, SVG bar and pie charts, Mermaid diagrams, callout boxes, and map embeds."
+---
+
+The `@solez-ai/vell-extensions` package ships a curated set of production-ready extension adapters that cover the most common embedding and enrichment use cases. You get video embeds, inline SVG charts, Mermaid diagrams, styled callout boxes, and map embeds — all with safe HTML output, proper fallback behavior, and LSP metadata for editor completions.
+
+## Installation
+
+```bash
+npm install @solez-ai/vell-extensions
+```
+
+All six built-in adapters are auto-registered the moment you import anything from the package. You don't need to call `register` manually for built-in extensions:
+
+```typescript
+import '@solez-ai/vell-extensions'; // auto-registers YouTube, Vimeo, Chart, Mermaid, Callout, MapEmbed
+
+import { renderExtension, createExtensionContext } from '@solez-ai/vell-extensions';
+```
+
+---
+
+## `embed/YouTube`
+
+Embeds a YouTube video using a privacy-enhanced `youtube-nocookie.com` iframe.
+
+**Props:**
+
+| Prop | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `video` | string | ✅ | — | YouTube video ID (the part after `?v=`) |
+| `width` | number | — | `560` | iframe width in pixels |
+| `height` | number | — | `315` | iframe height in pixels |
+
+**Usage:**
+
+```vell
+@[embed/YouTube](video="dQw4w9WgXcQ")
+```
+
+**With a fallback body for non-HTML renderers:**
+
+```vell
+@[embed/YouTube](video="dQw4w9WgXcQ" width=800 height=450) {
+  Watch the demo video on YouTube.
+}
+```
+
+**HTML output:**
+
+```html
+<div class="vell-extension" data-name="embed/YouTube">
+  <iframe width="560" height="315"
+    src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+    frameborder="0" allowfullscreen title="YouTube video"></iframe>
+</div>
+```
+
+<Note>
+  The `video` prop accepts only the video ID, not a full YouTube URL. Use the string after `v=` in a standard YouTube link — for example, from `https://www.youtube.com/watch?v=dQw4w9WgXcQ`, the ID is `dQw4w9WgXcQ`.
+</Note>
+
+---
+
+## `embed/Vimeo`
+
+Embeds a Vimeo video via the official Vimeo player iframe.
+
+**Props:**
+
+| Prop | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `video` | string | ✅ | — | Vimeo video ID (numeric, from the video URL) |
+| `width` | number | — | `560` | iframe width in pixels |
+| `height` | number | — | `315` | iframe height in pixels |
+
+**Usage:**
+
+```vell
+@[embed/Vimeo](video="76979871")
+```
+
+**HTML output:**
+
+```html
+<div class="vell-extension" data-name="embed/Vimeo">
+  <iframe width="560" height="315"
+    src="https://player.vimeo.com/video/76979871"
+    frameborder="0" allowfullscreen title="Vimeo video"></iframe>
+</div>
+```
+
+---
+
+## `npm/chart`
+
+Renders a bar or pie chart as inline SVG with no external dependencies. All chart data is encoded directly in the SVG, so the output works in any HTML environment without JavaScript.
+
+**Props:**
+
+| Prop | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `type` | string | ✅ | `"bar"` | Chart type: `"bar"` or `"pie"` |
+| `title` | string | — | — | Chart title displayed above the chart |
+| `labels` | string | — | — | Comma-separated series labels (e.g., `"Q1,Q2,Q3,Q4"`) |
+| `data` | string | ✅ | — | Comma-separated numeric values (e.g., `"100,200,150,300"`) |
+
+**Bar chart example:**
+
+```vell
+@[npm/chart](type=bar title="Quarterly Sales" labels="Q1,Q2,Q3,Q4" data="100,200,150,300")
+```
+
+**Pie chart example:**
+
+```vell
+@[npm/chart](type=pie title="Market Share" labels="Product A,Product B,Product C" data="45,30,25")
+```
+
+**With a fallback body:**
+
+```vell
+@[npm/chart](type=bar title="Traffic" labels="Mon,Tue,Wed" data="1200,1800,900") {
+  Weekly traffic: Monday 1200, Tuesday 1800, Wednesday 900.
+}
+```
+
+**HTML output (abbreviated):**
+
+```html
+<div class="vell-chart vell-chart-bar">
+  <svg width="500px" height="250px" viewBox="0 0 500 250" xmlns="http://www.w3.org/2000/svg">
+    <text x="250" y="22" text-anchor="middle" font-size="14" font-weight="bold">Quarterly Sales</text>
+    <!-- Y-axis grid lines, bars, and labels -->
+  </svg>
+</div>
+```
+
+<Tip>
+  The chart auto-scales bar heights to the maximum data value. Use the `labels` prop to annotate each bar or pie slice on the X-axis or in the legend.
+</Tip>
+
+---
+
+## `npm/mermaid`
+
+Renders a Mermaid.js diagram from a text definition in the extension body. The HTML output wraps the diagram source in a `<pre class="mermaid">` element, which the Mermaid.js library on the page then processes into an SVG diagram.
+
+**Props:**
+
+| Prop | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `theme` | string | — | `"default"` | Mermaid theme: `"default"`, `"dark"`, or `"neutral"` |
+
+**Usage:**
+
+```vell
+@[npm/mermaid](theme=default) {
+  graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Continue]
+    B -->|No| D[Stop]
+}
+```
+
+**HTML output:**
+
+```html
+<div class="vell-extension" data-name="npm/mermaid" data-theme="default">
+  <pre class="mermaid">graph TD
+    A[Start] --&gt; B{Decision}
+    B --&gt;|Yes| C[Continue]
+    B --&gt;|No| D[Stop]</pre>
+</div>
+```
+
+<Warning>
+  This extension outputs a `<pre class="mermaid">` element but does **not** bundle the Mermaid.js library. You must load Mermaid.js separately in the page that serves the rendered HTML:
+
+  ```html
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+  ```
+</Warning>
+
+---
+
+## `npm/callout`
+
+Renders a styled admonition callout box with an icon, an optional title, and a body. Callouts are useful for notes, tips, warnings, and other contextual information that should stand out from the main prose.
+
+**Props:**
+
+| Prop | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `type` | string | ✅ | `"note"` | Callout type (controls icon and CSS class) |
+| `title` | string | — | — | Optional title displayed in bold above the body |
+
+**Available types and their icons:**
+
+| Type | Icon | CSS class |
+|---|---|---|
+| `note` | 📝 | `.vell-callout-note` |
+| `tip` | 💡 | `.vell-callout-tip` |
+| `warning` | ⚠ | `.vell-callout-warning` |
+| `danger` | 🚨 | `.vell-callout-danger` |
+| `info` | ℹ | `.vell-callout-info` |
+| `success` | ✅ | `.vell-callout-success` |
+| `question` | ❓ | `.vell-callout-question` |
+
+**Usage:**
+
+```vell
+@[npm/callout](type=tip title="Pro tip") {
+  You can chain multiple @[Ref] directives in a single paragraph by adding
+  them inline as InlineComponent nodes.
+}
+
+@[npm/callout](type=warning) {
+  This feature is experimental. The API may change in a future release.
+}
+```
+
+**HTML output:**
+
+```html
+<div class="vell-callout vell-callout-tip">
+  <span class="callout-icon">💡</span>
+  <div class="callout-title">Pro tip</div>
+  <div class="callout-body">
+    <p>You can chain multiple @[Ref] directives…</p>
+  </div>
+</div>
+```
+
+You can style the callout variants in your own stylesheet by targeting the type-specific classes (e.g., `.vell-callout-warning { background: #fff3cd; border-left: 4px solid #ffc107; }`).
+
+---
+
+## `npm/map`
+
+Embeds an interactive OpenStreetMap at a given latitude and longitude using an iframe. No API key required.
+
+**Props:**
+
+| Prop | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `lat` | number | ✅ | — | Latitude of the map center |
+| `lng` | number | ✅ | — | Longitude of the map center |
+| `zoom` | number | — | `12` | Zoom level (1 = world, 18 = building) |
+| `title` | string | — | `"Map location"` | Accessible title and link label |
+
+**Usage:**
+
+```vell
+@[npm/map](lat=51.5074 lng=-0.1278 zoom=13 title="London, UK")
+```
+
+**With a fallback body for PDF/print:**
+
+```vell
+@[npm/map](lat=48.8566 lng=2.3522 zoom=12 title="Paris, France") {
+  Paris, France (48.8566°N, 2.3522°E)
+}
+```
+
+**HTML output:**
+
+```html
+<div class="vell-extension" data-name="npm/map">
+  <iframe width="100%" height="350"
+    src="https://www.openstreetmap.org/export/embed.html?bbox=..."
+    title="London, UK" frameborder="0" style="border:0" allowfullscreen></iframe>
+  <br>
+  <small><a href="https://www.openstreetmap.org/#map=13/51.5074/-0.1278" target="_blank">London, UK</a></small>
+</div>
+```
+
+<Note>
+  The map iframe connects to `openstreetmap.org`. If you're rendering documents for an offline or intranet environment, replace the `npm/map` adapter with a custom one that points to a self-hosted tile server.
+</Note>
+
+---
+
+## Using Extensions with the HTML Renderer
+
+All built-in extensions integrate with `@solez-ai/vell-renderer-html` through the `renderExtension` helper:
+
+```typescript
+import { parse } from '@solez-ai/vell';
+import { render } from '@solez-ai/vell-renderer-html';
+import '@solez-ai/vell-extensions'; // auto-registers all built-in adapters
+
+const source = `
+= Video Demo
+
+@[embed/YouTube](video="dQw4w9WgXcQ")
+
+@[npm/callout](type=info title="Note") {
+  This video demonstrates the core rendering pipeline.
+}
+`;
+
+const result = parse(source);
+if (result.errors.length === 0) {
+  const html = render(result.document);
+  console.log(html);
+}
+```
+
+To build your own extension adapter, see the [Authoring Extensions](/extensions/authoring) guide.

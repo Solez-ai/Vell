@@ -1,0 +1,208 @@
+---
+title: "Tables in Vell: Pipe Tables, Grid Tables, and Alignment"
+sidebarTitle: "Tables"
+description: "Create pipe tables and ASCII grid tables in Vell documents. Covers column alignment, merged cells with colspan and rowspan, and table formatting."
+---
+
+Vell supports two complementary table syntaxes. Pipe tables are the quick-and-easy option for straightforward data — they look similar to Markdown tables and are fast to type. Grid tables are the power option: their ASCII-art border syntax allows cells to span multiple columns and rows, making them ideal for complex layouts and structured data.
+
+## Pipe Tables
+
+A pipe table consists of three parts: a header row, a separator row, and zero or more body rows. Use `|` characters to divide columns, and pad cells with spaces for readability.
+
+```vell
+| Name    | Language | Stars |
+|---------|----------|-------|
+| Vell    | Rust     | 1024  |
+| Pandoc  | Haskell  | 32000 |
+| Typst   | Rust     | 28000 |
+```
+
+<Note>
+The leading and trailing `|` characters on each row are optional but recommended for clarity. The parser accepts rows with or without them.
+</Note>
+
+### Column Alignment
+
+Control how each column's content aligns by adding colon(s) to the separator row:
+
+| Alignment | Separator syntax | Example |
+|-----------|-----------------|---------|
+| Left (default) | `:---` or `---` | `:------` |
+| Center | `:---:` | `:------:` |
+| Right | `---:` | `------:` |
+
+```vell
+| Item         | Quantity | Unit Price |
+|:-------------|:--------:|-----------:|
+| Apples       | 12       | $0.99      |
+| Bread        | 2        | $3.49      |
+| Orange juice | 1        | $4.99      |
+```
+
+In the example above:
+- **Item** is left-aligned (`:---`)
+- **Quantity** is center-aligned (`:---:`)
+- **Unit Price** is right-aligned (`---:`)
+
+### Pipe Table Rules
+
+- Every row must have the same number of `|` separators as the separator row.
+- The separator row must contain only `-`, `:`, `|`, and spaces.
+- Cells may contain any inline markup — bold, italic, math, links, code, etc.
+- Empty cells are written as `|  |` (one or more spaces between pipes).
+
+### Pipe Table with Inline Markup
+
+```vell
+| Command        | Flag          | Description                       |
+|:---------------|:--------------|:----------------------------------|
+| `vell render`  | `--format`    | Selects the output format.        |
+| `vell fmt`     | `--check`     | Checks formatting without writing.|
+| `vell validate`| `--strict`    | Treats warnings as *errors*.      |
+```
+
+---
+
+## Grid Tables
+
+Grid tables use `+`, `-`, and `|` characters to draw borders around cells. The added syntax overhead pays off when you need cells that span multiple columns or rows.
+
+### Basic Grid Table
+
+```vell
++----------+----------+----------+
+| Column A | Column B | Column C |
++==========+==========+==========+
+| Row 1A   | Row 1B   | Row 1C   |
++----------+----------+----------+
+| Row 2A   | Row 2B   | Row 2C   |
++----------+----------+----------+
+```
+
+The `+=====+` separator row (using `=` instead of `-`) marks the boundary between the header and body rows. This row is required.
+
+### Column Span (Colspan)
+
+Merge adjacent columns by removing the `|` divider between them and extending the `-` fill across the merged width:
+
+```vell
++----------+----------+----------+
+| Merged Header — spans 3 cols   |
++==========+==========+==========+
+| Cell A   | Cell B   | Cell C   |
++----------+----------+----------+
+| Wide cell spans two columns    |
++----------+----------+----------+
+```
+
+<Tip>
+The merged cell's content must fit within the total width of all spanned columns. The `colspan` value is inferred by counting how many `+` separators are bridged.
+</Tip>
+
+### Row Span (Rowspan)
+
+Merge rows in the same column by using spaces (rather than cell content) in the lower cell and ensuring the border rows are absent between them:
+
+```vell
++----------+--------------------+
+| Header 1 | Header 2           |
++==========+====================+
+| Tall     | Row 1, Column 2    |
+| cell     +--------------------+
+| spans    | Row 2, Column 2    |
+| 3 rows   +--------------------+
+|          | Row 3, Column 2    |
++----------+--------------------+
+```
+
+The `rowspan` value is determined by counting how many horizontal row separators the tall cell crosses.
+
+### Combined Colspan and Rowspan
+
+```vell
++-----------+-----------+-----------+
+| Top-left             | Top-right  |
+| spans 2 cols         |            |
++===========+===========+===========+
+| Mid-left  | Center cell spans      |
+|           | 2 columns and 2 rows   |
++-----------+                        |
+| Bot-left  |                        |
++-----------+-----------+-----------+
+```
+
+### Grid Table Rules
+
+- Every row must start and end with `+` (corner) or `|` (side border).
+- Use `-` to fill horizontal segments and `|` for vertical segments.
+- The `+=====+` header separator uses `=` characters instead of `-`.
+- Cells in grid tables may contain any inline markup.
+- The parser infers `colspan` from the number of `+` separators bridged and `rowspan` from the height of the cell.
+
+---
+
+## Choosing Between Table Styles
+
+<Tabs>
+  <Tab title="Pipe tables">
+    Use pipe tables when:
+    - You need a quick, readable table without merged cells.
+    - You want column alignment (left, center, right).
+    - You are generating table source programmatically.
+
+    ```vell
+    | Name  | Score | Grade |
+    |:------|------:|:-----:|
+    | Alice | 95    |  A    |
+    | Bob   | 82    |  B    |
+    | Carol | 74    |  C    |
+    ```
+  </Tab>
+  <Tab title="Grid tables">
+    Use grid tables when:
+    - You need cells that span multiple columns or rows.
+    - You are documenting structured data with complex layouts.
+    - Visual alignment in the source file matters.
+
+    ```vell
+    +-------+-------+-------+
+    | Name  | Score | Grade |
+    +=======+=======+=======+
+    | Alice |    95 |   A   |
+    +-------+-------+-------+
+    | Bob   |    82 |   B   |
+    +-------+-------+-------+
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Full Working Examples
+
+<CodeGroup>
+```vell Comparison table (pipe)
+| Feature         | Vell | Markdown | LaTeX |
+|:----------------|:----:|:--------:|:-----:|
+| Math support    | ✅   | ⚠️       | ✅    |
+| Tables          | ✅   | ✅       | ✅    |
+| Reactive vars   | ✅   | ❌       | ❌    |
+| Deterministic   | ✅   | ❌       | ✅    |
+| PDF output      | ✅   | ⚠️       | ✅    |
+```
+
+```vell Schedule table (grid, rowspan)
++------------+---------------------+
+| Time       | Event               |
++============+=====================+
+| 09:00      | Opening keynote     |
++------------+---------------------+
+| 10:00      | Workshop A          |
+|            +---------------------+
+|            | Workshop B          |
++------------+---------------------+
+| 12:00      | Lunch               |
++------------+---------------------+
+```
+</CodeGroup>

@@ -1,0 +1,30 @@
+{
+  "name": "@solez-ai/vell",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "tasks": {
+    "build": "deno run -A scripts/build.ts",
+    "test": "deno test -A",
+    "typecheck": "deno check packages/vell-js/src/index.ts"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "target": "es2020"
+  },
+  "imports": {
+    "@solez-ai/vell": "./packages/vell-js/src/index.ts",
+    "@solez-ai/vell-renderer-html": "./packages/vell-renderer-html/src/index.ts",
+    "@solez-ai/vell-renderer-pdf": "./packages/vell-renderer-pdf/src/index.ts"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  },
+  "fmt": {
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "semiColons": true,
+    "singleQuote": false
+  }
+}

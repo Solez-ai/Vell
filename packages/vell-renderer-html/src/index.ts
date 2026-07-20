@@ -2,6 +2,12 @@
 // Copyright (C) 2026 Samin Yeasar
 
 import { getRuntimeScript } from "./runtime.js";
+import {
+  getDirectiveRenderer,
+  getInlineRenderer,
+  runBeforeRenderHooks,
+  runAfterRenderHooks,
+} from "./registry.js";
 
 /** Minimal Vell AST document accepted by the renderer. */
 export interface VellDocument {
@@ -55,6 +61,10 @@ interface RenderContext {
   lofEntries: Array<{ caption: string; id: string }>;
   /** Pre-collected LOT entries: (caption, id). */
   lotEntries: Array<{ caption: string; id: string }>;
+  /** Alphabetized index terms and their generated anchors. */
+  indexEntries: Array<{ term: string; id: string }>;
+  /** Alphabetized glossary terms and definitions. */
+  glossaryEntries: Array<{ term: string; definition: string; id: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +73,9 @@ interface RenderContext {
 
 /** Renders a document to a complete HTML string. */
 export function render(doc: VellDocument, options?: { interactive?: boolean }): string {
+  // Run before-render hooks from registered plugins
+  runBeforeRenderHooks(doc as any);
+
   const ctx = buildRenderContext(doc);
   const content = (doc.children ?? []).map(n => renderNode(n, ctx)).join("\n");
   const footnotesHtml = renderFootnotesSection(ctx);
@@ -79,11 +92,24 @@ export function render(doc: VellDocument, options?: { interactive?: boolean }): 
   const runtimeScript = options?.interactive
     ? `\n<script defer>${getRuntimeScript()}</script>`
     : "";
-  return (
+  // Detect whether the document has math content (inline $...$ or block $$...$$)
+  const hasMath = /<math[^>]*>/.test(content);
+
+  // KaTeX polyfill for browsers that don't support MathML natively
+  // Loads from CDN only when math is present and MathML support is missing.
+  const katexPolyfill = hasMath
+    ? `\n<script>(function(){var d=document.createElement('div');d.innerHTML='<math><mfrac><mi>x</mi><mi>y</mi></mfrac></math>';var isMathMlSupported=d.querySelector('mfrac')&&d.querySelector('mfrac').offsetHeight>0;if(!isMathMlSupported){function loadKatex(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js';s.onload=function(){var l=document.createElement('link');l.rel='stylesheet';l.href='https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css';document.head.appendChild(l);document.querySelectorAll('math[data-latex]').forEach(function(el){try{katex.render(el.getAttribute('data-latex'),el,{displayMode:el.getAttribute('display')==='block',throwOnError:false});}catch(e){}});};document.head.appendChild(s);}if(document.readyState==='complete'){loadKatex();}else{window.addEventListener('load',loadKatex);}}})()</script>`
+    : "";
+
+  let html = (
     `<!doctype html>\n` +
-    `<html${langAttr}${dirAttr}><head><meta charset="utf-8">${title}<style>\n${VELL_CSS}\n</style>${runtimeScript}</head>` +
+    `<html${langAttr}${dirAttr}><head><meta charset="utf-8">${title}<style>\n${VELL_CSS}\n</style>${katexPolyfill}${runtimeScript}</head>` +
     `<body>${content}${footnotesHtml}</body></html>`
   );
+
+  // Run after-render hooks from registered plugins
+  html = runAfterRenderHooks(html, doc as any);
+  return html;
 }
 
 /** Renders a document to a complete interactive HTML string with embedded runtime. */
@@ -117,6 +143,8 @@ function buildRenderContext(doc: VellDocument): RenderContext {
     tocEntries: collectTocEntries(doc),
     lofEntries: collectLofEntries(doc),
     lotEntries: collectLotEntries(doc),
+    indexEntries: collectIndexEntries(doc),
+    glossaryEntries: collectGlossaryEntries(doc),
   };
 }
 
@@ -181,14 +209,18 @@ function renderNode(node: VellNode, ctx: RenderContext): string {
     }
     case "CodeBlock": {
       const lang = node.lang ? ` class="language-${escapeAttr(String(node.lang))}"` : "";
-      const execAttr = node.executable ? ` data-executable="true"` : "";
-      return `<pre><code${lang}${execAttr}>${escapeHtml(String(node.source ?? ""))}</code></pre>`;
+      const source = String(node.source ?? "");
+      if (node.executable) {
+        return `<div class="vell-cell" data-language="${escapeAttr(String(node.lang ?? "javascript"))}"><pre><code${lang}>${escapeHtml(source)}</code></pre><button type="button" data-vell-run>Run</button><script type="text/plain" data-vell-source>${escapeHtml(source)}</script><pre class="vell-cell-output" aria-live="polite"></pre></div>`;
+      }
+      return `<pre><code${lang}>${escapeHtml(source)}</code></pre>`;
     }
     case "MathBlock": {
       const src = String(node.source ?? "");
       const mathml = latexToMathml(src, true);
       const alttext = escapeAttr(mathmlToPlainText(mathml));
-      return `<math display="block" alttext="${alttext}">${mathml}</math>`;
+      const srcAttr = ` data-latex="${escapeAttr(String(node.source ?? ""))}"`;
+      return `<math display="block" alttext="${alttext}"${srcAttr}>${mathml}</math>`;
     }
     case "List": {
       const tag = node.ordered ? "ol" : "ul";
@@ -286,6 +318,59 @@ function renderDirective(node: VellNode, ctx: RenderContext): string {
       const cols = escapeAttr(String(props?.columns ?? 1));
       return `<div class="vell-layout vell-cols-${cols}">${(node.children as VellNode[] ?? []).map(n => renderNode(n, ctx)).join("\n")}</div>`;
     }
+    case "Book":
+    case "Part":
+    case "Chapter":
+    case "Appendix":
+    case "Foreword":
+    case "Preface": {
+      const tag = name === "Chapter" || name === "Appendix" ? "section" : "div";
+      const title = props?.title ? `<h2>${escapeHtml(String(props.title))}</h2>` : "";
+      const children = (node.children as VellNode[] ?? []).map(n => renderNode(n, ctx)).join("\n");
+      return `<${tag} class="vell-book-section vell-${name.toLowerCase()}">${title}${children}</${tag}>`;
+    }
+    case "Index": {
+      const term = String(props?.term ?? "").trim();
+      if (term) {
+        const id = `index-${slugify(term)}`;
+        return `<span id="${escapeAttr(id)}" class="vell-index-marker" data-term="${escapeAttr(term)}"></span>`;
+      }
+      const items = ctx.indexEntries.map(entry => `<li><a href="#${escapeAttr(entry.id)}">${escapeHtml(entry.term)}</a></li>`).join("");
+      return `<nav class="vell-index" aria-label="Index"><h2>${escapeHtml(String(props?.title ?? "Index"))}</h2><ol>${items}</ol></nav>`;
+    }
+    case "Glossary": {
+      const term = String(props?.term ?? "").trim();
+      const definition = String(props?.definition ?? extractTextFromChildren(node.children as VellNode[] ?? [])).trim();
+      if (term) {
+        return `<dfn id="glossary-${escapeAttr(slugify(term))}" class="vell-glossary-term" title="${escapeAttr(definition)}">${escapeHtml(term)}</dfn>`;
+      }
+      const items = ctx.glossaryEntries.map(entry => `<dt id="${escapeAttr(entry.id)}">${escapeHtml(entry.term)}</dt><dd>${escapeHtml(entry.definition)}</dd>`).join("");
+      return `<section class="vell-glossary"><h2>${escapeHtml(String(props?.title ?? "Glossary"))}</h2><dl>${items}</dl></section>`;
+    }
+    case "PageRef": {
+      const label = String(props?.label ?? "");
+      const target = ctx.labelMap[label];
+      return target
+        ? `<a href="#${escapeAttr(target.anchorId)}" class="vell-page-ref" data-page-ref="${escapeAttr(label)}">${escapeHtml(String(props?.text ?? target.displayText))}</a>`
+        : `<span class="unresolved-ref">[?${escapeHtml(label)}]</span>`;
+    }
+    case "On": {
+      const event = String(props?.event ?? (props?.click ? "click" : "change"));
+      const action = String(props?.action ?? props?.click ?? props?.change ?? "");
+      const children = (node.children as VellNode[] ?? []).map(n => renderNode(n, ctx)).join("\n");
+      return `<span class="vell-event" data-vell-on="${escapeAttr(event)}" data-vell-action="${escapeAttr(action)}">${children}</span>`;
+    }
+    case "Run": {
+      const language = String(props?.lang ?? "javascript");
+      const source = String(props?.source ?? extractTextFromChildren(node.children as VellNode[] ?? []));
+      return `<div class="vell-cell" data-language="${escapeAttr(language)}"><pre><code class="language-${escapeAttr(language)}">${escapeHtml(source)}</code></pre><button type="button" data-vell-run>Run</button><script type="text/plain" data-vell-source>${escapeHtml(source)}</script><pre class="vell-cell-output" aria-live="polite"></pre></div>`;
+    }
+    case "Notebook": {
+      const children = (node.children as VellNode[] ?? []).map(n => renderNode(n, ctx)).join("\n");
+      return `<section class="vell-notebook">${children}</section>`;
+    }
+    case "Button":
+      return `<button type="button" class="vell-button">${escapeHtml(String(props?.label ?? extractTextFromChildren(node.children as VellNode[] ?? []) ?? "Button"))}</button>`;
 
     /* --- missing directives --- */
     case "Code": {
@@ -319,6 +404,7 @@ function renderDirective(node: VellNode, ctx: RenderContext): string {
     case "Chart": {
       const chartType = String(props?.type ?? "bar");
       const title = props?.title ? String(props.title) : "";
+      const bindAttr = props?.bind ? ` data-vell-chart="${escapeAttr(String(props.bind))}"` : "";
       const source = extractTextFromChildren(node.children as VellNode[]);
       const data: Array<{ label: string; value: number }> = [];
       for (const line of source.split("\n")) {
@@ -335,9 +421,9 @@ function renderDirective(node: VellNode, ctx: RenderContext): string {
       }
       if (chartType === "bar" && data.length > 0) {
         const svg = renderBarChartSvg(data, title);
-        return `<div class="vell-chart vell-chart-bar">\n${svg}\n</div>`;
+        return `<div class="vell-chart vell-chart-bar"${bindAttr}>\n${svg}\n</div>`;
       }
-      let html = `<div class="vell-chart vell-chart-${escapeAttr(chartType)}">\n`;
+      let html = `<div class="vell-chart vell-chart-${escapeAttr(chartType)}"${bindAttr}>\n`;
       if (title) html += `<div class="chart-title">${escapeHtml(title)}</div>\n`;
       html += `<table>\n`;
       for (const d of data) {
@@ -717,6 +803,38 @@ function collectLotEntries(doc: VellDocument): Array<{ caption: string; id: stri
   return entries;
 }
 
+function collectIndexEntries(doc: VellDocument): Array<{ term: string; id: string }> {
+  const terms = new Map<string, string>();
+  walkDirectives(doc.children ?? [], "Index", node => {
+    const term = String((node.props as Record<string, unknown> | undefined)?.term ?? "").trim();
+    if (term) terms.set(term, `index-${slugify(term)}`);
+  });
+  return [...terms].map(([term, id]) => ({ term, id })).sort((a, b) => a.term.localeCompare(b.term));
+}
+
+function collectGlossaryEntries(doc: VellDocument): Array<{ term: string; definition: string; id: string }> {
+  const entries = new Map<string, string>();
+  walkDirectives(doc.children ?? [], "Glossary", node => {
+    const props = node.props as Record<string, unknown> | undefined;
+    const term = String(props?.term ?? "").trim();
+    if (!term) return;
+    const definition = String(props?.definition ?? extractTextFromChildren(node.children as VellNode[] ?? [])).trim();
+    entries.set(term, definition);
+  });
+  return [...entries].map(([term, definition]) => ({ term, definition, id: `glossary-${slugify(term)}` })).sort((a, b) => a.term.localeCompare(b.term));
+}
+
+function walkDirectives(nodes: VellNode[], name: string, visit: (node: VellNode) => void): void {
+  for (const node of nodes) {
+    if (node.type === "Directive" && node.name === name) visit(node);
+    if (Array.isArray(node.children)) walkDirectives(node.children as VellNode[], name, visit);
+  }
+}
+
+function slugify(value: string): string {
+  return value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "") || "entry";
+}
+
 function collectLotEntriesNodes(
   nodes: VellNode[],
   entries: Array<{ caption: string; id: string }>,
@@ -948,7 +1066,8 @@ function renderInline(node: VellInline, ctx: RenderContext): string {
       const src = String(node.source ?? "");
       const mathml = latexToMathml(src, false);
       const alttext = escapeAttr(mathmlToPlainText(mathml));
-      return `<math display="inline" alttext="${alttext}">${mathml}</math>`;
+      const srcAttr = ` data-latex="${escapeAttr(String(node.source ?? ""))}"`;
+      return `<math display="inline" alttext="${alttext}"${srcAttr}>${mathml}</math>`;
     }
 
     /* --- variables & components --- */
@@ -1073,6 +1192,13 @@ function latexToMathml(latex: string, _isBlock: boolean): string {
       i++;
       if (i < latex.length && (latex[i] === " " || latex[i] === "\n")) {
         i++;
+        continue;
+      }
+      // Check for \begin{...} environment
+      if (i + 5 < latex.length && latex.substring(i, i + 6) === "begin{") {
+        const envResult = parseLatexEnvironment(latex, i);
+        i = envResult.newPos;
+        stack.push(envResult.value);
         continue;
       }
       let cmd = "";
@@ -1225,6 +1351,10 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
     case "varrho": return { value: "<mi>&rho;</mi>", newPos };
     case "varsigma": return { value: "<mi>&sigmaf;</mi>", newPos };
     case "varphi": return { value: "<mi>&phi;</mi>", newPos };
+    // Dotless letters and misc
+    case "imath": return { value: "<mi>&#x0131;</mi>", newPos };
+    case "jmath": return { value: "<mi>&#x0237;</mi>", newPos };
+    case "ell": return { value: "<mi>&#x2113;</mi>", newPos };
     // Greek uppercase
     case "Gamma": return { value: "<mi>&Gamma;</mi>", newPos };
     case "Delta": return { value: "<mi>&Delta;</mi>", newPos };
@@ -1268,6 +1398,15 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
     case "ominus": return { value: "<mo>&#x2296;</mo>", newPos };
     case "oslash": return { value: "<mo>&#x2298;</mo>", newPos };
     case "odot": return { value: "<mo>&#x2299;</mo>", newPos };
+    // Additional binary operators
+    case "ltimes": return { value: "<mo>&#x22C9;</mo>", newPos };
+    case "rtimes": return { value: "<mo>&#x22CA;</mo>", newPos };
+    case "uplus": return { value: "<mo>&#x228E;</mo>", newPos };
+    case "sqcap": return { value: "<mo>&#x2293;</mo>", newPos };
+    case "sqcup": return { value: "<mo>&#x2294;</mo>", newPos };
+    case "curlyvee": return { value: "<mo>&#x22CE;</mo>", newPos };
+    case "circledast": return { value: "<mo>&#x229B;</mo>", newPos };
+    case "bullet": return { value: "<mo>&#x2219;</mo>", newPos };
     // Relations
     case "equiv": return { value: "<mo>&#x2261;</mo>", newPos };
     case "approx": return { value: "<mo>&#x2248;</mo>", newPos };
@@ -1284,6 +1423,12 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
     case "succ": return { value: "<mo>&#x227B;</mo>", newPos };
     case "preceq": return { value: "<mo>&#x227C;</mo>", newPos };
     case "succeq": return { value: "<mo>&#x227D;</mo>", newPos };
+    // Additional relations
+    case "leqq": return { value: "<mo>&#x2266;</mo>", newPos };
+    case "geqq": return { value: "<mo>&#x2267;</mo>", newPos };
+    case "asymp": return { value: "<mo>&#x224D;</mo>", newPos };
+    case "varpropto": return { value: "<mo>&#x221D;</mo>", newPos };
+    case "vartriangle": return { value: "<mo>&#x25B5;</mo>", newPos };
     // Set symbols
     case "subset": return { value: "<mo>&#x2282;</mo>", newPos };
     case "supset": return { value: "<mo>&#x2283;</mo>", newPos };
@@ -1308,6 +1453,7 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
     case "downarrow": return { value: "<mo>&#x2193;</mo>", newPos };
     case "mapsto": return { value: "<mo>&#x21A6;</mo>", newPos };
     case "implies": return { value: "<mo>&#x21D2;</mo>", newPos };
+    case "impliedby": return { value: "<mo>&#x27F8;</mo>", newPos };
     case "iff": return { value: "<mo>&#x21D4;</mo>", newPos };
     // Logical
     case "forall": return { value: "<mo>&#x2200;</mo>", newPos };
@@ -1321,6 +1467,10 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
     case "vdash": return { value: "<mo>&#x22A2;</mo>", newPos };
     case "mid": return { value: "<mo>&#x2223;</mo>", newPos };
     case "models": return { value: "<mo>&#x22A7;</mo>", newPos };
+    // Additional relations
+    case "doteq": return { value: "<mo>&#x2250;</mo>", newPos };
+    case "nsubseteq": return { value: "<mo>&#x2288;</mo>", newPos };
+    case "subsetneq": return { value: "<mo>&#x228A;</mo>", newPos };
     // Functions
     case "sin": case "cos": case "tan": case "cot": case "sec": case "csc":
     case "log": case "ln":
@@ -1337,6 +1487,17 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
       newPos = den.newPos;
       return {
         value: `<mfrac>${wrapMrow(num.value)}${wrapMrow(den.value)}</mfrac>`,
+        newPos,
+      };
+    }
+    // Continued fraction
+    case "cfrac": {
+      const cnum = parseMathGroup(latex, newPos);
+      newPos = cnum.newPos;
+      const cden = parseMathGroup(latex, newPos);
+      newPos = cden.newPos;
+      return {
+        value: `<mfrac>${wrapMrow(cnum.value)}${wrapMrow(cden.value)}</mfrac>`,
         newPos,
       };
     }
@@ -1376,6 +1537,89 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
       const content = parseMathGroup(latex, newPos);
       newPos = content.newPos;
       return { value: `<mover>${wrapMrow(content.value)}<mo>&#x2192;</mo></mover>`, newPos };
+    }
+    // Additional font commands
+    case "mathfrak": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      const letter = content.value.replace(/<[^>]+>/g, "").trim().charAt(0) || "A";
+      return { value: `<mi mathvariant="fraktur">${letter}</mi>`, newPos };
+    }
+    case "mathscr": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      const letter = content.value.replace(/<[^>]+>/g, "").trim().charAt(0) || "A";
+      return { value: `<mi mathvariant="script">${letter}</mi>`, newPos };
+    }
+    case "textbf":
+    case "boldsymbol": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<mi mathvariant="bold">${content.value}</mi>`, newPos };
+    }
+    case "textit": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<mi mathvariant="italic">${content.value}</mi>`, newPos };
+    }
+    // Boxed formula
+    case "boxed": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<menclose notation="box">${wrapMrow(content.value)}</menclose>`, newPos };
+    }
+    // Cancel
+    case "cancel": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<menclose notation="updiagonalstrike">${wrapMrow(content.value)}</menclose>`, newPos };
+    }
+    case "bcancel": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<menclose notation="downdiagonalstrike">${wrapMrow(content.value)}</menclose>`, newPos };
+    }
+    case "xcancel": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<menclose notation="updiagonalstrike downdiagonalstrike">${wrapMrow(content.value)}</menclose>`, newPos };
+    }
+    // Lines
+    case "underline": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<menclose notation="bottom">${wrapMrow(content.value)}</menclose>`, newPos };
+    }
+    case "overline": {
+      const content = parseMathGroup(latex, newPos);
+      newPos = content.newPos;
+      return { value: `<mover>${wrapMrow(content.value)}<mo>&#x00AF;</mo></mover>`, newPos };
+    }
+    // Stacking
+    case "overset": {
+      const above = parseMathGroup(latex, newPos);
+      newPos = above.newPos;
+      const base = parseMathGroup(latex, newPos);
+      newPos = base.newPos;
+      return { value: `<mover>${wrapMrow(base.value)}${wrapMrow(above.value)}</mover>`, newPos };
+    }
+    case "underset": {
+      const below = parseMathGroup(latex, newPos);
+      newPos = below.newPos;
+      const base = parseMathGroup(latex, newPos);
+      newPos = base.newPos;
+      return { value: `<munder>${wrapMrow(base.value)}${wrapMrow(below.value)}</munder>`, newPos };
+    }
+    // Extensible arrows
+    case "xrightarrow": {
+      const xrArg = parseMathGroup(latex, newPos);
+      newPos = xrArg.newPos;
+      return { value: `<mover><mo>&#x2192;</mo><mtext>${xrArg.value}</mtext></mover>`, newPos };
+    }
+    case "xleftarrow": {
+      const xlArg = parseMathGroup(latex, newPos);
+      newPos = xlArg.newPos;
+      return { value: `<mover><mo>&#x2190;</mo><mtext>${xlArg.value}</mtext></mover>`, newPos };
     }
     // Font commands
     case "mathbb": {
@@ -1432,6 +1676,79 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
       newPos = content.newPos;
       return { value: `<mi>${content.value}</mi>`, newPos };
     }
+    // Substack (stacked subscripts like \sum_{\substack{i<j\\ j>k}})
+    case "substack": {
+      const subst = parseMathGroup(latex, newPos);
+      newPos = subst.newPos;
+      // substack content is already parsed; wrap in a small mtable
+      return { value: `<mtable rowspacing="0.1em" columnalign="center">${subst.value}</mtable>`, newPos };
+    }
+    // Prescript (left-side scripts)
+    case "prescript": {
+      const pLeft = parseMathGroup(latex, newPos);
+      newPos = pLeft.newPos;
+      const pRight = parseMathGroup(latex, newPos);
+      newPos = pRight.newPos;
+      const pBase = parseMathGroup(latex, newPos);
+      newPos = pBase.newPos;
+      return {
+        value: `<mmultiscripts>${pBase.value}<mprescripts/>${pRight.value}${pLeft.value}</mmultiscripts>`,
+        newPos,
+      };
+    }
+    // Sideset (prescript/postscript around large operators)
+    case "sideset": {
+      // Parse the two braced groups: {left_scripts}{right_scripts}
+      const ssLeft = parseMathGroup(latex, newPos);
+      newPos = ssLeft.newPos;
+      const ssRight = parseMathGroup(latex, newPos);
+      newPos = ssRight.newPos;
+      // Skip whitespace before the operator
+      while (newPos < latex.length && /[ \t]/.test(latex[newPos])) newPos++;
+      // Consume the following large operator (\sum, \prod, etc.) and its limits
+      let baseLatex = "";
+      if (newPos < latex.length && latex[newPos] === "\\") {
+        const opStart = newPos;
+        newPos++; // skip backslash
+        while (newPos < latex.length && /[a-zA-Z]/.test(latex[newPos])) {
+          newPos++;
+        }
+        baseLatex = latex.substring(opStart, newPos);
+        // Consume any sub/superscripts attached to the operator (_ and ^ and {groups})
+        while (newPos < latex.length && (latex[newPos] === "^" || latex[newPos] === "_")) {
+          newPos++;
+          if (newPos < latex.length && latex[newPos] === "{") {
+            let depth = 1;
+            newPos++;
+            while (newPos < latex.length && depth > 0) {
+              if (latex[newPos] === "{") depth++;
+              else if (latex[newPos] === "}") depth--;
+              if (depth > 0) newPos++;
+            }
+            newPos++;
+          } else if (newPos < latex.length && latex[newPos] === "\\") {
+            // \command as script content (e.g., ^\infty or _\alpha)
+            newPos++;
+            while (newPos < latex.length && /[a-zA-Z]/.test(latex[newPos])) newPos++;
+          } else if (newPos < latex.length) {
+            newPos++; // single character
+          }
+          baseLatex = latex.substring(opStart, newPos);
+        }
+      }
+      // Convert the base (operator + limits) to MathML
+      const baseMml = baseLatex ? latexToMathml(baseLatex, false) : "";
+      return {
+        value: `<mmultiscripts>${baseMml}<mprescripts/>${ssLeft.value}${ssRight.value}</mmultiscripts>`,
+        newPos,
+      };
+    }
+    // Modulo
+    case "pmod": {
+      const arg = parseMathGroup(latex, newPos);
+      newPos = arg.newPos;
+      return { value: `<mo>(</mo><mi>mod</mi><mtext>&#x00A0;</mtext>${arg.value}<mo>)</mo>`, newPos };
+    }
     // Physics: bra-ket notation
     case "bra": {
       const content = parseMathGroup(latex, newPos);
@@ -1472,6 +1789,12 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
       newPos = content.newPos;
       return { value: `<mtext>${escapeHtml(content.value)}</mtext>`, newPos };
     }
+    // Intertext (text between rows in aligned environments)
+    case "intertext": {
+      const itContent = parseMathGroup(latex, newPos);
+      newPos = itContent.newPos;
+      return { value: `<mtext>${escapeHtml(itContent.value)}</mtext>`, newPos };
+    }
     // Additional math commands
     case "displaystyle": {
       const content = parseMathGroup(latex, newPos);
@@ -1497,6 +1820,52 @@ function latexCmdToMathml(cmd: string, latex: string, pos: number): CmdResult {
       newPos = content.newPos;
       return { value: `<mo>&#x00AC;</mo>${wrapMrow(content.value)}`, newPos };
     }
+    // Delimiters
+    case "lfloor": return { value: "<mo>&#x230A;</mo>", newPos };
+    case "rfloor": return { value: "<mo>&#x230B;</mo>", newPos };
+    case "lceil": return { value: "<mo>&#x2308;</mo>", newPos };
+    case "rceil": return { value: "<mo>&#x2309;</mo>", newPos };
+    // Geometry
+    case "triangle": return { value: "<mo>&#x25B3;</mo>", newPos };
+    case "angle": return { value: "<mo>&#x2220;</mo>", newPos };
+    case "parallel": return { value: "<mo>&#x2225;</mo>", newPos };
+    case "perp": return { value: "<mo>&#x27C2;</mo>", newPos };
+    // Proofs
+    case "therefore": return { value: "<mo>&#x2234;</mo>", newPos };
+    case "because": return { value: "<mo>&#x2235;</mo>", newPos };
+    // Arrows
+    case "hookrightarrow": return { value: "<mo>&#x21AA;</mo>", newPos };
+    case "longmapsto": return { value: "<mo>&#x27FC;</mo>", newPos };
+    // Turnstile
+    case "dashv": return { value: "<mo>&#x22A3;</mo>", newPos };
+    // Amssymb misc
+    case "square": return { value: "<mo>&#x25A1;</mo>", newPos };
+    case "lozenge": return { value: "<mo>&#x25CA;</mo>", newPos };
+    case "blacksquare": return { value: "<mo>&#x25A0;</mo>", newPos };
+    case "hbar": return { value: "<mi>&#x210F;</mi>", newPos };
+    case "complement": return { value: "<mo>&#x2201;</mo>", newPos };
+    case "dag": return { value: "<mo>&#x2020;</mo>", newPos };
+    case "ddag": return { value: "<mo>&#x2021;</mo>", newPos };
+    // Cardinals
+    case "aleph": return { value: "<mi>&#x2135;</mi>", newPos };
+    case "beth": return { value: "<mi>&#x2136;</mi>", newPos };
+    case "gimel": return { value: "<mi>&#x2137;</mi>", newPos };
+    case "daleth": return { value: "<mi>&#x2138;</mi>", newPos };
+    // Special letters
+    case "Bbbk": return { value: "<mi mathvariant=\"double-struck\">k</mi>", newPos };
+    case "mho": return { value: "<mi>&#x2127;</mi>", newPos };
+    case "Finv": return { value: "<mi>&#x2132;</mi>", newPos };
+    case "Game": return { value: "<mi>&#x2141;</mi>", newPos };
+    case "eth": return { value: "<mi>&#x00F0;</mi>", newPos };
+    case "hslash": return { value: "<mi>&#x210F;</mi>", newPos };
+    // Diagonals
+    case "diagdown": return { value: "<mo>&#x27CD;</mo>", newPos };
+    case "diagup": return { value: "<mo>&#x27CE;</mo>", newPos };
+    // Text punctuation
+    case "pounds": return { value: "<mo>&#x00A3;</mo>", newPos };
+    case "S": return { value: "<mo>&#x00A7;</mo>", newPos };
+    case "P": return { value: "<mo>&#x00B6;</mo>", newPos };
+    case "checkmark": return { value: "<mo>&#x2713;</mo>", newPos };
     case "colon": return { value: "<mo>:</mo>", newPos };
     case "prime": return { value: "<mo>&#x2032;</mo>", newPos };
     case "degree": return { value: "<mo>&#x00B0;</mo>", newPos };
@@ -1570,6 +1939,116 @@ function isRtlLanguage(lang: string): boolean {
   return rtlLangs.includes(base);
 }
 
+// ---------------------------------------------------------------------------
+// LaTeX environment parsing (\begin{align}, \begin{cases}, \begin{matrix}, etc.)
+// ---------------------------------------------------------------------------
+
+/** Map of environment names to MathML table column alignments. */
+const ENV_ALIGN: Record<string, string> = {
+  align: "right left right left right left",
+  aligned: "right left right left right left",    "align*": "right left right left right left",
+  flalign: "left right left right left right",
+  gather: "center",
+  gathered: "center",
+  multline: "left",
+  matrix: "center center center center",
+  pmatrix: "center center center center",
+  bmatrix: "center center center center",
+  Bmatrix: "center center center center",
+  vmatrix: "center center center center",
+  Vmatrix: "center center center center",
+  cases: "left left",
+  smallmatrix: "center center center center",
+  split: "right left",
+};
+
+/** Whether the environment uses `&` alignment markers. */
+const ENV_HAS_ALIGN = new Set(["align", "aligned", "align*", "split", "cases", "flalign"]);
+
+/**
+ * Parses a \\begin{env}...\end{env} LaTeX environment and returns MathML.
+ */
+function parseLatexEnvironment(latex: string, pos: number): CmdResult {
+  // pos points to just after \\ — so latex[pos..] starts with "begin{...}"
+  const beginMatch = latex.substring(pos).match(/^begin\{([a-zA-Z*]+)\}/);
+  if (!beginMatch) {
+    return { value: "", newPos: pos };
+  }
+  const envName = beginMatch[1];
+  const colAlign = ENV_ALIGN[envName] || "center";
+  const hasAlign = ENV_HAS_ALIGN.has(envName);
+  let newPos = pos + beginMatch[0].length;
+
+  // Find the closing \end{envName}
+  const endPattern = `\\end{${envName}}`;
+  const endIdx = latex.indexOf(endPattern, newPos);
+  if (endIdx === -1) {
+    // No closing environment — push remainder as raw text
+    return { value: `<mtext>\\begin{${escapeHtml(envName)}}</mtext>`, newPos: pos + 6 };
+  }
+
+  const body = latex.substring(newPos, endIdx).trim();
+  newPos = endIdx + endPattern.length;
+
+  // Split into rows on \\
+  const rows = body.split("\\\\").map(r => r.trim()).filter(r => r.length > 0);
+
+  if (envName === "cases") {
+    // \begin{cases} x & y \\ a & b \end{cases} → table with left-brace
+    let caseHtml = `<mrow><mo>{</mo><mtable columnalign="left left">`;
+    for (const row of rows) {
+      const cols = row.split("&").map(c => latexToMathml(c.trim(), false));
+      caseHtml += `<mtr>${cols.map(c => `<mtd>${c}</mtd>`).join("")}</mtr>`;
+    }
+    caseHtml += `</mtable></mrow>`;
+    return { value: caseHtml, newPos };
+  }
+
+  if (envName === "matrix" || envName === "pmatrix" || envName === "bmatrix" ||
+      envName === "Bmatrix" || envName === "vmatrix" || envName === "Vmatrix") {
+    const leftDelim: Record<string, string> = {
+      matrix: "", pmatrix: "(", bmatrix: "[", Bmatrix: "\{", vmatrix: "|", Vmatrix: "\|\|",
+    };
+    const rightDelim: Record<string, string> = {
+      matrix: "", pmatrix: ")", bmatrix: "]", Bmatrix: "\}", vmatrix: "|", Vmatrix: "\|\|",
+    };
+    const left = leftDelim[envName] || "";
+    const right = rightDelim[envName] || "";
+
+    // Count max columns
+    let numCols = 0;
+    for (const row of rows) {
+      const cols = row.split("&").length;
+      if (cols > numCols) numCols = cols;
+    }
+    const colAlignStr = Array(numCols).fill("center").join(" ");
+
+    let matrixHtml = "";
+    if (left) matrixHtml += `<mo>${escapeHtml(left)}</mo>`;
+    matrixHtml += `<mtable columnalign="${colAlignStr}">`;
+    for (const row of rows) {
+      const cols = row.split("&").map(c => latexToMathml(c.trim(), false));
+      matrixHtml += `<mtr>${cols.map(c => `<mtd>${c}</mtd>`).join("")}</mtr>`;
+    }
+    matrixHtml += `</mtable>`;
+    if (right) matrixHtml += `<mo>${escapeHtml(right)}</mo>`;
+    return { value: matrixHtml, newPos };
+  }
+
+  // align / aligned / gather / split
+  let envHtml = `<mtable columnalign="${colAlign}">`;
+  for (const row of rows) {
+    if (hasAlign && row.includes("&")) {
+      const cols = row.split("&").map(c => latexToMathml(c.trim(), false));
+      envHtml += `<mtr>${cols.map(c => `<mtd>${c}</mtd>`).join("")}</mtr>`;
+    } else {
+      envHtml += `<mtr><mtd>${latexToMathml(row, false)}</mtd></mtr>`;
+    }
+  }
+  envHtml += `</mtable>`;
+  return { value: envHtml, newPos };
+}
+
 /** Strip all MathML/HTML tags from a string, returning plain text for alttext. */
 function mathmlToPlainText(markup: string): string {
   return markup.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -1616,7 +2095,22 @@ img { max-width: 100%; height: auto; }
 .admonition.success, .admonition.tip { border-left-color: #38a169; background: #f0fff4; }
 .vell-chem { margin: 0.6em 0; padding: 0.4em 1em; background: #f0fdfa; border: 1px solid #b2f5ea; border-radius: 4px; font-family: 'Courier New', monospace; }
 .vell-chem .chem-formula { font-size: 1.1em; font-weight: bold; color: #234e52; }
-.vell-toc, .vell-lof, .vell-lot { margin: 1em 0; padding: 0.6em 1em; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; }
+.vell-toc, .vell-lof, .vell-lot, .vell-index, .vell-glossary { margin: 1em 0; padding: 0.6em 1em; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; }
+.vell-book-section { margin: 1.5em 0; }
+.vell-part { page-break-before: always; border-top: 3px solid #2d3748; padding-top: 1em; }
+.vell-chapter, .vell-appendix { page-break-before: always; }
+.vell-index-marker { position: absolute; }
+.vell-glossary dt { font-weight: 700; margin-top: 0.6em; }
+.vell-glossary dd { margin-left: 1.5em; }
+.vell-page-ref::after { content: target-counter(attr(href), page); }
+.vell-event { display: contents; }
+.vell-cell { margin: 1em 0; border: 1px solid #cbd5e0; border-radius: 6px; overflow: hidden; }
+.vell-cell pre { margin: 0; border-radius: 0; }
+.vell-cell button { margin: 0.6em; padding: 0.35em 0.8em; cursor: pointer; }
+.vell-cell-output { min-height: 1.5em; padding: 0.75em !important; background: #f7fafc !important; border-top: 1px solid #e2e8f0; white-space: pre-wrap; }
+.vell-notebook { counter-reset: vell-cell; }
+.vell-live-chart-row { display: grid; grid-template-columns: minmax(6em, 1fr) 4fr; gap: 0.6em; align-items: center; margin: 0.35em 0; }
+.vell-live-chart-bar { display: block; min-width: 2em; padding: 0.2em 0.4em; color: #fff; background: #3182ce; border-radius: 3px; }
 .vell-toc h2, .vell-lof h2, .vell-lot h2 { font-size: 1.1em; margin: 0 0 0.5em 0; color: #2d3748; }
 .vell-toc .toc-list, .vell-lof .lof-list, .vell-lot .lot-list { padding-left: 1.5em; }
 .vell-toc .toc-list li, .vell-lof .lof-list li, .vell-lot .lot-list li { margin: 0.2em 0; }

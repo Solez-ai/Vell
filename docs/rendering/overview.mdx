@@ -1,0 +1,136 @@
+---
+title: "Vell Rendering Overview: HTML and PDF Output Formats"
+sidebarTitle: "Overview"
+description: "Learn how Vell renderers transform the parsed AST into HTML5 and PDF output. Understand the rendering pipeline and how to choose the right renderer."
+---
+
+Vell separates parsing from rendering entirely. When you feed a `.vl` source file to the parser, you get back a structured abstract syntax tree (AST). Renderers then consume that AST to produce whatever output format you need — whether that's a browser-ready HTML5 page or a print-quality PDF. This separation means your rendering logic stays clean, your output is deterministic, and a single document can target multiple formats without touching the source.
+
+## The Rendering Pipeline
+
+Every Vell document travels through the same four-stage pipeline before it reaches any output format:
+
+```
+.vl source  →  vell-core parser  →  AST  →  renderer  →  output
+```
+
+<Steps>
+  <Step title="Write your .vl source">
+    Author your document in Vell's markup language. Headings, paragraphs, math, tables, directives — everything lives in the source file.
+  </Step>
+  <Step title="Parse with vell-core">
+    Pass the source to the parser (via `@solez-ai/vell` in JavaScript/TypeScript). The parser produces a `VellDocument` AST as a plain JavaScript object.
+  </Step>
+  <Step title="Hand the AST to a renderer">
+    Import the renderer package you need and call its top-level function with the document. The renderer walks the `children` arrays, dispatches on each node's `type` field, and produces format-specific output.
+  </Step>
+  <Step title="Receive your output">
+    The HTML renderer returns a string. The PDF renderer returns a `Uint8Array` of raw PDF bytes. Both are ready to write to disk, stream over HTTP, or embed in your application.
+  </Step>
+</Steps>
+
+## The AST Is the Stable Contract
+
+Renderers never parse source text themselves — they operate exclusively on the AST. This is intentional. The AST is the versioned, stable interface between the parser and every downstream consumer. When new node types are added in a future Vell version, well-written renderers tolerate them gracefully by rendering children or a neutral placeholder rather than crashing.
+
+The root of every parsed document is a `VellDocument` object:
+
+```typescript
+interface VellDocument {
+  children: VellNode[];
+  metadata?: {
+    title?: string;
+    author?: string;
+    date?: string;
+    lang?: string;
+    variables?: Record<string, unknown>;
+  };
+}
+```
+
+Every renderer receives exactly this shape as its input argument.
+
+## Two Official Renderers
+
+Vell ships two primary renderers as separate npm packages. Their supported feature depth differs, so validate the target output required by your application:
+
+<CardGroup cols={2}>
+  <Card title="HTML Renderer" icon="code" href="/rendering/html">
+    `@solez-ai/vell-renderer-html` — Renders to a complete HTML5 document with MathML, footnotes, cross-references, and an optional reactive runtime for interactive variables. Use this for web delivery, previews, and documentation sites.
+  </Card>
+  <Card title="PDF Renderer" icon="file-pdf" href="/rendering/pdf">
+    `@solez-ai/vell-renderer-pdf` — Renders directly to a PDF binary with no HTML intermediate. Use this for print output, academic papers, and downloadable reports.
+  </Card>
+</CardGroup>
+
+## Choosing a Renderer
+
+<Tabs>
+  <Tab title="Use the HTML renderer when…">
+    - You're serving documents in a browser
+    - You need reactive variables, sliders, or interactive inputs
+    - You want MathML rendered natively by the browser
+    - You need a table of contents, list of figures, or list of tables
+    - You're generating documentation, blogs, or knowledge-base articles
+  </Tab>
+  <Tab title="Use the PDF renderer when…">
+    - You need print-ready output with precise page layout
+    - You're generating academic papers, reports, or invoices
+    - You want a self-contained file with no browser dependency
+    - You're running in a server environment without a headless browser
+  </Tab>
+</Tabs>
+
+## Two-Pass Rendering
+
+The HTML renderer and several cross-reference paths use pre-collection before output. Renderer implementations may use different internal strategies, but they must resolve labels deterministically and tolerate unknown nodes.
+
+1. **Collection** — Gather footnotes, labels, TOC entries, figures, tables, index terms, and glossary definitions when the target needs them.
+2. **Rendering** — Walk every node and emit target-specific output with neutral fallbacks for unsupported nodes.
+
+<Note>
+  You never need to run these passes manually. Both renderers handle the two-pass logic internally. Simply call the top-level render function with a parsed `VellDocument`.
+</Note>
+
+## Safety Guarantees
+
+The HTML renderer enforces the following safety rules. Non-HTML renderers must apply equivalent escaping appropriate to their output format:
+
+- **HTML escaping** — All user-supplied strings pass through an escape function before appearing in output. Fields like `Text.value`, `CodeBlock.source`, `Image.alt`, and directive property values are all escaped.
+- **URL sanitization** — Link `href` and image `src` attributes are sanitized before use. The renderers reject `javascript:`, `data:`, `vbscript:`, and `file:` schemes, returning an empty string for any URL that could execute code.
+- **Extension fallback** — Unknown extensions (and unknown node types) never cause a crash. They render as muted labeled containers so your document still builds even when a renderer doesn't recognize a particular directive.
+
+## Installing the Renderers
+
+```bash
+npm install @solez-ai/vell-renderer-html
+npm install @solez-ai/vell-renderer-pdf
+```
+
+Use `@solez-ai/vell` for typed parsing after registering a compatible generated `vell-wasm` module:
+
+```bash
+npm install @solez-ai/vell
+```
+
+A minimal end-to-end example using the HTML renderer:
+
+```typescript
+import { parse } from '@solez-ai/vell';
+import { render } from '@solez-ai/vell-renderer-html';
+
+const source = `
+= Hello, Vell!
+
+Welcome to the rendering pipeline.
+`;
+
+const result = parse(source);
+
+if (result.errors.length === 0) {
+  const html = render(result.document);
+  console.log(html);
+}
+```
+
+For the full API of each renderer, see the [HTML renderer](/rendering/html), [PDF renderer](/rendering/pdf), and [publishing exporters](/rendering/publishing) pages. Read [Reliability and production readiness](/reliability) before adopting an output format in a critical workflow.

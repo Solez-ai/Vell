@@ -4,7 +4,7 @@
 
 //! Command-line interface for the Vell language.
 //!
-//! Subcommands: parse, fmt, render html, validate.
+//! Subcommands: parse, fmt, render, validate, and watch.
 //! Use `vell --help` for usage.
 
 use clap::{Parser, Subcommand};
@@ -103,6 +103,24 @@ enum RenderFormat {
         #[arg(long)]
         renderer_path: Option<PathBuf>,
     },
+    /// Render to LaTeX.
+    Latex {
+        input: Option<PathBuf>,
+        #[arg(short = 'o')]
+        output: Option<PathBuf>,
+    },
+    /// Render to JATS XML.
+    Jats {
+        input: Option<PathBuf>,
+        #[arg(short = 'o')]
+        output: Option<PathBuf>,
+    },
+    /// Render to a DOCX document.
+    Docx {
+        input: Option<PathBuf>,
+        #[arg(short = 'o')]
+        output: PathBuf,
+    },
 }
 
 fn main() {
@@ -120,12 +138,22 @@ fn main() {
             format: RenderFormat::Slides { input, output },
         } => vell_cli::cmd_render_slides(&input, &output),
         Command::Render {
-            format: RenderFormat::Epub {
-                input,
-                output,
-                renderer_path,
-            },
+            format:
+                RenderFormat::Epub {
+                    input,
+                    output,
+                    renderer_path,
+                },
         } => vell_cli::cmd_render_epub(&input, &output, &renderer_path),
+        Command::Render {
+            format: RenderFormat::Latex { input, output },
+        } => vell_cli::cmd_render_latex(&input, &output),
+        Command::Render {
+            format: RenderFormat::Jats { input, output },
+        } => vell_cli::cmd_render_jats(&input, &output),
+        Command::Render {
+            format: RenderFormat::Docx { input, output },
+        } => vell_cli::cmd_render_docx(&input, &output),
         Command::Watch {
             input,
             format,

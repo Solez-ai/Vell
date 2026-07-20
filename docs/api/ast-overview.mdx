@@ -1,0 +1,228 @@
+---
+title: "Vell AST Overview: Structure, Versioning, and Metadata"
+sidebarTitle: "AST Overview"
+description: "The Vell AST is the stable parser-to-renderer contract. Version 1 schema covers Document root, Span, DocumentMetadata, block nodes, and inline nodes."
+---
+
+The Vell Abstract Syntax Tree (AST) is the stable, versioned contract between the Vell parser and every downstream renderer, formatter, or analysis tool. When you call `parse()` from `@solez-ai/vell` or `parse_to_json()` from the WASM binding, you receive a deterministic JSON object that fully represents your source document — complete with source spans for diagnostics, structured metadata, and a tagged-union node hierarchy that covers every construct in the Vell markup language.
+
+## How the AST is Produced
+
+You obtain an AST by parsing a Vell source string. The two primary entry points are the JavaScript package and the WASM binding:
+
+<Tabs>
+  <Tab title="JavaScript / TypeScript">
+    ```typescript
+    import { parse } from '@solez-ai/vell';
+
+    const source = `= My Document\n\nHello, world!`;
+    const result = parse(source);
+
+    console.log(result.document.version);   // 1
+    console.log(result.document.children);  // Node[]
+    ```
+  </Tab>
+  <Tab title="WASM (low-level)">
+    ```typescript
+    import init, { parse_to_json } from '../../target/vell-wasm-pkg/vell_wasm.js';
+
+    await init();
+    const json = parse_to_json(source);
+    const result = JSON.parse(json);
+    const document = result.document;
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The low-level WASM boundary serializes the AST as JSON. The typed JavaScript wrapper deserializes that JSON before returning `result.document`. The `version` field identifies the AST schema revision.
+</Note>
+
+---
+
+## Document Root
+
+Every parsed document is a single root object with four required fields:
+
+<ResponseField name="version" type="integer" required>
+  The AST schema version. Currently always `1`. Incremented only on breaking changes.
+</ResponseField>
+
+<ResponseField name="children" type="Node[]" required>
+  The top-level block nodes of the document in source order.
+</ResponseField>
+
+<ResponseField name="metadata" type="DocumentMetadata" required>
+  Document-level metadata extracted during parsing. See [DocumentMetadata](#document-metadata) below.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required>
+  Byte span covering the entire source document. See [Span](#span) below.
+</ResponseField>
+
+---
+
+## Span
+
+Every node in the AST — including the document root itself — carries a `span` field that records the node's exact position in the original source bytes. Spans power error reporting, hover tooltips, go-to-definition, and any other tooling that needs to map AST nodes back to source text.
+
+<ResponseField name="start" type="integer" required>
+  Inclusive byte offset where the node begins in the source string.
+</ResponseField>
+
+<ResponseField name="end" type="integer" required>
+  Exclusive byte offset where the node ends. The node covers `source[start..end]`.
+</ResponseField>
+
+```json
+{ "start": 0, "end": 15 }
+```
+
+<Warning>
+  Spans are byte offsets, not character or line offsets. When the source contains multi-byte UTF-8 characters, a single character may span multiple byte positions. Always index into the source buffer using byte slicing (e.g., `Buffer.from(source).slice(span.start, span.end)` in Node.js).
+</Warning>
+
+---
+
+## Document Metadata
+
+The `metadata` object aggregates document-level information that Vell extracts automatically during parsing. Fields are populated either from the `@[Meta](...)` directive or inferred from the document structure (for example, `title` is set from the first level-1 heading when no explicit `@[Meta](title=...)` is present).
+
+<ResponseField name="title" type="string | null">
+  The document title. Set from `@[Meta](title=...)` or inferred from the first `=`-level heading.
+</ResponseField>
+
+<ResponseField name="author" type="string | null">
+  The author string, set from `@[Meta](author=...)`.
+</ResponseField>
+
+<ResponseField name="date" type="string | null">
+  A date string (typically ISO 8601), set from `@[Meta](date=...)`.
+</ResponseField>
+
+<ResponseField name="lang" type="string | null">
+  A BCP-47 language tag such as `"en"` or `"fr-CA"`, set from `@[Meta](lang=...)`.
+  Renderers use this to set both `lang` and `dir` attributes on the output — direction is
+  auto-inferred: Arabic, Hebrew, Persian, Urdu, and 16+ other RTL scripts get `dir="rtl"`.
+</ResponseField>
+
+<ResponseField name="variables" type="object">
+  A map of variable names to their JSON values, populated from `@var` declarations in document order.
+</ResponseField>
+
+```json
+{
+  "title": "My Document",
+  "author": "You",
+  "date": "2026-01-15",
+  "lang": "en",
+  "variables": {
+    "count": 42,
+    "name": "Vell"
+  }
+}
+```
+
+---
+
+## Node Categories
+
+The AST uses a **tagged union** pattern: every node object includes a `"type"` string field that identifies its kind. Renderers switch on `type` to dispatch handling. Beyond `type` and `span`, each kind carries its own set of fields.
+
+There are two categories of nodes:
+
+<AccordionGroup>
+  <Accordion title="Block Nodes">
+    Block nodes form the top-level structure of a document and can contain other blocks or inline content. Examples include `Heading`, `Paragraph`, `CodeBlock`, `List`, `Table`, `Directive`, and `Extension`. The `children` array of the document root always contains block nodes.
+  </Accordion>
+  <Accordion title="Inline Nodes">
+    Inline nodes appear inside block containers — typically inside `Paragraph`, `Heading`, and similar blocks. Examples include `Text`, `Bold`, `Italic`, `Link`, `Image`, `MathInline`, and `VarInterpolation`. Inline nodes may be nested (for example, a `Bold` node containing `Italic` children).
+  </Accordion>
+</AccordionGroup>
+
+The complete list of all node types with their fields is documented in the [AST Node Reference](/api/ast-nodes).
+
+---
+
+## Minimal AST Example
+
+The following is the complete AST for a one-heading document:
+
+```json
+{
+  "version": 1,
+  "metadata": {
+    "title": "My Document",
+    "author": "You",
+    "date": null,
+    "lang": null,
+    "variables": {}
+  },
+  "children": [
+    {
+      "type": "Heading",
+      "level": 1,
+      "children": [
+        {
+          "type": "Text",
+          "value": "My Document",
+          "span": { "start": 2, "end": 13 }
+        }
+      ],
+      "id": "my-document",
+      "span": { "start": 0, "end": 14 }
+    }
+  ],
+  "span": { "start": 0, "end": 14 }
+}
+```
+
+<Tip>
+  The `id` field on `Heading` nodes is a slugified anchor identifier automatically derived from the heading text. You can use it to generate `#`-fragment links in rendered output.
+</Tip>
+
+---
+
+## Versioning Policy
+
+The AST schema follows a three-tier versioning policy. The current schema version is **1**.
+
+| Change type | Version bump | Example |
+|---|---|---|
+| Bug fixes, documentation updates | None (patch) | Correcting a span calculation |
+| New optional fields on existing nodes | None (backward compatible) | Adding `id` to `Heading` |
+| New node types | Minor note in changelog | Adding a new `Callout` block node |
+| Removed or renamed fields | **Major** (`version` → 2) | Renaming `consequent` → `then_children` |
+| Changed type discriminator values | **Major** (`version` → 2) | Renaming `"CodeBlock"` → `"FencedCode"` |
+
+<Note>
+  The `version` field in the document root reflects the **major** schema version only. You do not need to handle patch-level or minor-level changes — they are always backward compatible.
+</Note>
+
+### Forward Compatibility and Extension Nodes
+
+Renderers are required to tolerate unknown `type` values. When the Vell parser encounters a directive or markup construct it does not recognize as a built-in, it emits an `Extension` node rather than failing. This means your renderer will continue to work as new node types are introduced — unrecognized nodes arrive as `Extension` nodes with a `raw_source` field so you can pass them through or handle them yourself.
+
+```json
+{
+  "type": "Extension",
+  "name": "myorg/Widget",
+  "props": { "data": 42 },
+  "children": [],
+  "raw_source": "@[myorg/Widget](data=42)",
+  "span": { "start": 0, "end": 26 }
+}
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AST Node Reference" icon="list-tree" href="/api/ast-nodes">
+    Field-level documentation for every block and inline node type.
+  </Card>
+  <Card title="AST JSON Schema" icon="brackets-curly" href="/api/ast-schema">
+    The formal JSON Schema (draft-07) and how to validate AST output with AJV.
+  </Card>
+</CardGroup>

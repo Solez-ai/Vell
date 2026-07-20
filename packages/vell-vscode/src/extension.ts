@@ -7,11 +7,11 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-lan
 let client: LanguageClient | undefined;
 
 /** Activates the Vell VS Code extension. */
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const serverOptions: ServerOptions = { command: "vell-lsp", args: [] };
   const clientOptions: LanguageClientOptions = { documentSelector: [{ scheme: "file", language: "vell" }] };
   client = new LanguageClient("vell", "Vell Language Server", serverOptions, clientOptions);
-  context.subscriptions.push(client.start());
+  await client.start();
   context.subscriptions.push(vscode.commands.registerCommand("vell.formatDocument", () => vscode.commands.executeCommand("editor.action.formatDocument")));
   context.subscriptions.push(vscode.commands.registerCommand("vell.exportHtml", async () => {
     const editor = vscode.window.activeTextEditor;

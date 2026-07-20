@@ -1,0 +1,395 @@
+---
+title: "vell-js: Complete TypeScript API and Type Reference"
+sidebarTitle: "vell-js"
+description: "TypeScript API for @solez-ai/vell: parse(), parseOrThrow(), validate(), format(), getVersion(), and setWasmModule() with full type definitions."
+---
+
+The `@solez-ai/vell` package is the primary TypeScript interface to the Vell parser. It wraps the low-level WASM bindings with a clean, typed API so you can parse, validate, and format Vell documents without handling raw JSON deserialization yourself. All functions in this package delegate to a WASM module that you install once at startup with `setWasmModule()`.
+
+## Setup
+
+The `@solez-ai/vell` npm package ships a pre-compiled WASM binary. Import the package and initialize it before parsing:
+
+```typescript
+import init, { parse } from '@solez-ai/vell';
+
+await init();
+
+const result = parse('= Hello\n\nThis is Vell.');
+console.log(result.document);
+```
+
+### Advanced: Custom WASM Module
+
+If you need to build the WASM module from source (e.g., for a custom or development build), use `setWasmModule()`:
+
+```typescript
+import init, * as wasm from '../../target/vell-wasm-pkg/vell_wasm.js';
+import { parse, format, validate, getVersion, setWasmModule } from '@solez-ai/vell';
+
+await init();
+setWasmModule(wasm);
+
+const result = parse('= Hello\n\nThis is Vell.');
+console.log(result.document);
+console.log(getVersion());
+```
+
+<Warning>
+  Every function except `setWasmModule()` throws if called before
+  the WASM module is ready. Always `await init()` before any other API call.
+</Warning>
+
+### Deno
+
+Vell works in Deno via the npm compatibility layer. The WASM module is loaded automatically:
+
+```typescript
+import init, { parse } from 'npm:@solez-ai/vell';
+
+await init();
+const result = parse('= Hello from Deno\n\nMath: $E = mc^2$');
+console.log(result.document);
+```
+
+<Note>
+  The Deno runtime may need the `--allow-read` and `--allow-env` permissions
+  to load the WASM binary from the npm package cache.
+</Note>
+
+---
+
+## Types
+
+### `Span`
+
+A byte-offset range in the original source string.
+
+```typescript
+interface Span {
+  start: number;
+  end: number;
+}
+```
+
+<ResponseField name="start" type="number" required>
+  Inclusive start byte offset within the source string.
+</ResponseField>
+
+<ResponseField name="end" type="number" required>
+  Exclusive end byte offset within the source string.
+</ResponseField>
+
+---
+
+### `ParseError`
+
+A diagnostic emitted by the parser. Both errors and warnings share this shape.
+
+```typescript
+interface ParseError {
+  kind: string;
+  span: Span;
+  message: string;
+  suggestion?: string;
+}
+```
+
+<ResponseField name="kind" type="string" required>
+  A machine-readable error category string (e.g. `"UnexpectedToken"`, `"MissingHeading"`).
+</ResponseField>
+
+<ResponseField name="span" type="Span" required>
+  The byte range in the source where the problem was detected.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  A human-readable description of the problem.
+</ResponseField>
+
+<ResponseField name="suggestion" type="string">
+  An optional hint for how to fix the problem, suitable for display in an editor.
+</ResponseField>
+
+---
+
+### `VellDocument`
+
+The parsed AST document returned by a successful parse. You pass this object directly to renderer functions like `render()` or `renderToPdfBuffer()`.
+
+```typescript
+interface VellDocument {
+  version: number;
+  children: Node[];
+  metadata: DocumentMetadata;
+  span: Span;
+}
+```
+
+<ResponseField name="version" type="number" required>
+  The AST schema version. Currently `1`.
+</ResponseField>
+
+<ResponseField name="children" type="Node[]" required>
+  The top-level block nodes of the document (headings, paragraphs, code blocks, etc.).
+</ResponseField>
+
+<ResponseField name="metadata" type="DocumentMetadata" required>
+  Document-level metadata extracted from front matter or `@var` declarations.
+  <Expandable title="DocumentMetadata fields">
+    <ResponseField name="title" type="string">
+      Document title, if present.
+    </ResponseField>
+    <ResponseField name="author" type="string">
+      Author name, if present.
+    </ResponseField>
+    <ResponseField name="date" type="string">
+      Publication date, if present.
+    </ResponseField>
+    <ResponseField name="lang" type="string">
+      BCP 47 language tag (e.g. `"en"`, `"fr"`), if present.
+    </ResponseField>
+    <ResponseField name="variables" type="Record<string, unknown>" required>
+      All top-level `@var` declarations as a key-value map.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="span" type="Span" required>
+  The byte range of the entire document in the source string.
+</ResponseField>
+
+---
+
+### `ParseResult`
+
+The object returned by `parse()`. Always safe to inspect even when parsing fails.
+
+```typescript
+interface ParseResult {
+  document: VellDocument | null;
+  errors: ParseError[];
+  warnings: ParseError[];
+}
+```
+
+<ResponseField name="document" type="VellDocument | null" required>
+  The parsed AST, or `null` if the source contained fatal errors that prevented
+  a valid document from being produced.
+</ResponseField>
+
+<ResponseField name="errors" type="ParseError[]" required>
+  Fatal parse errors. When this array is non-empty, `document` is `null`.
+</ResponseField>
+
+<ResponseField name="warnings" type="ParseError[]" required>
+  Non-fatal parse warnings. A document can be returned alongside warnings.
+</ResponseField>
+
+---
+
+## Functions
+
+### `setWasmModule()`
+
+Installs the WASM implementation used by all other functions in this package. `setWasmModule` is exported from `@solez-ai/vell`. Call it once after initializing the module generated by `wasm-pack`.
+
+```typescript
+function setWasmModule(module: VellWasmModule): void
+```
+
+<ParamField body="module" type="VellWasmModule" required>
+  A compatible module object generated from `vell-wasm`. It must expose
+  `parse_to_json`, `validate`, `format_source`, and `get_version` methods.
+</ParamField>
+
+<Tip>
+  `setWasmModule()` is intentionally idempotent — calling it a second time with
+  a new module replaces the previous one. This can be useful in test environments
+  where you want to swap in a mock implementation.
+</Tip>
+
+---
+
+### `parse()`
+
+Parses a Vell source string and returns a `ParseResult` that always contains both the (possibly `null`) document and any diagnostics. This function never throws.
+
+```typescript
+function parse(source: string): ParseResult
+```
+
+<ParamField body="source" type="string" required>
+  The full Vell source text to parse.
+</ParamField>
+
+**Returns:** `ParseResult`
+
+<CodeGroup>
+```typescript Successful parse
+import { parse } from '@solez-ai/vell';
+
+const result = parse('= Hello World\n\nWelcome to **Vell**.');
+
+if (result.document) {
+  console.log('Parsed OK, children:', result.document.children.length);
+}
+
+if (result.warnings.length > 0) {
+  for (const w of result.warnings) {
+    console.warn(`Warning at ${w.span.start}: ${w.message}`);
+  }
+}
+```
+
+```typescript Handling errors
+import { parse } from '@solez-ai/vell';
+
+const result = parse('@[InvalidDirective(unclosed=');
+
+if (!result.document) {
+  const err = result.errors[0];
+  console.error(`Parse error [${err.kind}]: ${err.message}`);
+  if (err.suggestion) {
+    console.info('Suggestion:', err.suggestion);
+  }
+}
+```
+</CodeGroup>
+
+---
+
+### `parseOrThrow()`
+
+Parses a Vell source string and returns the document directly, throwing a JavaScript `Error` if the source contains any parse errors. Use this when you control the source and want simpler error handling.
+
+```typescript
+function parseOrThrow(source: string): VellDocument
+```
+
+<ParamField body="source" type="string" required>
+  The full Vell source text to parse.
+</ParamField>
+
+**Returns:** `VellDocument`
+
+**Throws:** `Error` — the message is taken from the first parse error, or `"Unable to parse Vell source"` if no error message is available.
+
+```typescript
+import { parseOrThrow } from '@solez-ai/vell';
+
+try {
+  const doc = parseOrThrow('= My Document\n\nHello, world!');
+  console.log('Title:', doc.metadata.title);
+} catch (err) {
+  console.error('Parse failed:', err.message);
+}
+```
+
+---
+
+### `validate()`
+
+Parses the source purely to collect diagnostics, without returning the document. Useful for editor integrations or linting pipelines where you only care about errors and warnings, not the AST.
+
+```typescript
+function validate(source: string): ParseError[]
+```
+
+<ParamField body="source" type="string" required>
+  The full Vell source text to validate.
+</ParamField>
+
+**Returns:** `ParseError[]` — an array of all diagnostics (errors and warnings). Returns an empty array if the source is valid.
+
+```typescript
+import { validate } from '@solez-ai/vell';
+
+const diagnostics = validate(source);
+
+if (diagnostics.length === 0) {
+  console.log('Source is valid.');
+} else {
+  for (const d of diagnostics) {
+    console.log(`[${d.kind}] ${d.message} at byte ${d.span.start}`);
+  }
+}
+```
+
+---
+
+### `format()`
+
+Formats a Vell source string with the canonical Rust formatter exposed by the installed WASM module.
+
+```typescript
+function format(source: string): string
+```
+
+<ParamField body="source" type="string" required>
+  The Vell source text to format.
+</ParamField>
+
+**Returns:** `string` — canonical, idempotently formatted Vell source. The function throws when the source cannot be parsed.
+
+```typescript
+import { format } from '@solez-ai/vell';
+
+const source = '= Hello\n\nText with   spacing';
+const formatted = format(source);
+// Run format(formatted) again to receive the same result.
+```
+
+<Note>
+  Call `setWasmModule()` before `format()`. Formatting uses the same parser and AST as the Rust CLI.
+</Note>
+
+---
+
+### `getVersion()`
+
+Returns the version string of the underlying Vell parser.
+
+```typescript
+function getVersion(): string
+```
+
+**Returns:** `string` — a semver version string such as `"0.1.0"`.
+
+```typescript
+import { getVersion } from '@solez-ai/vell';
+
+console.log('Vell parser version:', getVersion());
+// Example output: "Vell parser version: 0.1.0"
+```
+
+---
+
+### `VellWasmModule` interface
+
+The shape expected by `setWasmModule()`. This normally matches the namespace object generated by `wasm-pack` from the `vell-wasm` crate.
+
+```typescript
+interface VellWasmModule {
+  parse_to_json(source: string): string;
+  validate(source: string): string;
+  get_version(): string;
+  format_source(source: string): string;
+}
+```
+
+<ResponseField name="parse_to_json" type="(source: string) => string" required>
+  Returns a JSON string shaped like `ParseResult`. Never throws.
+</ResponseField>
+
+<ResponseField name="validate" type="(source: string) => string" required>
+  Returns a JSON string containing an array of `ParseError` objects.
+</ResponseField>
+
+<ResponseField name="get_version" type="() => string" required>
+  Returns the parser version string.
+</ResponseField>
+
+<ResponseField name="format_source" type="(source: string) => string" required>
+  Returns canonical formatter output or throws when parsing fails.
+</ResponseField>

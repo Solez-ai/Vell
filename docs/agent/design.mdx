@@ -1,0 +1,152 @@
+---
+title: "Vell Design Decisions: Architecture and Principles"
+sidebarTitle: "Design"
+description: "The eight principles behind Vell: PEG grammar, versioned AST, WASM portability, the directive system, reactive variables, and security considerations."
+---
+
+Every design decision in Vell traces back to a small set of non-negotiable principles. These principles were established before a single line of implementation was written, and they constrain every architectural choice made since. This document records those principles and the rationale behind the major decisions that follow from them. If you are evaluating a proposed change to Vell or trying to understand why something works the way it does, start here.
+
+## Design Principles
+
+These eight principles are non-negotiable. Any proposed change that violates one of them requires an explicit justification and a discussion of how to resolve the conflict before implementation begins.
+
+<Accordion title="1. Human-readable first">
+A `.vl` file must be legible to a person who has never read the specification. Syntax constructs must be intuitive from context. This rules out purely symbolic syntaxes (LaTeX-style `\begin{enumerate}`) and requires that structural intent be visually apparent from the source text. A heading that looks like a heading, a list item that looks like a list item.
+
+This principle is why Vell chose `=` for headings (visually distinct, unambiguous as a prefix) over `#` (already overloaded in many contexts) and why directives use `@[Name]` (clearly machine-addressed) rather than fenced blocks with magic strings.
+</Accordion>
+
+<Accordion title="2. Unambiguous grammar">
+The grammar is a Parsing Expression Grammar (PEG). Every valid input has exactly one parse tree. There are no context-sensitive rules, no ambiguous productions, and no need for a 652-item conformance test suite. When you write a `.vl` file, you know what the parser will produce — not approximately, but exactly.
+
+This is a direct reaction to Markdown's specification history. The original Markdown spec left dozens of constructs underspecified. Different implementations diverged. CommonMark eventually resolved this with an exhaustive test suite, but the fundamental problem — an ambiguous grammar — remained. Vell avoids this by design.
+</Accordion>
+
+<Accordion title="3. Linear-time parsing">
+The tokenizer and parser together run in O(n) time relative to input length. Packrat memoization is acceptable to achieve this for PEG grammars. There are no quadratic backtracking paths, no worst-case exponential inputs, and no denial-of-service vectors via crafted documents.
+
+Linear-time parsing is enforced structurally: block-level dispatch is O(1) on the first token of each line, and inline parsing is bounded by delimiter nesting depth, which is finite.
+</Accordion>
+
+<Accordion title="4. Deterministic output">
+The same source file always produces the same AST, the same rendered output, and the same formatted source. There is no environment-dependent behavior: no locale sensitivity, no date interpolation at parse time, no randomized IDs.
+
+Determinism enables content-addressable caching of rendered output, reliable diffing of formatted source in version control, and reproducible builds. Any proposal that introduces non-determinism — even optional non-determinism — requires a strong justification.
+</Accordion>
+
+<Accordion title="5. Extensible without breaking">
+The `@` directive syntax is the extension mechanism. The core grammar never changes to accommodate new features. Extensions declare typed schemas. Unknown extension nodes are preserved as opaque `Extension` nodes in the AST, not rejected as parse errors. An older renderer encountering a document written for a newer version of Vell will produce degraded but safe output, never a crash.
+
+This principle shapes the entire extension architecture: the parser is agnostic to extension semantics, renderers opt in to specific extensions, and every renderer must have a safe fallback for unknown `Extension` nodes.
+</Accordion>
+
+<Accordion title="6. Interactive by design">
+Variables, reactive bindings, and interactive component nodes are first-class AST node types, not a preprocessing layer or a JavaScript embed hack. `VarDeclaration`, `VarInterpolation`, `ForLoop`, `IfBlock`, and `InlineComponent` are all proper AST nodes with spans, props, and children — they participate in the same tree-walking and serialization machinery as every other node.
+
+This means a static renderer (PDF, for example) can encounter these nodes and apply a sensible static fallback, while a dynamic renderer (a browser with the reactive runtime loaded) can evaluate them correctly. Interactivity degrades gracefully.
+</Accordion>
+
+<Accordion title="7. Portable implementation">
+The reference parser is written in Rust and compiled to WebAssembly. Every language that needs to parse Vell documents consumes this WASM binary. There is one parser, one set of parse semantics, and one AST schema. Nobody re-implements the parser in JavaScript, Python, or Go and introduces subtle behavioral divergence.
+
+The WASM boundary is the stable API. The Rust internals can be refactored, optimized, or reorganized without breaking downstream consumers, as long as the WASM-exported JSON AST shape remains compatible.
+</Accordion>
+
+<Accordion title="8. Tooling parity">
+The language is only as good as its editor support. An LSP server, a canonical formatter, and a VS Code extension ship alongside the parser. They are not afterthoughts — they are part of the definition of a complete Vell release.
+
+This means the LSP server and formatter are tested against the same fixture suite as the parser. A Vell release that ships a parser without a working formatter is not a complete release.
+</Accordion>
+
+## Why PEG Grammar?
+
+Vell's grammar is a Parsing Expression Grammar rather than a Context-Free Grammar (CFG) as used by most traditional parser generators. This choice has four concrete benefits:
+
+**Determinism.** PEG grammars have no ambiguity by construction. Every ordered choice `e1 / e2` tries `e1` first; if `e1` succeeds, `e2` is never tried. There is no ambiguity resolution algorithm, no shift-reduce conflict, and no need for disambiguation rules.
+
+**Ordered choice eliminates parse conflicts.** In a CFG, two rules that match the same prefix require explicit disambiguation. In a PEG, you declare priority by ordering: the more specific rule comes first, the fallback comes last. Block-level dispatch in Vell is a single ordered choice over all possible block types, tried in a defined sequence.
+
+**Packrat memoization gives O(n) time.** Naive PEG parsing can be exponential in the worst case due to backtracking. Packrat memoization stores the result of every parse function at every input position, guaranteeing that each position is visited at most once per rule. The result is linear time with a memory overhead proportional to the input size times the number of grammar rules.
+
+**Formal specification enables independent implementations.** The PEG grammar in `spec/grammar.peg` is the normative specification of Vell syntax. A future implementation in another language — say, a Go parser for a server-side rendering pipeline — can be validated against the same grammar. The grammar is the spec, not the Rust code.
+
+## Why a Versioned AST?
+
+The AST schema is versioned independently of the Vell language version. The `version` field on the `Document` root node is currently `1`. This separation exists for three reasons:
+
+**Separates syntax contract from rendering contract.** A change to Vell's source syntax — adding a new inline delimiter, for example — does not necessarily change the AST schema if the new syntax maps to an existing node type. Conversely, a restructuring of an AST node — splitting `Directive` into `BuiltinDirective` and `Extension` — would change the schema without changing the source syntax.
+
+**Renderers can be updated independently.** A renderer that targets AST version 1 continues to work on all version-1 documents regardless of Vell language version bumps. When a breaking AST change is made and the version increments to 2, renderers can choose when to adopt the new schema. The `version` field gives them the signal they need.
+
+**Forward compatibility via `Extension` nodes.** New node types added in future AST versions appear as `Extension` nodes (or unknown `type` values) in older renderers. Because renderers are required to handle unknown node types gracefully — rendering children, emitting a placeholder, or skipping silently — documents with new features degrade safely in older renderers.
+
+## Why Rust and WebAssembly?
+
+The choice of Rust as the implementation language and WebAssembly as the distribution target is driven by specific requirements, not aesthetic preference.
+
+**Rust: memory safety without GC pauses.** A document parser that allocates many small nodes during tree construction benefits from predictable memory behavior. Rust's ownership system eliminates use-after-free and data races at compile time, and the absence of a garbage collector eliminates GC pauses. For a synchronous, latency-sensitive operation like parsing, this matters.
+
+**Rust: zero-cost abstractions.** The parser's recursive descent structure maps cleanly onto Rust's enum types and pattern matching. The `Node` enum, `InlineNode` enum, and all supporting types serialize cleanly with `serde`. There is no impedance mismatch between the language model and the problem domain.
+
+**WASM: one implementation, every platform.** The same `.wasm` binary runs in a browser, in Node.js, in Deno, and via a native WASM runtime. There is no "browser parser" and "server parser" that could diverge. Every JavaScript consumer of the `@solez-ai/vell` package is using the same parser, byte for byte.
+
+**`wasm-bindgen`: clean TypeScript bindings without manual glue.** `wasm-bindgen` generates TypeScript type declarations and JavaScript glue code automatically from annotated Rust functions. The `parse`, `validate`, `format`, and `get_version` entry points are declared once in Rust and are immediately available as typed TypeScript functions.
+
+## Directive System Rationale
+
+The directive syntax `@[Name](props) { body }` was designed to satisfy several constraints simultaneously:
+
+**Unambiguous in any context.** The `@[` prefix does not conflict with any prose text, Markdown syntax, or LaTeX command. A parser can identify a directive at the start of a line without lookahead beyond the first two characters.
+
+**Namespaced extensions prevent collision.** Custom extension names follow the pattern `namespace/Name`. The `/` separator is syntactically required for extensions; names without `/` are reserved for built-in directives. This means third-party extensions can never accidentally claim a name that a future Vell version wants for a built-in directive.
+
+**Unknown directives → `Extension` node (not errors).** When the parser encounters `@[myorg/Widget]`, it does not look up `myorg/Widget` in any registry. It constructs an `Extension` node and moves on. This is the mechanism that makes the extension system forward-compatible: a document using an extension unknown to the current toolchain version is still parseable and renderable.
+
+**Props are typed, not raw strings.** The `PropValue` type supports strings, numbers, booleans, null, and variable references. Props are not a raw string that each extension must parse itself. This means all props can be validated by schema, serialized cleanly to JSON, and consumed by renderers without per-extension parsing logic.
+
+## Reactive Variable Design
+
+Variables in Vell are first-class AST nodes, not a preprocessor feature that is resolved before the AST is constructed.
+
+**`@var` declarations are `VarDeclaration` AST nodes.** They appear in document order in the `children` array of the `Document` root. They carry a `name` and a `value` (any JSON-compatible type). They are not expanded away during parsing; they survive into the AST.
+
+**`@{name}` interpolation is `VarInterpolation` nodes.** They appear inline in paragraphs, headings, and directive props. They carry the variable name as a string. The parser can warn at parse time if a `VarInterpolation` references a name that has no corresponding `VarDeclaration` in scope, but this is a warning, not an error — the variable may be provided by a runtime context that the parser does not have access to.
+
+**`@for` and `@if` are first-class block nodes.** A `ForLoop` node carries the loop variable name, the iterable variable name, and a `children` array of block nodes that are repeated for each element. An `IfBlock` carries a condition string, a `consequent` array, and an optional `alternate` array. Static renderers treat these as fallback content; interactive renderers evaluate them against live variable values.
+
+**The reactive runtime is optional.** Documents degrade gracefully without it. A static HTML renderer that does not implement the reactive runtime renders `VarInterpolation` nodes as `<span class="vell-var">@{name}</span>` — visible but inert. A PDF renderer renders them as literal `@{name}` text. No renderer crashes because reactive nodes exist in the AST.
+
+## Security Considerations
+
+Security is a property of the system as a whole, not a feature that can be added later. The following constraints are enforced at every layer of the Vell toolchain.
+
+**All user-supplied strings are untrusted.** Every string value that originates from a `.vl` document passes through either `escapeHtml()` or `sanitizeUrl()` before being included in rendered output. "User-supplied" means any string in the AST: `Text.value`, `Code.value`, `CodeBlock.source`, `Link.href`, `Image.src`, `Image.alt`, `Link.title`, and all directive property values.
+
+```typescript
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function sanitizeUrl(url: string): string {
+  const allowed = ["http:", "https:", "mailto:", "/", "#"];
+  for (const prefix of allowed) {
+    if (url.toLowerCase().startsWith(prefix)) return url;
+  }
+  return ""; // Reject unsafe URLs silently
+}
+```
+
+**URL sanitization rejects execution-capable schemes.** The `sanitizeUrl` function rejects `javascript:`, `data:text/html`, `vbscript:`, and `file:` schemes. These are XSS vectors. An `href` or `src` that does not match an allowlisted prefix is replaced with an empty string, not rendered as-is and not logged as an error.
+
+**No `unwrap()` or `expect()` in the parser or formatter.** The parser is the primary attack surface for malformed input. Any `unwrap()` in the parser is a potential panic, which in a server-side rendering context becomes a denial-of-service vector. All error paths in `vell-core` and `vell-fmt` return structured `ParseError` values. This is enforced by the constraint: `cargo clippy -- -D clippy::unwrap_used` in the workspace lint configuration.
+
+**No `unsafe` Rust in `vell-core` or `vell-fmt`.** The parser and formatter operate on UTF-8 strings and allocate AST nodes. There is no legitimate need for unsafe Rust in these crates. WASM bindings in `vell-wasm` may use `unsafe` only where `wasm-bindgen` requires it for the WASM ABI.
+
+<Note>
+Extension adapters that generate HTML must use the `escapeHtml` and `sanitizeUrl` functions provided by the `ExtensionContext` interface. An extension adapter that generates HTML by string interpolation without escaping is a security vulnerability, not a minor bug.
+</Note>

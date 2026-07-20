@@ -1,0 +1,324 @@
+---
+title: "Vell AST JSON Schema: Draft-07 Validation Reference"
+sidebarTitle: "AST Schema"
+description: "The Vell AST JSON Schema (draft-07) validates parsed document trees. Learn the versioning policy and validate AST output using AJV or any JSON Schema tool."
+---
+
+The Vell AST is formally specified by a JSON Schema document located at `spec/ast-schema.json` in the Vell repository. This schema follows the JSON Schema **draft-07** specification and gives you a machine-readable contract you can use to validate AST output, generate types, build linters, or confirm that a stored AST blob is compatible with the current schema version. Every conformant Vell AST — whether produced by the JavaScript parser, the WASM binding, or a custom implementation — must satisfy this schema.
+
+## Schema Location and Format
+
+| Property | Value |
+|---|---|
+| File path | `spec/ast-schema.json` |
+| JSON Schema dialect | `draft-07` |
+| `$schema` URI | `http://json-schema.org/draft-07/schema#` |
+| Current schema version | `1` |
+| `title` | `"Vell AST"` |
+
+The schema defines three reusable `$defs` referenced throughout: `Span`, `Node`, and `InlineNode`.
+
+---
+
+## Schema Rules
+
+The following rules are enforced by the schema. Any conformant validator will reject AST objects that violate them.
+
+### Document Root
+
+The top-level AST object must satisfy all four of these constraints:
+
+<ResponseField name="version" type="integer (const: 1)" required>
+  Must equal exactly `1`. The schema uses a `const` constraint, so any other value — including future major versions — will fail validation against this schema revision.
+</ResponseField>
+
+<ResponseField name="children" type="array" required>
+  Must be a JSON array. Each element must conform to the `Node` definition (see below).
+</ResponseField>
+
+<ResponseField name="metadata" type="object" required>
+  Must be a JSON object. The schema does not enforce specific metadata fields, allowing documents with partial or empty metadata to be valid.
+</ResponseField>
+
+<ResponseField name="span" type="Span" required>
+  Must conform to the `Span` definition (see below).
+</ResponseField>
+
+### Span
+
+Every `span` object must have two fields:
+
+<ResponseField name="start" type="integer ≥ 0" required>
+  Inclusive start byte offset. Must be a non-negative integer.
+</ResponseField>
+
+<ResponseField name="end" type="integer ≥ 0" required>
+  Exclusive end byte offset. Must be a non-negative integer.
+</ResponseField>
+
+The schema does not enforce that `end >= start` — your validator will accept inverted spans. Rely on the parser to produce well-formed spans; only use the schema for structural validation.
+
+### Node
+
+Every object in any `children` array must satisfy:
+
+- `type` field — **required**, must be a `string`
+- `span` field — **required**, must conform to the `Span` definition
+- `additionalProperties: true` — any other fields are allowed
+
+This open-ended definition means the schema validates the minimal structural contract for all node types without enumerating every node variant. Unknown `type` values pass validation, which is intentional for forward compatibility.
+
+### InlineNode
+
+`InlineNode` has the same shape as `Node`: requires `type` (string) and `span` (Span), with all additional properties permitted. The distinction between block and inline nodes is semantic; the schema does not enforce it structurally.
+
+---
+
+## Full Schema Source
+
+The complete `spec/ast-schema.json` is reproduced below for reference:
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vell AST",
+  "type": "object",
+  "required": ["version", "children", "metadata", "span"],
+  "properties": {
+    "version": { "const": 1 },
+    "children": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Node" }
+    },
+    "metadata": { "type": "object" },
+    "span": { "$ref": "#/$defs/Span" }
+  },
+  "$defs": {
+    "Span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "end":   { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Node": {
+      "type": "object",
+      "required": ["type", "span"],
+      "properties": {
+        "type": { "type": "string" },
+        "span": { "$ref": "#/$defs/Span" }
+      },
+      "additionalProperties": true
+    },
+    "InlineNode": {
+      "type": "object",
+      "required": ["type", "span"],
+      "properties": {
+        "type": { "type": "string" },
+        "span": { "$ref": "#/$defs/Span" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
+```
+
+<Note>
+  The schema intentionally uses `additionalProperties: true` on all node definitions. This is a deliberate forward-compatibility choice: as new node types and fields are added in minor releases, existing validators continue to pass without schema updates.
+</Note>
+
+---
+
+## Validating with AJV
+
+[AJV](https://ajv.js.org/) is the most widely used JSON Schema validator for JavaScript and TypeScript. Install it with your package manager and compile the schema once, then reuse the compiled validator across calls.
+
+### Installation
+
+```bash
+npm install ajv
+# or
+pnpm add ajv
+```
+
+### Validation Example
+
+```typescript
+import Ajv from 'ajv';
+import { readFileSync } from 'node:fs';
+import { parse } from '@solez-ai/vell';
+
+const schema = JSON.parse(readFileSync('spec/ast-schema.json', 'utf8'));
+
+const ajv = new Ajv();
+const validate = ajv.compile(schema);
+
+const source = `= Hello\n\nThis is a Vell document.`;
+const result = parse(source);
+
+const valid = validate(result.document);
+if (!valid) {
+  console.error('AST validation failed:', validate.errors);
+} else {
+  console.log('AST is valid. Version:', result.document.version);
+}
+```
+
+### Loading the Schema Directly from the Repository
+
+If you are working in a monorepo or have cloned the Vell repository, you can import the schema file directly:
+
+```typescript
+import Ajv from 'ajv';
+import { readFileSync } from 'node:fs';
+import { parse } from '@solez-ai/vell';
+
+const schema = JSON.parse(readFileSync('spec/ast-schema.json', 'utf8'));
+
+const ajv = new Ajv();
+const validate = ajv.compile(schema);
+
+const result = parse('= My Document\n\nHello!');
+const valid = validate(result.document);
+```
+
+### Validating a Stored AST Blob
+
+If you store serialized AST objects (for example in a database or build cache), validate them on retrieval before processing:
+
+```typescript
+import Ajv from 'ajv';
+import schema from './spec/ast-schema.json';
+
+const ajv = new Ajv();
+const validate = ajv.compile(schema);
+
+function loadDocument(json: string) {
+  const doc = JSON.parse(json);
+
+  if (!validate(doc)) {
+    throw new Error(
+      `Invalid Vell AST: ${ajv.errorsText(validate.errors)}`
+    );
+  }
+
+  if (doc.version !== 1) {
+    throw new Error(
+      `Unsupported AST version ${doc.version}. Expected 1.`
+    );
+  }
+
+  return doc;
+}
+```
+
+<Tip>
+  Compile the validator once at application startup rather than inside a per-request function. AJV's `compile()` step builds an optimized validation function, and calling it repeatedly is wasteful.
+</Tip>
+
+---
+
+## Using Other Validators
+
+Because the schema targets JSON Schema draft-07, it is compatible with any conformant validator. Here are two common alternatives:
+
+<Tabs>
+  <Tab title="Zod (TypeScript)">
+    You can use Zod's `z.custom()` or define Zod schemas that mirror the JSON Schema. For the structural minimum:
+
+    ```typescript
+    import { z } from 'zod';
+
+    const SpanSchema = z.object({
+      start: z.number().int().nonnegative(),
+      end:   z.number().int().nonnegative(),
+    });
+
+    const NodeSchema = z.object({
+      type: z.string(),
+      span: SpanSchema,
+    }).passthrough(); // allow additional fields
+
+    const VellDocumentSchema = z.object({
+      version:  z.literal(1),
+      children: z.array(NodeSchema),
+      metadata: z.object({}).passthrough(),
+      span:     SpanSchema,
+    });
+    ```
+  </Tab>
+  <Tab title="Python (jsonschema)">
+    ```python
+    import json
+    import jsonschema
+
+    with open("spec/ast-schema.json") as f:
+        schema = json.load(f)
+
+    def validate_document(doc: dict) -> None:
+        jsonschema.validate(instance=doc, schema=schema)
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Versioning Policy
+
+The Vell AST schema follows semantic versioning. The `version` field in the document root carries only the **major** version number. Minor and patch changes are backward compatible and do not require a version bump.
+
+| Release type | Schema change | `version` field | Action required for renderers |
+|---|---|---|---|
+| **Patch** | None | Unchanged (`1`) | None |
+| **Minor** | New optional node fields; new node types added | Unchanged (`1`) | None — unknown fields and node types are tolerated by design |
+| **Major** | Removed or renamed fields; renamed `type` discriminators; changed field semantics | Incremented (`2`) | Update renderer to handle new schema |
+
+<Warning>
+  A major version bump is a **breaking change**. If you store AST blobs, you must either re-parse documents or write a migration that transforms the old schema to the new one. The `version` field is your signal to select the correct processing path.
+</Warning>
+
+### Forward Compatibility Guarantees
+
+Between major versions, the Vell project commits to the following:
+
+- **Existing `type` values will not be removed or renamed.** Renaming `"CodeBlock"` to `"FencedCode"`, for example, requires a major version bump.
+- **Existing required fields will not be removed.** Fields may be deprecated in minor releases but are only removed in major releases.
+- **New node types arrive as `Extension` nodes first.** This gives the ecosystem time to adopt them before they become first-class built-ins.
+- **New optional fields may be added at any time** without a version bump. Your code must not fail on encountering unexpected fields.
+
+### Checking the Version at Runtime
+
+Always check the `version` field before processing an AST, especially when loading stored documents:
+
+```typescript
+import { parse } from '@solez-ai/vell';
+
+const SUPPORTED_VERSION = 1;
+
+function processDocument(source: string) {
+  const { document } = parse(source);
+
+  if (document.version !== SUPPORTED_VERSION) {
+    throw new Error(
+      `Unsupported AST version ${document.version}. ` +
+      `This renderer supports version ${SUPPORTED_VERSION} only.`
+    );
+  }
+
+  return render(document);
+}
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AST Overview" icon="sitemap" href="/api/ast-overview">
+    Understand the Document root, Span, and DocumentMetadata structures.
+  </Card>
+  <Card title="AST Node Reference" icon="list-tree" href="/api/ast-nodes">
+    Field-level documentation for every block and inline node type.
+  </Card>
+</CardGroup>

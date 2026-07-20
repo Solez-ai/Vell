@@ -45,3 +45,11 @@ pub fn validate(source: &str) -> JsValue {
         &serde_json::to_string(&validate_source(source)).unwrap_or_else(|_| "[]".to_string()),
     )
 }
+
+/// Formats Vell source with the canonical Rust formatter.
+#[wasm_bindgen]
+pub fn format_source(source: &str) -> Result<String, JsValue> {
+    parse_document(source)
+        .map(|document| vell_fmt::format(&document))
+        .map_err(|error| JsValue::from_str(&error.to_string()))
+}

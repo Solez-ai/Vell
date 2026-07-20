@@ -1,0 +1,315 @@
+---
+title: "Reactive Variables in Vell: @var, Loops, and Conditionals"
+sidebarTitle: "Variables"
+description: "Declare variables with @var, interpolate with @{name}, and build dynamic documents using @for loops, @if conditionals, and interactive input directives."
+---
+
+Vell documents are not static — they can carry reactive variables that drive conditional sections, lists, and live-updating values when viewed in a browser. You declare variables with `@var`, interpolate them with `@{name}`, loop over them with `@for`, and branch on them with `@if`. Pair these with interactive input directives like `@[Slider]` and `@[Input]` to produce documents that respond to reader input in real time.
+
+## Declaring Variables
+
+Use `@var name = value` at the block level to declare a document variable. Place the declaration anywhere in your document before you first use the variable.
+
+```vell
+@var title = "My Research Note"
+@var version = 3
+@var pi = 3.14159
+@var enabled = true
+@var nothing = null
+@var tags = ["math", "tutorial", "vell"]
+@var author = {"name": "Samin", "role": "creator"}
+```
+
+### Supported Value Types
+
+| Type | Declaration | Example |
+|------|-------------|---------|
+| String | `"quoted"` or bare word | `@var lang = "en"` |
+| Number | Integer or float | `@var count = 42` |
+| Float | Decimal number | `@var ratio = 1.618` |
+| Boolean | `true` or `false` | `@var debug = false` |
+| Null | `null` | `@var data = null` |
+| Array | JSON array | `@var items = ["a", "b", "c"]` |
+| Object | JSON object | `@var meta = {"key": "value"}` |
+
+### Naming Rules
+
+Variable names must:
+- Start with a letter or underscore (`_`)
+- Contain only letters, digits, and underscores
+- Be unique within the document (a later `@var` with the same name shadows the earlier one)
+
+Valid: `count`, `_tmp`, `first_name`, `v1`  
+Invalid: `1count`, `my-var`, `first name`
+
+<Note>
+Variables declared with `@var` have document-level scope. They are available for interpolation after their declaration point in the source. For-loop iteration variables are scoped only to the loop body.
+</Note>
+
+---
+
+## Interpolating Variables
+
+Reference any declared variable inside prose, headings, list items, or table cells using `@{name}`:
+
+```vell
+@var name = "Vell"
+@var version = 1
+
+= Welcome to @{name} v@{version}
+
+This document was produced by @{name}, version @{version}.
+
+The following table lists @{name}'s key properties.
+```
+
+If you reference a variable that has not been declared, the parser emits a warning (not an error). At render time, the interpolation evaluates to an empty string or the runtime-provided value.
+
+---
+
+## For Loops
+
+Iterate over an array variable with `@for item in @{list} { ... }`. The loop body is a full Vell block — you can include paragraphs, lists, math, and any other block content:
+
+```vell
+@var fruits = ["apple", "banana", "cherry", "date"]
+
+@for fruit in @{fruits} {
+  - @{fruit}
+}
+```
+
+This expands at render time to an unordered list with one item per element.
+
+### Loop with Richer Body
+
+```vell
+@var features = ["deterministic parsing", "MathML output", "reactive variables"]
+
+The key features are:
+
+@for feature in @{features} {
+  - *@{feature}*
+}
+```
+
+### Nested Loops
+
+You can nest `@for` loops, but the iteration variables must have different names:
+
+```vell
+@var matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+@for row in @{matrix} {
+  @for cell in @{row} {
+    @{cell}
+  }
+}
+```
+
+---
+
+## If Conditionals
+
+Use `@if condition { ... } else { ... }` to render content conditionally. The condition is a comparison expression using `@{var}` references:
+
+```vell
+@var score = 75
+
+@if @{score} >= 50 {
+  Score is @{score} — *passing*.
+} else {
+  Score is @{score} — _failing_.
+}
+```
+
+The `else` branch is optional:
+
+```vell
+@var show_advanced = true
+
+@if @{show_advanced} {
+  == Advanced Configuration
+
+  Set the `debug` variable to `true` to enable verbose output.
+}
+```
+
+### Supported Comparison Operators
+
+| Operator | Meaning |
+|----------|---------|
+| `>` | Greater than |
+| `<` | Less than |
+| `>=` | Greater than or equal |
+| `<=` | Less than or equal |
+| `==` | Equal |
+| `!=` | Not equal |
+
+---
+
+## Interactive Input Directives
+
+Vell's interactive directives bind HTML form controls to declared variables. When a reader changes the control's value in a browser, all `@{var}` interpolations that depend on that variable update instantly — no page reload required.
+
+### @[Slider]
+
+Bind a range slider to a numeric variable:
+
+```vell
+@var count = 50
+
+@[Slider](min=0 max=100 bind=count label="Count")
+
+Current value: @{count}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `min` | number | Minimum slider value |
+| `max` | number | Maximum slider value |
+| `bind` | variable name | The `@var` to update when the slider moves |
+| `label` | string | Label displayed next to the slider |
+
+### @[Input]
+
+Bind a text input to a string variable:
+
+```vell
+@var name = "World"
+
+@[Input](type=text bind=name label="Enter your name:")
+
+Hello, @{name}!
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | string | Input type: `text`, `number`, `email`, etc. |
+| `bind` | variable name | The `@var` to update on input |
+| `label` | string | Label displayed above the input |
+
+### @[Checkbox]
+
+Bind a checkbox to a boolean variable:
+
+```vell
+@var dark_mode = false
+
+@[Checkbox](bind=dark_mode label="Enable dark mode")
+
+Dark mode is: @{dark_mode}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `bind` | variable name | The `@var` to toggle (must be boolean) |
+| `label` | string | Label displayed next to the checkbox |
+
+### @[Select]
+
+Bind a dropdown to a string variable. List the options in the directive body, one per line:
+
+```vell
+@var selected = "Option B"
+
+@[Select](bind=selected label="Pick an option:") {
+  Option A
+  Option B
+  Option C
+}
+
+You selected: @{selected}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `bind` | variable name | The `@var` to update when a new option is chosen |
+| `label` | string | Label displayed above the dropdown |
+
+---
+
+## How Reactivity Works in HTML Output
+
+When you render a Vell document to HTML, the renderer emits `data-vell-var` attributes on interpolated elements and a small inline runtime script. The script wires up the form controls so they write to a central variable store, and watchers re-render any element whose variable changes.
+
+```vell
+@var greeting = "Hello"
+
+@[Input](type=text bind=greeting label="Greeting:")
+
+@{greeting}, world!
+```
+
+The rendered HTML looks roughly like:
+
+```html
+<input type="text" data-vell-bind="greeting" value="Hello">
+<label>Greeting:</label>
+
+<span data-vell-var="greeting">Hello</span>, world!
+
+<script>
+  // Vell reactive runtime (inline, ~1 KB)
+  const store = { greeting: "Hello" };
+  // ... wires inputs → store → DOM updates
+</script>
+```
+
+<Note>
+Reactivity works entirely in the browser with no external JavaScript framework. The runtime is a small inline script injected by the HTML renderer.
+</Note>
+
+---
+
+## Complete Interactive Example
+
+```vell
+= Interactive Demo
+
+@var count = 0
+@var items = ["Apples", "Bananas", "Cherries"]
+@var name = "World"
+@var dark_mode = false
+@var selected = "Option B"
+
+== Slider
+
+@[Slider](min=0 max=100 bind=count label="Count")
+
+Count is currently @{count}.
+
+@if @{count} >= 50 {
+  Count is *at or above* 50.
+} else {
+  Count is _below_ 50.
+}
+
+== Text Input
+
+@[Input](type=text bind=name label="Your name:")
+
+Hello, @{name}!
+
+== Checkbox
+
+@[Checkbox](bind=dark_mode label="Enable dark mode")
+
+Dark mode enabled: @{dark_mode}
+
+== Dropdown
+
+@[Select](bind=selected label="Choose a fruit:") {
+  Apples
+  Bananas
+  Cherries
+}
+
+You selected: @{selected}
+
+== Loop
+
+@for item in @{items} {
+  - @{item}
+}
+```

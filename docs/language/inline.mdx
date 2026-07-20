@@ -1,0 +1,294 @@
+---
+title: "Vell Inline Elements: Bold, Italic, Links, and More"
+sidebarTitle: "Inline Elements"
+description: "Reference for all Vell inline elements: bold, italic, underline, strikethrough, superscript, subscript, links, images, citations, and escape sequences."
+---
+
+Inline elements appear inside block-level content — paragraphs, headings, list items, blockquote bodies, and table cells. Each inline element is delimited by a pair of matching characters; the parser scans left-to-right and commits to the first valid pairing it finds. You can nest most inline elements freely, and you can always escape a delimiter with a backslash to use it literally.
+
+## Bold
+
+Wrap text in `*asterisks*` to make it bold (`<strong>`):
+
+```vell
+This sentence contains *bold words* for emphasis.
+
+You can combine *bold and /italic/ text* in a single run.
+```
+
+---
+
+## Italic
+
+Wrap text in `/forward slashes/` to italicize it (`<em>`):
+
+```vell
+The term /abstract syntax tree/ is italicized here.
+
+/Entire phrases/ can be italicized, including *bold* spans.
+```
+
+<Note>
+Vell uses `/` for italic rather than `_` (which means underline) or `*` (which means bold). This avoids the parsing ambiguities common in Markdown.
+</Note>
+
+---
+
+## Underline
+
+Wrap text in `_underscores_` to underline it:
+
+```vell
+Please read the _terms and conditions_ carefully.
+
+The _underline_ style signals important terminology in this guide.
+```
+
+---
+
+## Strikethrough
+
+Wrap text in `~tildes~` to strike it through:
+
+```vell
+The original price was ~$199~ — now only $99.
+
+~This sentence was removed from the final draft.~
+```
+
+---
+
+## Inline Code
+
+Wrap text in single backticks to render it as inline code (`<code>`):
+
+```vell
+Call the `parse_document` function with the source string.
+
+Set the `lang` property to `"en"` in your `@[Meta]` directive.
+```
+
+Content inside backticks is treated as literal text — no further inline parsing occurs. This makes backticks ideal for writing code tokens, file paths, and command names.
+
+---
+
+## Superscript
+
+Wrap text in `^carets^` to raise it as a superscript:
+
+```vell
+E = mc^2^ where ^2^ is a superscript.
+
+Use footnotes[^1] or superscript notation^a^ for references.
+
+x^n^ + y^n^ = z^n^
+```
+
+<Tip>
+For mathematical expressions, prefer `$E = mc^2$` inline math over superscript markup — the math renderer produces properly typeset output with MathML.
+</Tip>
+
+---
+
+## Subscript
+
+Wrap text in `,,double commas,,` to lower it as a subscript:
+
+```vell
+Water is H,,2,,O and carbon dioxide is CO,,2,,.
+
+The sequence is a,,n,, = a,,n-1,, + a,,n-2,,.
+```
+
+---
+
+## Links
+
+### Inline Links
+
+Use `[link text](url)` for inline links. Add an optional title string in quotes:
+
+```vell
+Visit the [Vell repository](https://github.com/Solez-ai/Vell).
+
+Read the [language specification](https://example.com/spec "Vell Spec v1").
+```
+
+### Reference-Style Links
+
+Use `[text][id]` to link to a URL defined elsewhere in the document with a [reference definition](/language/syntax#reference-definitions):
+
+```vell
+See the [official docs][vell-docs] and the [GitHub repo][vell-repo].
+
+[vell-docs]: https://docs.example.com/vell
+[vell-repo]: https://github.com/Solez-ai/Vell
+```
+
+You can also use a collapsed reference where the link text doubles as the ID:
+
+```vell
+Check out [Vell][] for more information.
+
+[Vell]: https://github.com/Solez-ai/Vell
+```
+
+---
+
+## Images
+
+### Inline Images
+
+Use `![alt text](src)` to embed an image. The alt text is required for accessibility:
+
+```vell
+![Vell logo](/images/vell-logo.png)
+
+![Architecture diagram](/diagrams/arch.png "System Architecture")
+```
+
+### Reference-Style Images
+
+Use `![alt][id]` together with a reference definition:
+
+```vell
+Here is the logo: ![Vell Logo][logo]
+
+[logo]: /images/vell-logo.png "Vell Logo"
+```
+
+---
+
+## Footnote References
+
+Use `[^marker]` to place a footnote reference at the current position. The marker must match a [footnote definition](/language/syntax#footnote-definitions) somewhere in the document:
+
+```vell
+The Pythagorean theorem[^pythagoras] is widely known.
+
+Vell uses a formal PEG grammar[^grammar-note] for deterministic parsing.
+
+[^pythagoras]: Attributed to ancient Greek mathematicians.
+[^grammar-note]: See the `spec/grammar.peg` file in the Vell repository.
+```
+
+Renderers collect all footnote definitions and render them at the end of the document (HTML) or the end of the page (PDF).
+
+---
+
+## Citations
+
+Use `[[key]]` to insert a formatted citation reference. The key typically matches an entry in your bibliography or reference list:
+
+```vell
+This result was first established by [[einstein1905]].
+
+Later work by [[knuth1984]] formalized the algorithmic analysis.
+```
+
+Citations render as a numbered or keyed reference marker (for example, `[1]` or `[einstein1905]`) that links to the bibliography entry.
+
+---
+
+## Inline Math
+
+Wrap a LaTeX expression in single `$` signs for inline math. The expression is rendered as MathML in HTML output:
+
+```vell
+The quadratic formula $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$ solves any quadratic.
+
+Water freezes at $0°C$ and boils at $100°C$ at sea level.
+
+Euler's identity $e^{i\pi} + 1 = 0$ connects five fundamental constants.
+```
+
+For display-mode math on its own line, use a block math fence instead (see [Math](/language/math)).
+
+---
+
+## Nesting Inline Elements
+
+You can nest compatible inline elements freely. The parser resolves nesting from the innermost pair outward:
+
+```vell
+This text is *bold and /italic at the same time/*.
+
+A _underlined `code snippet`_ in a sentence.
+
+The price ~was $42~ but is now *$99*.
+```
+
+<Warning>
+Overlapping (non-nested) delimiters are not supported. Always close inner spans before outer ones: `*bold /and italic/*` is correct; `*bold /and* italic/` is not.
+</Warning>
+
+---
+
+## Escape Sequences
+
+Prefix any inline delimiter with a backslash to produce the literal character instead of starting markup:
+
+<CodeGroup>
+```vell Bold escape
+This \*is not bold\* — the asterisks are literal.
+```
+
+```vell Italic escape
+This \/is not italic\/ — the slashes are literal.
+```
+
+```vell Underline escape
+This \_is not underlined\_ — the underscores are literal.
+```
+
+```vell Strikethrough escape
+This \~is not struck\~ — the tildes are literal.
+```
+
+```vell Math escape
+The \$price is \$42 — no math is parsed.
+```
+</CodeGroup>
+
+The full set of escapable characters:
+
+| Escape | Literal character | Prevents |
+|--------|-------------------|----------|
+| `\*`   | `*`               | Bold |
+| `\/`   | `/`               | Italic |
+| `\_`   | `_`               | Underline |
+| `\~`   | `~`               | Strikethrough |
+| `\^`   | `^`               | Superscript |
+| `\,`   | `,`               | Subscript start (`,,`) |
+| `` \` ``  | `` ` ``        | Inline code |
+| `\$`   | `$`               | Inline math |
+| `\\`   | `\`               | Backslash itself |
+
+---
+
+## Complete Inline Reference
+
+```vell
+= Inline Elements in Action
+
+*Bold text* for strong emphasis.
+/Italic text/ for gentle emphasis.
+_Underlined text_ for terminology.
+~Strikethrough text~ for corrections.
+`inline code` for code tokens.
+^superscript^ for footnote markers.
+,,subscript,, for chemical formulas.
+
+A [link](https://example.com) and an ![image](/img/photo.png).
+A [reference link][ref] and a ![reference image][img].
+
+A footnote reference[^fn] and a citation [[smith2023]].
+
+Inline math: $E = mc^2$ and $\alpha + \beta = \gamma$.
+
+Escaped: \*not bold\*, \/not italic\/, \$not math\$.
+
+[ref]: https://example.com "Example Site"
+[img]: /img/photo.png "A photo"
+[^fn]: This is the footnote content.
+```

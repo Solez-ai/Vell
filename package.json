@@ -1,17 +1,17 @@
 {
-  "name": "vell-monorepo",
+  "name": "@solez-ai/vell-workspace",
   "version": "0.1.0",
   "private": true,
   "author": "Samin Yeasar",
   "license": "AGPL-3.0-or-later",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "npm@11.3.0",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

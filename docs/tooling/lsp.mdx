@@ -1,0 +1,204 @@
+---
+title: "Vell LSP Server: Editor Intelligence for .vl Files"
+sidebarTitle: "LSP Server"
+description: "The Vell LSP server provides diagnostics, completions, hover, go-to-definition, rename, and 14+ more editor features for any LSP-compatible editor."
+---
+
+The Vell LSP server (`vell-lsp`) implements the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) and brings full editor intelligence to `.vl` files. Any LSP-compatible editor — VS Code, Neovim, Emacs, Helix, and others — can connect to `vell-lsp` and immediately gain the features documented below. The server communicates over stdio and requires no configuration beyond pointing your editor at the binary.
+
+## Starting the server
+
+```bash
+# The server reads from stdin and writes to stdout — your editor manages this automatically.
+vell-lsp
+```
+
+The server maintains an in-memory cache of every open document. On each change, it applies the text edit to the cached source and **incrementally re-parses only the affected region** (starting from the block containing the edit), reusing the existing document metadata and variable declarations. The server then re-publishes diagnostics for the updated document.
+
+---
+
+## Features
+
+### Diagnostics
+
+The server validates every document on open and on every change, then pushes diagnostics to your editor without you having to ask. Parse errors carry `ERROR` severity; undefined variable references carry `WARNING` severity and are tagged as `unnecessary` so editors that support diagnostic tags can visually dim them.
+
+Each diagnostic includes:
+- The source span (highlighted inline in your editor)
+- A human-readable message including a suggestion when one is available
+- A `code` number linking to the online reference at `https://vell-lang.dev/docs/diagnostics#vellN` where `N` is the numeric error code
+
+### Hover
+
+Hovering over elements in a `.vl` file shows contextual information:
+
+| Element | Hover content |
+|---|---|
+| `@{varName}` | The declaration `@var name = value` when the variable is declared; a "not declared" notice when it is not |
+| `= Heading Text` | The heading level label with level number, e.g. `Title (level 1)` or `Section (level 2)` |
+| `@[DirectiveName](...)` | The directive's description from the built-in catalogue |
+| `[text](url)` | The link target URL and title if present |
+| `![alt](src)` | The image source and alt text |
+| `` `code` `` | "Inline code" with the code value |
+| `$math$` | "Inline math" with the LaTeX source |
+| `[^marker]` | Footnote reference with a hint to use Go to Definition |
+
+### Completions
+
+The server provides context-aware completions triggered by `@`:
+
+<Accordion title="Directive completions — @[...]">
+Typing `@[` shows all built-in directives with their descriptions. The full catalogue includes: `Figure`, `Code`, `Diagram`, `Chart`, `Plot`, `Cite`, `Slide`, `Animation`, `Frame`, `Layout`, `Column`, `Accessibility`, `Theme`, `Meta`, `Slider`, `Template`, `Input`, `Select`, `Checkbox`, `Data`, `Equation`, `Chem`, `Theorem`, `Proof`, `Lemma`, `Corollary`, `Definition`, `Remark`, `Example`, `Conjecture`, `Axiom`, `Proposition`, `Notation`, `Include`, `Ref`, `Toc`, `Lof`, `Lot`, `Align`, `Matrix`, `PMatrix`, `BMatrix`, `VMatrix`, `Cases`, and `Bibliography`.
+</Accordion>
+
+<Accordion title="Variable completions — @{...}, @var, @for, @if">
+Typing `@` shows completions for `@var`, `@for`, and `@if` keywords, as well as all variable names declared with `@var` in the current document (for use as `@{name}` interpolations).
+</Accordion>
+
+<Accordion title="Admonition type completions">
+Inside a `> [!...]` admonition block, the server completes admonition type keywords such as `NOTE`, `WARNING`, `TIP`, `DANGER`, and `SUCCESS`.
+</Accordion>
+
+<Accordion title="Math symbol completions">
+Inside a math context (`$...$` or `$$...$$`), the server offers completions for common LaTeX symbols:
+
+| Symbol | Description |
+|---|---|
+| `\alpha` – `\omega` | Greek letters (α β γ δ ε θ λ μ π σ ω) |
+| `\int` | Integral ∫ |
+| `\sum` | Summation ∑ |
+| `\prod` | Product ∏ |
+| `\frac{}{}` | Fraction |
+| `\sqrt{}` | Square root |
+| `\infty` | Infinity ∞ |
+| `\partial` | Partial derivative ∂ |
+| `\rightarrow` / `\Rightarrow` | Arrows → ⇒ |
+| `\forall` / `\exists` | Quantifiers ∀ ∃ |
+| `\in` / `\subset` / `\subseteq` | Set relations ∈ ⊂ ⊆ |
+</Accordion>
+
+### Formatting
+
+The server handles `textDocument/formatting` requests by delegating to the `vell-fmt` library, producing the same canonical output as `vell fmt` on the command line. Your editor's **Format Document** action and any format-on-save settings use this path.
+
+### Go to Definition
+
+<ParamField body="Variable references" type="@{name}">
+  Jumping to definition on `@{name}` navigates to the `@var name = value` declaration in the same document.
+</ParamField>
+
+<ParamField body="Footnote references" type="[^marker]">
+  Jumping to definition on a `[^marker]` reference navigates to the corresponding `[^marker]: ...` definition block.
+</ParamField>
+
+### Find References
+
+Right-clicking a variable declaration and choosing **Find All References** returns every `@{name}` usage in the open document. The server scans paragraphs, headings, table cells, list items, blockquotes, directive children, loop bodies, and conditional branches.
+
+### Rename
+
+You can rename a variable by placing the cursor on its declaration (`@var name = value`) or on any `@{name}` reference and triggering **Rename Symbol**. The server updates the declaration and all references in a single workspace edit.
+
+<Note>
+The server validates that the symbol under the cursor is renamable before the rename dialog opens. Attempting to rename non-renamable tokens returns an informative error.
+</Note>
+
+### Folding Ranges
+
+The server provides folding ranges so you can collapse sections of your document in the editor. The following node types are foldable:
+
+| Node type | Fold behaviour |
+|---|---|
+| Headings | Folds from the line after the heading marker to the line before the next heading at the same or higher level |
+| Code blocks | Folds the content between the opening and closing ` ``` ` fences |
+| Math blocks | Folds the content between `$$` delimiters |
+| Directives with children | Folds from the opening `@[Name](...)  {` to the closing `}` |
+| Blockquotes | Folds all `>` lines |
+| Lists (2+ items) | Folds the entire list |
+
+### Code Actions
+
+The server offers quick-fix actions when you activate the lightbulb or code action menu:
+
+| Action | Trigger |
+|---|---|
+| **Wrap in heading** | Available on any paragraph — promotes it to a heading |
+| **Add `@[Meta]`** | Available at the top of a document that lacks a `@[Meta]` block |
+| **Convert to bullet list** | Available on a paragraph — converts lines to `- item` list items |
+| **Add missing `@var` declaration** | Available on any `@{name}` reference where no `@var name` declaration exists |
+
+### Semantic Tokens
+
+The server emits semantic tokens that editors use to apply syntax highlighting on top of the TextMate grammar. Tokens are assigned to the following token types:
+
+| Token type | Applies to |
+|---|---|
+| `heading` | `=` marker characters; modifier encodes heading level |
+| `directive` | Directive name inside `@[Name]` |
+| `keyword` | `@var`, `@for`, `@if` keywords |
+| `code` | ` ``` ` fences and inline `` `code` `` spans |
+| `math` | `$$` delimiters and `$...$` inline math |
+| `variable` | Variable names in declarations, loop variables, condition expressions, and `@{name}` interpolations |
+| `punctuation` | `@[` and other structural punctuation |
+
+### Document Symbols (Hierarchical)
+
+The **Outline** panel in VS Code and equivalent views in other editors are powered by the server's hierarchical document symbol provider. The symbol tree includes:
+
+- **Headings** — Nested by level (h1 > h2 > h3…), showing the heading text
+- **Variables** — Each `@var` declaration as a variable symbol
+- **Directives** — Named directives as module symbols
+- **Footnotes** — Each `[^marker]:` definition as a constant symbol
+
+### Workspace Symbols
+
+The workspace symbol search (`Ctrl+T` / `Cmd+T` in VS Code) searches across **all open documents** simultaneously. Matching runs against heading text, variable names, and directive names — any of which can appear in the query string.
+
+### Signature Help
+
+When you type inside a directive's parentheses — for example `@[Figure](` — the server displays a signature popup listing the directive's parameters with their types. For `@[Figure]` this shows `src: string, caption: string`; for `@[Meta]` it shows `title: string, author: string, date: string, lang: string`, and so on for every built-in directive.
+
+### Inlay Hints
+
+`@var` declarations receive inlay hints that show the inferred type of the value. For example:
+
+```vell
+@var count = 42       ← : number
+@var title = "Hello"  ← : string
+@var flag = true      ← : bool
+```
+
+### Document Links
+
+URLs that appear in `[text](url)` link nodes and `![alt](src)` image nodes become clickable document links. Ctrl-clicking (or Cmd-clicking on macOS) the link range in a supporting editor opens the URL in the default browser.
+
+### Document Colors
+
+The server detects hex color literals anywhere in the source (`#rgb`, `#rrggbb`, `#rgba`, `#rrggbbaa`) and returns them as color information. Editors that support the color provider show an inline color swatch next to the hex value, and you can use the color picker to edit it interactively.
+
+### Code Lenses
+
+Each `@var` declaration displays a code lens above it showing how many times that variable is referenced in the document:
+
+```vell
+                              ← 3 references
+@var greeting = "Hello"
+```
+
+Clicking the lens has no side-effect by default, but the count updates live as you add or remove `@{greeting}` usages.
+
+### Linked Editing Ranges
+
+When you place the cursor on a loop variable name inside `@for variable in @{list}`, the server returns a linked editing range that covers the variable name in the loop header and every `@{variable}` usage inside the loop body. Editing the name in any one location simultaneously updates all the linked locations.
+
+### On-Type Formatting
+
+The server provides real-time formatting assistance triggered by specific characters:
+
+<ParamField body="} character" type="auto-dedent">
+  When you type the closing `}` of a directive, `@for`, or `@if` block, the server checks whether the indentation of the `}` matches the indentation of the corresponding opening line. If they differ, it issues a text edit to correct the indentation.
+</ParamField>
+
+<ParamField body="newline (Enter)" type="auto-indent">
+  Pressing Enter inside a block copies the current line's indentation to the new line. If the current line ends with `{`, the new line receives two extra spaces of indentation.
+</ParamField>

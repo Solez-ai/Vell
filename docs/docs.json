@@ -1,0 +1,124 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Vell",
+  "theme": "luma",
+  "colors": {
+    "primary": "#ffc15f",
+    "light": "#EEF0FF",
+    "dark": "#1A1730"
+  },
+  "favicon": {
+    "light": "/images/logo-no-bg.png",
+    "dark": "/images/logo-no-bg.png"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation",
+              "reliability"
+            ]
+          },
+          {
+            "group": "Language",
+            "pages": [
+              "language/syntax",
+              "language/inline",
+              "language/tables",
+              "language/math",
+              "language/variables",
+              "language/directives",
+              "language/interactivity",
+              "language/publishing"
+            ]
+          },
+          {
+            "group": "Tooling",
+            "pages": [
+              "tooling/cli",
+              "tooling/formatter",
+              "tooling/lsp",
+              "tooling/vscode"
+            ]
+          },
+          {
+            "group": "Rendering",
+            "pages": [
+              "rendering/overview",
+              "rendering/html",
+              "rendering/pdf",
+              "rendering/publishing"
+            ]
+          },
+          {
+            "group": "Extensions",
+            "pages": [
+              "extensions/overview",
+              "extensions/built-in",
+              "extensions/authoring"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "JavaScript / WASM",
+            "pages": [
+              "api/vell-js",
+              "api/wasm-bindings"
+            ]
+          },
+          {
+            "group": "Renderers",
+            "pages": [
+              "api/renderer-html",
+              "api/renderer-pdf"
+            ]
+          },
+          {
+            "group": "AST",
+            "pages": [
+              "api/ast-overview",
+              "api/ast-nodes",
+              "api/ast-schema"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "AI & Design",
+        "groups": [
+          {
+            "group": "Agent Guide",
+            "pages": [
+              "agent/overview",
+              "agent/architecture",
+              "agent/design"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Solez-ai/Vell"
+    }
+  },
+  "logo": {
+    "light": "/images/logo-no-bg.png",
+    "dark": "/images/logo-no-bg.png"
+  },
+  "icons": {
+    "library": "lucide"
+  }
+}

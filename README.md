@@ -29,9 +29,11 @@ Created and developed by **Samin Yeasar**.
 ### Installation
 
 ```bash
-cargo install vell-cli
+cargo install --path crates/vell-cli
 npm install @solez-ai/vell @solez-ai/vell-renderer-html
 ```
+
+The npm package is currently a typed wrapper. Build `crates/vell-wasm` with `wasm-pack` and register the generated module with `setWasmModule()` before using the JavaScript parser API.
 
 ### Usage
 
@@ -132,10 +134,10 @@ TypeScript Packages
 |---------|----------|-------------|
 | vell-core | Rust | Reference parser, AST, formatter, validator |
 | vell-wasm | Rust/WASM | WebAssembly bindings for browser and Node.js |
-| vell-js | TypeScript | WASM wrapper with typed API |
+| `@solez-ai/vell` | TypeScript | Official WASM wrapper with typed parse, validate, and format APIs |
 | vell-renderer-html | TypeScript | HTML5 renderer with MathML, URL sanitization, footnote support |
 | vell-renderer-pdf | TypeScript | Direct AST-to-PDF renderer using pdfkit |
-| vell-vscode | TypeScript | VS Code extension with syntax highlighting and LSP client |
+| `@solez-ai/vell-vscode` | TypeScript | VS Code extension with syntax highlighting and LSP client |
 
 ## Documentation
 
@@ -176,6 +178,8 @@ cargo build --workspace
 cargo test --workspace
 
 npm install
+npm run typecheck
+npm test
 npm run build
 ```
 
@@ -183,15 +187,17 @@ npm run build
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| Parser | Complete | PEG grammar, all fixtures pass |
-| Fixture tests | Complete | Tests for all node types |
-| HTML renderer | Complete | HTML5 with MathML |
-| CLI | Complete | Parse, fmt, render, validate |
-| Formatter | Complete | Idempotency verified |
-| LSP server | Complete | Full feature set |
-| PDF renderer | Complete | Direct AST-to-PDF |
-| WASM bindings | Complete | Browser and Node.js |
-| VS Code extension | Complete | Syntax highlighting + LSP |
+| Parser | Beta | Deterministic fixtures pass; fuzzing and compatibility certification remain |
+| Fixture tests | Strong | Parser and formatter fixtures cover the current language surface |
+| HTML renderer | Beta | Broad HTML5 and interactive support; behavioral browser tests remain |
+| CLI | Beta | Parse, fmt, validate, watch, and publishing commands work |
+| Formatter | Strong | Idempotency is verified across fixtures and specification examples |
+| LSP server | Beta | Broad feature set; multi-editor and long-running stress tests remain |
+| PDF renderer | Beta | Direct AST-to-PDF package with documented math and layout limitations |
+| WASM bindings | Incomplete distribution | Rust bindings work, but the npm package does not yet bundle generated WASM |
+| VS Code extension | Preview | Syntax highlighting and LSP client work from a source-built VSIX |
+
+See `docsfr/docs/reliability.mdx` for production-readiness guarantees, limitations, and the prioritized path to `1.0.0`.
 
 ## License
 

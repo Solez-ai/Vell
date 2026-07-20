@@ -1,0 +1,97 @@
+---
+title: "Interactive documents"
+description: "Build reactive controls, declarative events, and sandboxed notebook cells in Vell."
+---
+
+Vell can produce a self-contained interactive HTML document. Use `renderInteractive()` from `@solez-ai/vell-renderer-html` to embed the runtime.
+
+## Computed variables
+
+Reference other variables in a declaration to create a computed value.
+
+```vell
+@var price = 12
+@var quantity = 3
+@var total = @{price} * @{quantity}
+
+Total: @{total}
+```
+
+The runtime recalculates `total` whenever `price` or `quantity` changes.
+
+<Warning>
+  Computed expressions are document-authored JavaScript expressions compiled with `Function` in the page context. Enable interactive rendering only for trusted or reviewed documents.
+</Warning>
+
+## Declarative events
+
+Use `@[On]` to update a variable without running arbitrary code in the page context.
+
+```vell
+@var count = 0
+
+@[On](event="click" action="count += 1") {
+  @[Button](label="Add one")
+}
+
+Count: @{count}
+```
+
+Supported actions are assignment, `+=`, `-=`, and `toggle`.
+
+```vell
+@[On](event="click" action="dark_mode toggle") { Toggle theme }
+@[On](event="click" action="name = 'Vell'") { Reset name }
+```
+
+## Executable cells
+
+Use `@[Run]` for an explicit JavaScript cell.
+
+```vell
+@[Run](lang="javascript" source="console.log(2 + 2)")
+```
+
+You can also mark a fenced code block as executable with the executable fence syntax supported by the parser.
+
+The browser renderer executes JavaScript in a sandboxed iframe. The cell cannot access the parent document. Output from `console.log`, `console.error`, returned values, and thrown errors appears below the cell.
+
+<Warning>
+  Browser execution currently supports JavaScript only. Other language tags render normally and show a clear runtime message when you click **Run**.
+</Warning>
+
+## Notebook sections
+
+Group prose and executable cells with `@[Notebook]`.
+
+```vell
+@[Notebook] {
+  == Experiment
+
+  Change the inputs, then run the cell.
+
+  @[Run](lang="javascript" source="console.log('ready')")
+}
+```
+
+Notebook mode is an HTML authoring feature. Static renderers preserve the cell source and surrounding prose without executing it.
+
+## Live charts
+
+Bind a chart to an object, an array of `[label, value]` pairs, or an array of `{ label, value }` objects.
+
+```vell
+@var sales = [["Books", 12], ["Tools", 7]]
+
+@[Chart](type=bar bind="sales" title="Sales")
+```
+
+The interactive runtime rebuilds the chart when `sales` changes. Static renderers use data provided in the directive body and do not execute reactive updates.
+
+## Trust model
+
+- Static `render()` output does not execute cells.
+- `renderInteractive()` embeds the reactive runtime.
+- `@[On]` uses a constrained action parser rather than arbitrary event JavaScript.
+- JavaScript cells run in a sandboxed iframe without parent-document access.
+- Computed variable expressions execute in the parent page and therefore require trusted source.

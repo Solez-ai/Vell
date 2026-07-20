@@ -16,3 +16,4 @@ notify = "7"
 serde_json.workspace = true
 vell-core = { path = "../vell-core" }
 vell-fmt = { path = "../vell-fmt" }
+zip = { version = "2", default-features = false, features = ["deflate"] }

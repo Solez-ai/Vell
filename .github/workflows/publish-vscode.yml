@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Builds, tests, and publishes the Vell VS Code extension to the marketplace.
+#
+# Prerequisites:
+#   - Repository secret VSCODE_MARKETPLACE_TOKEN with a Personal Access Token
+#     from https://dev.azure.com (vsce publisher)
+#   - The extension publisher "solez-ai" registered in the marketplace
+#
+# Triggers:
+#   - Push to main branch (dry-run)
+#   - New tag vscode-v* (publishes)
+
+name: Publish VS Code Extension
+
+on:
+  push:
+    branches: [main]
+    tags: ["vscode-v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (package without publishing)"
+        type: boolean
+        default: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/vell-vscode
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Package extension (.vsix)
+        run: npx vsce package --allow-star-activation
+        env:
+          VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN || '' }}
+
+      - name: Publish to marketplace
+        if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'vscode-v') }}
+        run: npx vsce publish --allow-star-activation --pat ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+        env:
+          VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vell-vscode-${{ github.ref_name || 'latest' }}
+          path: packages/vell-vscode/*.vsix
+          retention-days: 30

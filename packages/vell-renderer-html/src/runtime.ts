@@ -230,6 +230,109 @@ export function getRuntimeScript(): string {
     updateVisibility();
   }
 
+  function applyAction(action) {
+    var match = String(action || '').trim().match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(=|\+=|-=|toggle)\s*(.*)$/);
+    if (!match) return;
+    var name = match[1];
+    var operator = match[2];
+    var raw = match[3].trim();
+    if (operator === 'toggle') {
+      setVar(name, !getVar(name));
+      return;
+    }
+    var value;
+    if (/^-?\d+(\.\d+)?$/.test(raw)) value = Number(raw);
+    else if (raw === 'true' || raw === 'false') value = raw === 'true';
+    else if ((raw[0] === '"' && raw[raw.length - 1] === '"') || (raw[0] === "'" && raw[raw.length - 1] === "'")) value = raw.slice(1, -1);
+    else value = getVar(raw);
+    if (operator === '+=') value = Number(getVar(name) || 0) + Number(value || 0);
+    if (operator === '-=') value = Number(getVar(name) || 0) - Number(value || 0);
+    setVar(name, value);
+  }
+
+  function bindEvents() {
+    var elements = document.querySelectorAll('[data-vell-on][data-vell-action]');
+    for (var i = 0; i < elements.length; i++) {
+      (function(element) {
+        element.addEventListener(element.getAttribute('data-vell-on') || 'click', function() {
+          applyAction(element.getAttribute('data-vell-action'));
+        });
+      })(elements[i]);
+    }
+  }
+
+  function bindExecutableCells() {
+    var cells = document.querySelectorAll('.vell-cell');
+    for (var i = 0; i < cells.length; i++) {
+      (function(cell) {
+        var button = cell.querySelector('[data-vell-run]');
+        var source = cell.querySelector('[data-vell-source]');
+        var output = cell.querySelector('.vell-cell-output');
+        if (!button || !source || !output) return;
+        button.addEventListener('click', function() {
+          output.textContent = '';
+          if ((cell.getAttribute('data-language') || 'javascript').toLowerCase() !== 'javascript') {
+            output.textContent = 'Only JavaScript cells execute in the browser runtime.';
+            return;
+          }
+          var frame = document.createElement('iframe');
+          frame.setAttribute('sandbox', 'allow-scripts');
+          frame.hidden = true;
+          var token = 'vell-' + Math.random().toString(36).slice(2);
+          function receive(event) {
+            if (!event.data || event.data.token !== token) return;
+            output.textContent += (output.textContent ? '\n' : '') + event.data.text;
+          }
+          window.addEventListener('message', receive);
+          frame.addEventListener('load', function() {
+            frame.contentWindow.postMessage({ token: token, source: source.textContent || '' }, '*');
+          });
+          frame.srcdoc = '<script>addEventListener("message",function(e){var t=e.data.token;function send(v){parent.postMessage({token:t,text:String(v)},"*")}console.log=send;console.error=send;try{var r=(0,eval)(e.data.source);if(r!==undefined)send(r)}catch(err){send(err&&err.stack||err)}})<\/script>';
+          document.body.appendChild(frame);
+          setTimeout(function() { window.removeEventListener('message', receive); frame.remove(); }, 5000);
+        });
+      })(cells[i]);
+    }
+  }
+
+  function bindLiveCharts() {
+    var charts = document.querySelectorAll('[data-vell-chart]');
+    for (var i = 0; i < charts.length; i++) {
+      (function(chart) {
+        var name = chart.getAttribute('data-vell-chart');
+        function renderChart(value) {
+          var entries = [];
+          if (Array.isArray(value)) {
+            for (var j = 0; j < value.length; j++) {
+              if (Array.isArray(value[j])) entries.push({ label: String(value[j][0]), value: Number(value[j][1]) });
+              else if (value[j] && typeof value[j] === 'object') entries.push({ label: String(value[j].label), value: Number(value[j].value) });
+            }
+          } else if (value && typeof value === 'object') {
+            for (var key in value) entries.push({ label: key, value: Number(value[key]) });
+          }
+          if (!entries.length) return;
+          var max = Math.max.apply(null, entries.map(function(entry) { return isFinite(entry.value) ? entry.value : 0; })) || 1;
+          chart.textContent = '';
+          for (var j = 0; j < entries.length; j++) {
+            var row = document.createElement('div');
+            row.className = 'vell-live-chart-row';
+            var label = document.createElement('span');
+            label.textContent = entries[j].label;
+            var bar = document.createElement('span');
+            bar.className = 'vell-live-chart-bar';
+            bar.style.width = Math.max(0, entries[j].value) / max * 100 + '%';
+            bar.textContent = String(entries[j].value);
+            row.appendChild(label);
+            row.appendChild(bar);
+            chart.appendChild(row);
+          }
+        }
+        subscribe(name, renderChart);
+        renderChart(getVar(name));
+      })(charts[i]);
+    }
+  }
+
   // -----------------------------------------------------------------------
   // Initialization
   // -----------------------------------------------------------------------
@@ -319,6 +422,10 @@ export function getRuntimeScript(): string {
     for (var i = 0; i < ifBlocks.length; i++) {
       renderIfBlock(ifBlocks[i]);
     }
+
+    bindEvents();
+    bindExecutableCells();
+    bindLiveCharts();
 
     // 11. Initial update of all variable displays
     for (var name in store) {

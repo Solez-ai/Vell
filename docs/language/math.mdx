@@ -1,0 +1,657 @@
+---
+title: "Math in Vell: LaTeX Syntax, Equations, and MathML Output"
+sidebarTitle: "Math"
+description: "Write inline and block math in Vell using LaTeX syntax. Covers equations, Greek letters, integrals, theorem environments, and cross-references."
+---
+
+Vell treats mathematics as a first-class citizen. You write LaTeX expressions directly in your source file, and the HTML renderer converts them to MathML — the web standard for accessible, scalable math. Whether you need a quick inline formula or a numbered theorem with a proof and cross-references, Vell has dedicated syntax for every case.
+
+## Inline Math
+
+Surround a LaTeX expression with single `$` delimiters to render it inline within a paragraph:
+
+```vell
+Einstein's famous equation $E = mc^2$ relates mass and energy.
+
+In a right triangle, $a^2 + b^2 = c^2$ always holds.
+
+Euler's identity $e^{i\pi} + 1 = 0$ unites five constants.
+
+The standard deviation is $\sigma = \sqrt{\frac{1}{n}\sum_{i=1}^n (x_i - \mu)^2}$.
+```
+
+Inline math renders inside the text flow at the same baseline as surrounding prose.
+
+---
+
+## Block Math
+
+Surround a LaTeX expression with `$$` delimiters — each on its own line — to render a centered display-mode equation:
+
+```vell
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+
+$$
+\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+$$
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}
+$$
+```
+
+Content between `$$` markers is raw LaTeX and is not parsed as Vell inline markup.
+
+<Note>
+Both the opening `$$` and closing `$$` must be on their own lines. A `$$` that appears in the middle of a line is not treated as a math block delimiter.
+</Note>
+
+---
+
+## LaTeX Syntax Reference
+
+Vell's LaTeX-to-MathML converter supports the full range of standard LaTeX math commands. The examples below come directly from the Vell test suite.
+
+### Greek Letters
+
+<Accordion title="Lowercase Greek letters">
+```vell
+$\alpha$ $\beta$ $\gamma$ $\delta$ $\epsilon$
+$\zeta$ $\eta$ $\theta$ $\iota$ $\kappa$ $\lambda$
+$\mu$ $\nu$ $\xi$ $\omicron$ $\pi$ $\rho$ $\sigma$
+$\tau$ $\upsilon$ $\phi$ $\chi$ $\psi$ $\omega$
+```
+</Accordion>
+
+<Accordion title="Uppercase Greek letters">
+```vell
+$\Gamma$ $\Delta$ $\Theta$ $\Lambda$ $\Xi$
+$\Pi$ $\Sigma$ $\Phi$ $\Psi$ $\Omega$
+```
+</Accordion>
+
+<Accordion title="Variant forms">
+```vell
+$\varepsilon$ $\vartheta$ $\varrho$ $\varsigma$ $\varphi$
+```
+</Accordion>
+
+### Superscripts and Subscripts
+
+```vell
+Simple:   $x^2$  $x_i$  $x_i^2$
+Grouped:  $x^{2n}$  $e^{i\pi}$  $a_{ij}$
+Combined: $\int_0^1$  $\sum_{i=1}^n$  $\prod_{i=1}^\infty$
+```
+
+### Fractions
+
+```vell
+$\frac{1}{2}$        $\frac{a}{b}$       $\frac{x+1}{x-1}$
+
+$$
+\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+$$
+
+$$
+\frac{\partial^2 f}{\partial x \partial y}
+$$
+```
+
+### Integrals, Sums, and Products
+
+```vell
+$$
+\int_0^\infty e^{-x^2} \, dx = \frac{\sqrt{\pi}}{2}
+$$
+
+$$
+\oint_C \vec{F} \cdot d\vec{r}
+$$
+
+$$
+\iint_S f \, dS \qquad \iiint_V g \, dV
+$$
+
+$$
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+$$
+
+$$
+\prod_{k=1}^{n} \frac{k}{k+1} = \frac{1}{n+1}
+$$
+```
+
+### Square Roots and Radicals
+
+```vell
+$\sqrt{2}$   $\sqrt{x}$   $\sqrt{x^2 + y^2}$
+
+$\sqrt{\frac{a}{b}}$   $\sqrt{\sqrt{x}}$
+```
+
+### Operators and Relations
+
+<Accordion title="Arithmetic operators">
+```vell
+$a \times b$  $a \div b$  $a \pm b$  $a \mp b$
+$a \cdot b$   $a \circ b$ $a \ast b$ $a \star b$
+$A \otimes B$ $A \oplus B$ $A \ominus B$
+$A \oslash B$ $A \odot B$ $\bullet$
+$\ltimes$ $\rtimes$ $\uplus$ $\sqcap$ $\sqcup$
+$\curlyvee$ $\circledast$
+```
+</Accordion>
+
+<Accordion title="Equality and inequality relations">
+```vell
+$a \equiv b$  $a \approx b$  $a \sim b$
+$a \simeq b$  $a \cong b$    $a \propto b$  $a \varpropto b$
+$a \neq b$    $a \le b$      $a \ge b$
+$a \ll b$     $a \gg b$      $a \prec b$  $a \succ b$  $a \preceq b$  $a \succeq b$
+$a \leqq b$   $a \geqq b$    $a \asymp b$  $a \doteq b$
+```
+</Accordion>
+
+### Set Theory
+
+```vell
+$A \subset B$  $A \supset B$  $A \subseteq B$  $A \supseteq B$
+$A \nsubseteq B$ $A \subsetneq B$
+$A \cap B$     $A \cup B$     $A \setminus B$
+$\emptyset$ $\varnothing$ $\complement$
+$x \in X$      $x \notin Y$   $\ni$
+$A \vartriangle B$
+
+$$
+\mathbb{N} \subset \mathbb{Z} \subset \mathbb{Q} \subset \mathbb{R} \subset \mathbb{C}
+$$
+```
+
+### Arrows and Logic
+
+```vell
+$\rightarrow$   $\leftarrow$   $\leftrightarrow$
+$\Rightarrow$   $\Leftarrow$   $\Leftrightarrow$
+$\implies$      $\iff$         $\mapsto$
+
+$\forall x \in \mathbb{R}$    $\exists y > 0$
+$P \land Q$   $P \lor Q$   $\neg P$
+```
+
+### Functions and Calculus
+
+```vell
+$\sin x$   $\cos x$   $\tan x$
+$\arcsin x$   $\arccos x$   $\arctan x$
+$\sinh x$  $\cosh x$  $\tanh x$
+$\log x$   $\ln x$    $\exp(x)$
+
+$$
+\lim_{x \to 0} \frac{\sin x}{x} = 1
+$$
+
+$$
+\lim_{n \to \infty} \left(1 + \frac{1}{n}\right)^n = e
+$$
+```
+
+### Accents and Decorations
+
+```vell
+$\hat{x}$   $\hat{\theta}$    (hat)
+$\tilde{x}$ $\tilde{\mu}$     (tilde)
+$\bar{x}$   $\bar{z}$         (bar)
+$\dot{x}$                     (dot)
+$\ddot{x}$  $\ddot{\theta}$   (double dot)
+$\vec{v}$   $\vec{F}$         (vector arrow)
+```
+
+### Text Inside Math
+
+```vell
+$$
+\{x \in \mathbb{R} \mid x > 0 \quad \text{and} \quad x < 1\}
+$$
+
+$$
+\text{Area} = \pi r^2 \quad \text{for} \quad r \geq 0
+$$
+```
+
+### Continued Fractions
+
+Use `\cfrac` for continued fractions with proper vertical spacing (identical to `\frac` in MathML output):
+
+```vell
+$$
+\cfrac{1}{1 + \cfrac{1}{2 + \cfrac{1}{3}}}
+$$
+```
+
+### Named Operators
+
+Vell supports all standard function names (`\sin`, `\cos`, `\tan`, `\log`, `\ln`, `\det`, `\dim`, `\lim`, `\max`, `\min`, `\sup`, `\inf`, `\exp`, `\deg`, `\arg`, `\ker`, `\hom`, `\gcd`, `\Pr`, and more). For custom operator names, use `\operatorname`:
+
+```vell
+$\operatorname{argmin}_{x} f(x)$  $\operatorname{span}\{v_1,\dots,v_n\}$
+```
+
+### Extensible Arrows
+
+Arrows that stretch to accommodate text above them:
+
+```vell
+$x \xrightarrow{text} y$  and  $a \xleftarrow{label} b$
+$$
+A \xleftarrow{\text{assembly}} B \xrightarrow{\text{disassembly}} C
+$$
+```
+
+### Stacked Subscripts
+
+Use `\substack` to stack multiple lines in a subscript position, typically for sums over multiple conditions:
+
+```vell
+$$
+\sum_{\substack{i < j \\ j > k}} a_{ij}
+$$
+```
+
+### Sideset and Prescript
+
+Place scripts on the **left** side of an operator with `\prescript`:
+
+```vell
+$\prescript{a}{b}{C}$    (left superscript a, left subscript b)
+$\prescript{1}{2}{X}_3^4$  (combined left and right scripts)
+```
+
+For large operators like `\sum` and `\prod`, use `\sideset` to place prescripts and postscripts around the operator while preserving its limits:
+
+```vell
+$$
+\sideset{_a^b}{_c^d}\sum_{n=1}^{\infty} a_n
+$$
+
+$$
+\sideset{}{^\ast}\prod_{k=1}^N x_k
+$$
+```
+
+### Font Commands
+
+Vell supports LaTeX's font selection commands inside math mode:
+
+| Command | Style | Example |
+|---------|-------|---------|
+| `\mathbb{}` | Blackboard bold | `$\mathbb{R}$`, `$\mathbb{C}$`, `$\mathbb{N}$` |
+| `\mathcal{}` | Calligraphic | `$\mathcal{F}$`, `$\mathcal{L}$` |
+| `\mathfrak{}` | Fraktur | `$\mathfrak{g}$`, `$\mathfrak{sl}_n$` |
+| `\mathscr{}` | Script (roundhand) | `$\mathscr{L}$`, `$\mathscr{O}$` |
+| `\mathrm{}` | Roman (upright) | `$\mathrm{Re}$`, `$\mathrm{E}$` |
+| `\mathbf{}` | Bold | `$\mathbf{v}$`, `$\mathbf{x}$` |
+| `\mathit{}` | Italic | `$\mathit{abc}$` |
+| `\mathsf{}` | Sans-serif | `$\mathsf{set}$` |
+| `\mathtt{}` | Typewriter | `$\mathtt{code}$` |
+| `\textbf{}` | Bold (text) | `$\textbf{bold}$` |
+| `\textit{}` | Italic (text) | `$\textit{italic}$` |
+
+```vell
+$$
+\mathbb{N} \subset \mathbb{Z} \subset \mathbb{Q} \subset \mathbb{R} \subset \mathbb{C}
+$$
+```
+
+### Decorations
+
+Enclose content in boxes, strikes, or horizontal lines:
+
+```vell
+$\boxed{x}$          (boxed)
+$\cancel{y}$         (upward diagonal strike)
+$\bcancel{z}$        (downward diagonal strike)
+$\xcancel{w}$        (both strikes)
+$\underline{a}$      (underline)
+$\overline{b}$       (overline)
+$\overset{*}{x}$     (stretchy above)
+$\underset{*}{x}$    (stretchy below)
+```
+
+### Bra-Ket Notation (Physics)
+
+Dirac bra-ket notation for quantum mechanics:
+
+```vell
+$\bra{\psi}$                 (bra)
+$\ket{\phi}$                 (ket)
+$\braket{\psi|\phi}$         (inner product)
+```
+
+### Special Symbols
+
+Vell supports a comprehensive set of amssymb and other special symbols:
+
+| Category | Commands |
+|----------|----------|
+| Real/Imag | `\Re`, `\Im` |
+| Cardinals | `\aleph`, `\beth`, `\gimel`, `\daleth` |
+| Special letters | `\Bbbk`, `\mho`, `\Finv`, `\Game`, `\eth` |
+| Physics | `\hbar`, `\hslash`, `\ell`, `\imath`, `\jmath` |
+| Punctuation | `\pounds`, `\S`, `\P`, `\checkmark`, `\dag`, `\ddag` |
+| Geometry | `\square`, `\lozenge`, `\blacksquare` |
+| Diagonals | `\diagdown`, `\diagup` |
+| Complement | `\complement`, `\circledast`, `\bullet` |
+| Curly ops | `\curlyvee`, `\ltimes`, `\rtimes`, `\uplus`, `\sqcap`, `\sqcup` |
+| Extended relations | `\leqq`, `\geqq`, `\asymp`, `\varpropto`, `\vartriangle` |
+| Dots | `\cdots`, `\ldots`, `\vdots`, `\ddots` |
+
+```vell
+$\aleph$ $\beth$ $\gimel$ $\daleth$  (cardinals)
+$\Re$ $\Im$ $\hbar$ $\hslash$       (physics & math)
+$\square$ $\lozenge$ $\blacksquare$  (geometry)
+$\implies$ $\impliedby$ $\iff$       (extended logic)
+$\hookrightarrow$ $\longmapsto$       (extended arrows)
+$\nsubseteq$ $\subsetneq$             (extended set relations)
+$\dashv$ $\doteq$                     (misc relations)
+$\pounds$ $\checkmark$ $\S$ $\P$    (typographic symbols)
+```
+
+### Intertext
+
+Insert short text passages inside multi-line math environments without breaking alignment:
+
+```vell
+$$
+\begin{aligned}
+x + y &= z \\
+\intertext{and therefore}
+a + b &= c
+\end{aligned}
+$$
+```
+
+---
+
+## Theorem Environments
+
+Vell includes dedicated directives for mathematical writing: theorems, proofs, lemmas, corollaries, definitions, and more. Each numbered environment auto-increments its counter document-wide.
+
+### @[Theorem]
+
+```vell
+@[Theorem](label="thm:pythagoras" name="Pythagoras") {
+  For any right triangle with legs *a*, *b* and hypotenuse *c*:
+
+  $$
+  a^2 + b^2 = c^2
+  $$
+}
+```
+
+### @[Proof]
+
+```vell
+@[Proof]() {
+  Consider a square of side $a + b$. Its area is $(a + b)^2$.
+  Arrange four copies of the triangle inside — the remaining area
+  equals $c^2$. Expanding $(a+b)^2 = a^2 + 2ab + b^2$ and
+  subtracting the four triangles (area $2ab$) gives $a^2 + b^2 = c^2$.
+}
+```
+
+### @[Lemma] and @[Corollary]
+
+```vell
+@[Lemma](name="Triangle Inequality") {
+  For any triangle with sides *a*, *b*, *c*:
+
+  $$
+  a + b \geq c
+  $$
+
+  with equality only in the degenerate case.
+}
+
+@[Corollary](name="Reverse Triangle Inequality") {
+  For any triangle with sides *a*, *b*, *c*:
+
+  $$
+  |a - b| \leq c
+  $$
+}
+```
+
+### Other Math Environments
+
+```vell
+@[Definition](name="Prime Number") {
+  A natural number *p* > 1 is *prime* if its only positive
+  divisors are 1 and *p* itself.
+}
+
+@[Example]() {
+  The prime numbers less than 20 are: $2, 3, 5, 7, 11, 13, 17, 19$.
+}
+
+@[Remark]() {
+  The number 1 is neither prime nor composite by convention.
+}
+
+@[Axiom](name="Euclid's Fifth Postulate") {
+  If a line segment intersects two straight lines forming two
+  interior angles on the same side summing to less than two right
+  angles, the two lines meet on that side when extended.
+}
+
+@[Conjecture](name="Goldbach's Conjecture") {
+  Every even integer greater than 2 can be expressed as the
+  sum of two primes.
+}
+
+@[Proposition](name="Sum of First n Naturals") {
+  For any positive integer *n*:
+
+  $$
+  \sum_{k=1}^{n} k = \frac{n(n+1)}{2}
+  $$
+}
+```
+
+---
+
+## Numbered Equations and Cross-References
+
+Use `@[Equation]` to create a standalone, auto-numbered equation with an optional label:
+
+```vell
+@[Equation](label="e:mass-energy" source="E = mc^2")
+
+@[Equation](source="\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}")
+
+@[Equation](label="e:pythagoras" source="a^2 + b^2 = c^2")
+```
+
+Then reference any labeled equation or theorem with `@[Ref]`:
+
+```vell
+As shown in equation @[Ref](label="e:mass-energy"), mass and energy
+are interchangeable.
+
+Theorem @[Ref](label="thm:pythagoras") proves this geometric identity.
+```
+
+The renderer resolves references in a two-pass pipeline:
+1. **First pass** — collects all labels and computes auto-incremented numbers.
+2. **Second pass** — replaces each `@[Ref]` with a clickable link showing the resolved number (for example, `(1)` for an equation or `Theorem 1 (Pythagoras)` for a theorem).
+
+If a referenced label does not exist, the renderer displays `[?label]` in red italic text.
+
+---
+
+## Multi-Line and Structured Math Environments
+
+### Align (multi-line equations)
+
+```vell
+@[Align](source="(a + b)^2 &= a^2 + 2ab + b^2 \\ (a - b)^2 &= a^2 - 2ab + b^2") {
+  Binomial expansion identities.
+}
+```
+
+### PMatrix (matrices)
+
+```vell
+@[PMatrix](source="\begin{pmatrix} a & b \\ c & d \end{pmatrix}") {
+  A 2x2 matrix with parentheses delimiters.
+}
+```
+
+### BMatrix, VMatrix, Bmatrix
+
+```vell
+@[BMatrix](source="\begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}") {
+  A matrix with square bracket delimiters.
+}
+
+@[VMatrix](source="\begin{vmatrix} a & b \\ c & d \end{vmatrix}") {
+  A matrix with vertical bar delimiters (determinant notation).
+}
+```
+
+### Cases (piecewise functions)
+
+```vell
+@[Cases](source="f(x) = \begin{cases} x^2 & \text{if } x \geq 0 \\ -x^2 & \text{if } x < 0 \end{cases}") {
+  A piecewise function definition.
+}
+```
+
+### Gathered, Flalign, SmallMatrix
+
+Multi-line environments can also be used inside `$$` block math via LaTeX commands:
+
+```vell
+$$
+\begin{gathered}
+x + y = z \\
+a + b = c
+\end{gathered}
+$$
+
+$$
+\begin{flalign}
+x + y &= z & a &= b \\
+u + v &= w & p &= q
+\end{flalign}
+$$
+
+Small matrix for inline use:
+
+```vell
+Small matrix: $\begin{smallmatrix} a & b \\ c & d \end{smallmatrix}$.
+```
+
+**Complete list of supported LaTeX environments:**
+
+| Environment | Description | Alignment |
+|---|---|---|
+| `pmatrix` | Matrix with parentheses | Center |
+| `bmatrix` | Matrix with square brackets | Center |
+| `Bmatrix` | Matrix with braces | Center |
+| `vmatrix` | Matrix with vertical bars | Center |
+| `Vmatrix` | Matrix with double vertical bars | Center |
+| `matrix` | Plain matrix (no delimiters) | Center |
+| `smallmatrix` | Inline-sized matrix | Center |
+| `cases` | Piecewise definition | Left, left |
+| `aligned` | Multi-line with alignment | Right, left |
+| `gathered` | Multi-line centered | Center |
+| `gather` | Multi-line centered (separate equations) | Center |
+| `align` | Multi-line with multiple columns | Right, left |
+| `flalign` | Full-width alignment | Left, right |
+| `multline` | Single multi-line equation | Left (first), right (last) |
+| `split` | Aligned within a single equation | Right, left |
+
+---
+
+## MathML Output
+
+The HTML renderer converts all LaTeX math to MathML — the W3C standard for web mathematics. MathML renders natively in all modern browsers without JavaScript, scales correctly with page zoom, and is fully accessible to screen readers.
+
+```vell
+Inline: $E = mc^2$
+
+$$
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+$$
+```
+
+Produces roughly:
+
+```html
+<!-- Inline -->
+<math xmlns="http://www.w3.org/1998/Math/MathML">
+  <mi>E</mi><mo>=</mo><mi>m</mi><msup><mi>c</mi><mn>2</mn></msup>
+</math>
+
+<!-- Block -->
+<div class="vell-math-block">
+  <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+    <!-- … MathML for the sum … -->
+  </math>
+</div>
+```
+
+<Tip>
+MathML requires no external JavaScript library. Unlike MathJax or KaTeX, the Vell HTML renderer produces self-contained output — the math is ready to display the moment the page loads.
+</Tip>
+
+### KaTeX Polyfill for Older Browsers
+
+For browsers that do not support MathML natively (e.g., older Chrome versions, some mobile browsers), the renderer includes an automatic KaTeX polyfill:
+
+1. On page load, a small inline script tests MathML support by rendering a test `<math>` element and checking its rendered height.
+2. If MathML is **not** supported, the script loads KaTeX (CSS + JS) from CDN.
+3. KaTeX re-renders all `<math>` elements on the page using their `data-latex` attribute values.
+
+This polyfill is **automatic and transparent** — no configuration or extra JavaScript is needed. The KaTeX CDN script is only loaded when the browser actually needs it.
+
+---
+
+## Test Suite
+
+Vell's LaTeX-to-MathML converter is tested with a comprehensive fixture at `spec/examples/07-math-comprehensive.vl`. This fixture exercises every implemented command — over 170 LaTeX commands across Greek letters, operators, relations, sets, arrows, logic, accents, fonts, decorations, environments, and amssymb extras — and is included in the project's standard test suite.
+
+Run the parser tests against this fixture with:
+
+```bash
+cargo test spec_examples_all_parse_successfully
+```
+
+---
+
+## Complete Math Example
+
+```vell
+= Fundamental Theorem of Calculus
+
+@[Theorem](label="thm:ftc" name="Fundamental Theorem of Calculus") {
+  Let *f* be a continuous real-valued function on a closed interval. Then:
+
+  @[Equation](source="\frac{d}{dx} \int_a^x f(t) \, dt = f(x)")
+
+  @[Equation](source="\int_a^b f(x) \, dx = F(b) - F(a)")
+}
+
+@[Proof]() {
+  By the definition of the derivative:
+
+  @[Equation](source="F'(x) = \lim_{h \to 0} \frac{1}{h} \int_x^{x+h} f(t) \, dt = f(x)")
+}
+
+As shown in @[Ref](label="thm:ftc"), differentiation and integration
+are inverse operations. The inline form $\int_a^b f(x)\,dx = F(b) - F(a)$
+is one of the most important results in mathematics.
+```

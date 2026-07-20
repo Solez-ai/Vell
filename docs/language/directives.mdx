@@ -1,0 +1,591 @@
+---
+title: "Vell Directives: Built-in Commands and Extension Points"
+sidebarTitle: "Directives"
+description: "Use Vell's built-in directives for figures, math, diagrams, charts, interactive inputs, and document structure. Learn the @[Name](props) directive syntax."
+---
+
+Directives are Vell's primary extension mechanism. They follow the `@[Name](props)` pattern and can optionally carry a block body wrapped in `{ }`. Directives let you embed figures, render diagrams and charts, define theorem environments, insert interactive controls, and structure complex multi-column layouts — all without modifying the core grammar. Extensions can also add entirely new directives using the namespaced `@[org/Name]` form.
+
+## Directive Syntax
+
+Every directive shares the same structure:
+
+```vell
+@[DirectiveName](property1=value1 property2="value 2")
+```
+
+When the directive owns a block body, open a `{` on the same line and close with `}` on its own line:
+
+```vell
+@[DirectiveName](prop=value) {
+  Block content goes here.
+
+  Any valid Vell block content is allowed.
+}
+```
+
+Self-closing directives (no body) do not need the curly braces at all:
+
+```vell
+@[Figure](src="chart.png" caption="Quarterly data")
+
+@[Meta](title="My Doc" author="Jane Doe" date="2026-01-15" lang=en)
+```
+
+### Property Value Types
+
+| Type | Syntax | Example |
+|------|--------|---------|
+| String (quoted) | `name="value"` | `caption="My chart"` |
+| String (bare) | `name=bareword` | `lang=en` |
+| Number | `name=42` | `min=0` |
+| Boolean | `name=true` | `enabled=true` |
+| Variable reference | `name=@{var}` | `data=@{count}` |
+| Null | `name=null` | `optional=null` |
+
+Multiple properties are separated by spaces:
+
+```vell
+@[Figure](src="arch.png" width=800 height=600 caption="Architecture")
+```
+
+### Inline Directives
+
+Some directives can appear inside paragraph text as inline components:
+
+```vell
+Use the @[Slider](min=0 max=100 bind=count label="Value") to pick a number.
+
+See @[Ref](label="e:mass-energy") for the energy-mass equivalence equation.
+```
+
+---
+
+## Document Directives
+
+These directives control document-level metadata and composition.
+
+### @[Meta]
+
+Sets document metadata: title, author, date, and language. Place it at the top of your document.
+
+```vell
+@[Meta](title="Research Note" author="Samin Yeasar" date="2026-01-15" lang=en)
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `title` | string | Document title (overrides the first `= Heading`) |
+| `author` | string | Author name |
+| `date` | string | Publication date (ISO-8601 recommended) |
+| `lang` | string | BCP-47 language tag, e.g. `en`, `fr`, `de`. Sets both `lang` and `dir` attributes on the rendered `<html>` element — direction is auto-inferred: `ar`, `he`, `fa`, `ur` and other RTL scripts get `dir="rtl"`. |
+
+### @[Include]
+
+Merges the content of another Vell file into the current document before parsing. Useful for splitting large documents across multiple files.
+
+```vell
+= My Book
+
+@[Include](path="chapter1.vl")
+@[Include](path="chapter2.vl")
+@[Include](path="appendix.vl")
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `path` | string | Yes | Path to the `.vl` file. Relative to the including file's directory. |
+
+<Warning>
+Circular includes (A includes B, B includes A) are detected and produce an error. The path value must use double quotes — bare paths and single quotes are not supported.
+</Warning>
+
+### @[Template]
+
+Applies a named document template that defines the overall page layout and visual structure. Renderers use the template to select the appropriate stylesheet and HTML skeleton.
+
+```vell
+@[Template](name="academic-paper")
+```
+
+### @[Theme]
+
+Applies a named visual theme to the rendered output.
+
+```vell
+@[Theme](name=dark)
+```
+
+---
+
+## Structure Directives
+
+These directives control document layout and visual grouping.
+
+### @[Figure]
+
+Embeds an image with an optional caption. Produces a semantic `<figure>` element in HTML.
+
+```vell
+@[Figure](src="/images/architecture.png" caption="System architecture overview")
+
+@[Figure](src="chart.png" width=800 height=400 caption="Q4 Revenue")
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `src` | string | Image source path or URL |
+| `caption` | string | Caption displayed below the image |
+| `width` | number | Image width in pixels |
+| `height` | number | Image height in pixels |
+
+### @[Layout] and @[Column]
+
+Create a multi-column layout. Wrap `@[Column]` directives inside a `@[Layout]` directive:
+
+```vell
+@[Layout](columns=2) {
+  @[Column] {
+    == Left Column
+
+    Content for the left column.
+  }
+
+  @[Column] {
+    == Right Column
+
+    Content for the right column.
+  }
+}
+```
+
+| Property (Layout) | Type | Description |
+|-------------------|------|-------------|
+| `columns` | number | Number of columns |
+
+### @[Frame]
+
+Wraps content in a bordered box, useful for highlighting sections:
+
+```vell
+@[Frame](title="Key Result") {
+  For any right triangle, $a^2 + b^2 = c^2$.
+}
+```
+
+### @[Slide]
+
+Defines a single slide in a presentation deck. Use multiple `@[Slide]` directives to build a complete slide show rendered with reveal.js via `vell render slides`.
+
+```text
+@[Slide] {
+  == Introduction
+
+  - What is Vell?
+  - Why a new markup language?
+}
+
+@[Slide] {
+  == Live Demo
+
+  (nested code block here)
+}
+
+@[Slide] {
+  == Conclusion
+
+  Thank you! Questions?
+}
+```
+
+---
+
+## Math and Science Directives
+
+These directives provide the full set of formal mathematical writing environments. Numbered environments auto-increment document-wide.
+
+### @[Equation]
+
+Renders a standalone, auto-numbered equation. Supply the LaTeX source via the `source` property:
+
+```vell
+@[Equation](label="e:mass-energy" source="E = mc^2")
+
+@[Equation](source="\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}")
+
+@[Equation](label="e:quadratic" source="x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}")
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `source` | string | Yes | LaTeX math expression |
+| `label` | string | No | Unique label for cross-referencing |
+
+### @[Ref]
+
+Creates a cross-reference to a labeled equation or theorem. Renders as a clickable link in HTML.
+
+```vell
+See @[Ref](label="e:mass-energy") for the mass-energy equivalence.
+
+Theorem @[Ref](label="thm:pythagoras") proves the result geometrically.
+```
+
+| Resolved target | Display text |
+|----------------|--------------|
+| `@[Equation]` | `(1)` — auto-incremented number |
+| `@[Theorem]` | `Theorem 1 (Name)` |
+| `@[Lemma]` | `Lemma 1` |
+| `@[Proof]` | `Proof` |
+| Unknown label | `[?label]` in red italic |
+
+### Theorem Environments
+
+All theorem-like environments support `name` and `label` properties. Numbered types auto-increment their own counters.
+
+<Accordion title="@[Theorem] — numbered">
+```vell
+@[Theorem](label="thm:ftc" name="Fundamental Theorem of Calculus") {
+  Let *f* be continuous on $[a, b]$. Then:
+
+  $$
+  \frac{d}{dx} \int_a^x f(t) \, dt = f(x)
+  $$
+}
+```
+</Accordion>
+
+<Accordion title="@[Proof] — unnumbered">
+```vell
+@[Proof]() {
+  By the definition of the derivative applied to the antiderivative.
+}
+```
+</Accordion>
+
+<Accordion title="@[Lemma] — numbered">
+```vell
+@[Lemma](name="Triangle Inequality") {
+  For any triangle with sides *a*, *b*, *c*: $a + b \geq c$.
+}
+```
+</Accordion>
+
+<Accordion title="@[Corollary] — numbered">
+```vell
+@[Corollary](name="Reverse Triangle Inequality") {
+  $|a - b| \leq c$ for any triangle.
+}
+```
+</Accordion>
+
+<Accordion title="@[Definition] — numbered">
+```vell
+@[Definition](name="Prime Number") {
+  A natural number *p* > 1 whose only positive divisors are 1 and *p*.
+}
+```
+</Accordion>
+
+<Accordion title="@[Example] — unnumbered">
+```vell
+@[Example]() {
+  The primes below 20 are $2, 3, 5, 7, 11, 13, 17, 19$.
+}
+```
+</Accordion>
+
+<Accordion title="@[Remark] — unnumbered">
+```vell
+@[Remark]() {
+  By convention, 1 is neither prime nor composite.
+}
+```
+</Accordion>
+
+<Accordion title="@[Axiom] — numbered">
+```vell
+@[Axiom](name="Euclid's Fifth Postulate") {
+  Parallel lines never meet in Euclidean geometry.
+}
+```
+</Accordion>
+
+<Accordion title="@[Conjecture] — numbered">
+```vell
+@[Conjecture](name="Goldbach's Conjecture") {
+  Every even integer greater than 2 is the sum of two primes.
+}
+```
+</Accordion>
+
+<Accordion title="@[Proposition] — numbered">
+```vell
+@[Proposition](name="Sum of First n Naturals") {
+  $\sum_{k=1}^{n} k = \frac{n(n+1)}{2}$
+}
+```
+</Accordion>
+
+### Math Structure Directives
+
+```vell
+@[Align](source="(a+b)^2 &= a^2 + 2ab + b^2 \\ (a-b)^2 &= a^2 - 2ab + b^2") {
+  Binomial square identities.
+}
+
+@[PMatrix](source="\begin{pmatrix} a & b \\ c & d \end{pmatrix}") {
+  A 2x2 matrix.
+}
+
+@[Cases](source="f(x) = \begin{cases} x^2 & x \geq 0 \\ -x^2 & x < 0 \end{cases}") {
+  A piecewise function.
+}
+```
+
+### @[Chem]
+
+Renders a chemical formula or reaction equation:
+
+```vell
+@[Chem](source="H_2O + CO_2 \rightarrow H_2CO_3")
+```
+
+---
+
+## Diagram and Chart Directives
+
+### @[Diagram]
+
+Renders a visual diagram. Supports Mermaid.js, ASCII art, and general diagram formats:
+
+<CodeGroup>
+```vell Mermaid flowchart
+@[Diagram](type=mermaid caption="Request lifecycle") {
+  sequenceDiagram
+    participant Client
+    participant Server
+    Client->>Server: POST /api/render
+    Server-->>Client: 200 OK
+}
+```
+
+```vell ASCII art
+@[Diagram](type=ascii caption="Network topology") {
+  +--------+        +--------+
+  | Client |------->| Server |
+  +--------+        +--------+
+}
+```
+</CodeGroup>
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `type` | string | `general` | `mermaid`, `ascii`, or `general` |
+| `caption` | string | — | Caption displayed below the diagram |
+
+<Note>
+Mermaid diagrams require the Mermaid.js library to be loaded on the page for client-side rendering. The Vell HTML renderer wraps Mermaid content in a `<div class="mermaid">` container — Mermaid.js picks it up automatically if loaded.
+</Note>
+
+### @[Chart]
+
+Renders an inline SVG bar chart from tabular data:
+
+```vell
+@[Chart](type=bar title="Quarterly Revenue") {
+  Q1, 45000
+  Q2, 62000
+  Q3, 38000
+  Q4, 71000
+}
+```
+
+Each line in the body is `label, value`. The chart auto-scales to the data range, cycles through 8 colors, and renders as a self-contained SVG with no external dependencies.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `type` | string | `bar` | Chart type. Currently `bar` is supported. |
+| `title` | string | — | Title displayed above the chart |
+
+### @[Plot]
+
+Renders a mathematical function plot:
+
+```vell
+@[Plot](fn="sin(x)" xmin=-6.28 xmax=6.28 caption="sin(x) over [-2π, 2π]")
+```
+
+---
+
+## Content Directives
+
+### @[Code]
+
+Displays a code snippet with optional syntax highlighting. Equivalent to a fenced code block but available as a directive with additional properties:
+
+```vell
+@[Code](lang=rust title="Hello World") {
+  fn main() {
+      println!("Hello, Vell!");
+  }
+}
+```
+
+### @[Cite]
+
+Inserts a formatted bibliography citation:
+
+```vell
+This result was shown by @[Cite](key=smith2023) and extended by @[Cite](key=jones2024).
+```
+
+### @[Accessibility]
+
+Adds ARIA attributes and alt text to a block for screen reader accessibility:
+
+```vell
+@[Accessibility](role=banner label="Page header") {
+  = My Document
+}
+```
+
+### @[Animation]
+
+Wraps content in an animated container. Animation type and timing are renderer-dependent:
+
+```vell
+@[Animation](type=fade-in duration=300) {
+  This content fades in when the page loads.
+}
+```
+
+---
+
+## Navigation Directives
+
+### @[Toc]
+
+Inserts a table of contents generated from document headings at the current position (HTML mode). In PDF mode the TOC is generated automatically at the document start.
+
+```vell
+@[Toc]()
+```
+
+### @[Lof]
+
+Inserts a List of Figures at the current position:
+
+```vell
+@[Lof]()
+```
+
+### @[Lot]
+
+Inserts a List of Tables at the current position:
+
+```vell
+@[Lot]()
+```
+
+---
+
+## Interactive Directives
+
+Use these directives to bind HTML form controls to `@var` variables. See [Variables and Reactivity](/language/variables) for full documentation.
+
+| Directive | Control | Example |
+|-----------|---------|---------|
+| `@[Slider]` | Range slider | `@[Slider](min=0 max=100 bind=value label="Pick")` |
+| `@[Input]` | Text / number input | `@[Input](type=text bind=name label="Name:")` |
+| `@[Checkbox]` | Checkbox | `@[Checkbox](bind=enabled label="Enable")` |
+| `@[Select]` | Dropdown menu | `@[Select](bind=choice label="Choose:") { ... }` |
+| `@[Button]` | Button element | `@[Button](label="Run")` |
+| `@[On]` | Declarative event action | `@[On](event=click action="count += 1") { ... }` |
+| `@[Run]` | Sandboxed JavaScript cell | `@[Run](lang=javascript source="console.log(1)")` |
+| `@[Notebook]` | Notebook section | `@[Notebook] { ... }` |
+
+`@[Chart](bind=data)` also subscribes a chart to a reactive array or object. See [Interactive documents](/language/interactivity) for the action grammar, executable-cell security model, and supported chart data shapes.
+
+---
+
+## Extension Directives
+
+Anyone can add new directives without modifying the Vell grammar by using the namespaced `@[org/Name]` syntax. Extension directives follow the same `@[Name](props) { body }` syntax as built-in directives.
+
+```vell
+@[myorg/Widget](data=42 color="blue") {
+  Custom widget content goes here.
+}
+
+@[acme/Chart3D](src="data.json" rotate=true)
+```
+
+**Rules:**
+- Extension names must contain a `/` separator between the namespace and the directive name.
+- The parser never rejects an unknown extension — unrecognized extensions are preserved and passed through safely.
+- Extension bodies are parsed as nested Vell documents, so they can contain any valid block content.
+- Renderers that do not recognize an extension may output the body content as a fallback, skip it, or pass it to a plugin.
+
+<Tip>
+If you are building a Vell plugin, prefix all your directives with a consistent namespace (for example, `mylib/`) to avoid collisions with future built-in directives.
+</Tip>
+
+---
+
+## Directive Quick Reference
+
+| Category | Directive | Numbered | Has Body |
+|----------|-----------|----------|----------|
+| Document | `@[Meta]` | — | No |
+| Document | `@[Include]` | — | No |
+| Document | `@[Template]` | — | No |
+| Document | `@[Theme]` | — | No |
+| Structure | `@[Figure]` | — | No |
+| Structure | `@[Layout]` | — | Yes |
+| Structure | `@[Column]` | — | Yes |
+| Structure | `@[Frame]` | — | Yes |
+| Structure | `@[Slide]` | — | Yes |
+| Math | `@[Equation]` | Yes | No |
+| Math | `@[Ref]` | — | No (inline) |
+| Math | `@[Theorem]` | Yes | Yes |
+| Math | `@[Proof]` | No | Yes |
+| Math | `@[Lemma]` | Yes | Yes |
+| Math | `@[Corollary]` | Yes | Yes |
+| Math | `@[Definition]` | Yes | Yes |
+| Math | `@[Example]` | No | Yes |
+| Math | `@[Remark]` | No | Yes |
+| Math | `@[Axiom]` | Yes | Yes |
+| Math | `@[Conjecture]` | Yes | Yes |
+| Math | `@[Proposition]` | Yes | Yes |
+| Math | `@[Align]` | — | Yes |
+| Math | `@[PMatrix]` | — | Yes |
+| Math | `@[Cases]` | — | Yes |
+| Math | `@[Chem]` | — | No |
+| Diagrams | `@[Diagram]` | — | Yes |
+| Diagrams | `@[Chart]` | — | Yes |
+| Diagrams | `@[Plot]` | — | No |
+| Content | `@[Code]` | — | Yes |
+| Content | `@[Cite]` | — | No (inline) |
+| Content | `@[Accessibility]` | — | Yes |
+| Content | `@[Animation]` | — | Yes |
+| Navigation | `@[Toc]` | — | No |
+| Navigation | `@[Lof]` | — | No |
+| Navigation | `@[Lot]` | — | No |
+| Publishing | `@[Book]` | — | Yes |
+| Publishing | `@[Part]` | — | Yes |
+| Publishing | `@[Chapter]` | — | Yes |
+| Publishing | `@[Appendix]` | — | Yes |
+| Publishing | `@[Foreword]` | — | Yes |
+| Publishing | `@[Preface]` | — | Yes |
+| Publishing | `@[Index]` | — | Optional |
+| Publishing | `@[Glossary]` | — | Optional |
+| Navigation | `@[PageRef]` | — | No |
+| Interactive | `@[Button]` | — | Optional |
+| Interactive | `@[On]` | — | Yes |
+| Interactive | `@[Run]` | — | Optional |
+| Interactive | `@[Notebook]` | — | Yes |
+| Interactive | `@[Slider]` | — | No (inline) |
+| Interactive | `@[Input]` | — | No (inline) |
+| Interactive | `@[Select]` | — | Yes |
+| Interactive | `@[Checkbox]` | — | No (inline) |

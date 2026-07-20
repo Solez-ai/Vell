@@ -1,0 +1,231 @@
+---
+title: "Vell PDF Renderer: renderToPdfBuffer() API Reference"
+sidebarTitle: "PDF Renderer"
+description: "Render Vell documents directly to PDF — no HTML intermediate. Supports headings, tables, math, footnotes, code blocks, and cross-references."
+---
+
+The `@solez-ai/vell-renderer-pdf` package converts a parsed Vell AST directly to a PDF binary. Unlike approaches that render HTML first and then print to PDF, this renderer draws directly to a PDF canvas — giving you predictable page layout, consistent typography, and no dependency on a headless browser or print engine.
+
+## Installation
+
+```bash
+npm install @solez-ai/vell-renderer-pdf
+```
+
+You also need the Vell parser:
+
+```bash
+npm install @solez-ai/vell
+```
+
+## API
+
+<ParamField path="renderToPdfBuffer(doc)" type="function">
+  Renders a `VellDocument` to a `Uint8Array` containing the raw PDF bytes. The function is synchronous and self-contained — it builds the entire PDF in memory and returns it as a typed array you can write to disk, stream over HTTP, or pass to a `Blob` constructor in the browser.
+</ParamField>
+
+### TypeScript signature
+
+```typescript
+import type { VellDocument } from '@solez-ai/vell';
+
+export function renderToPdfBuffer(doc: VellDocument): Uint8Array;
+```
+
+## Quick Start
+
+```typescript
+import { parse } from '@solez-ai/vell';
+import { renderToPdfBuffer } from '@solez-ai/vell-renderer-pdf';
+import { writeFileSync } from 'fs';
+
+const source = `
+= Technical Report
+
+== Introduction
+
+This is a sample PDF document rendered from Vell.
+
+== Mathematical Analysis
+
+$$
+\\int_0^1 x^2 \\, dx = \\frac{1}{3}
+$$
+`;
+
+const result = parse(source);
+if (result.errors.length === 0) {
+  const pdfBytes = renderToPdfBuffer(result.document);
+  writeFileSync('output.pdf', Buffer.from(pdfBytes));
+}
+```
+
+<Note>
+  Notice that `renderToPdfBuffer` is **synchronous** — it returns a `Uint8Array` directly, not a `Promise`. You do not need `await`.
+</Note>
+
+## Page Layout
+
+The renderer uses A4 page size with uniform margins on all sides. All measurements are in PDF points (1 point ≈ 0.353 mm):
+
+| Property | Value |
+|---|---|
+| Page width | 595.28 pt (A4) |
+| Page height | 841.89 pt (A4) |
+| Margins (all sides) | 56.69 pt (~20 mm) |
+| Content width | 481.89 pt |
+
+Automatic page breaks are handled by the renderer — when the current cursor position would overflow the page, a new page is added and the cursor resets to the top margin.
+
+## Typography
+
+The renderer uses the built-in PDF fonts (no font files required):
+
+| Element | Font | Size | Notes |
+|---|---|---|---|
+| Body text | Helvetica | 10 pt | Line height 1.35 |
+| Heading 1 | Helvetica-Bold | 22 pt | 24 pt space before |
+| Heading 2 | Helvetica-Bold | 16 pt | 18 pt space before |
+| Heading 3 | Helvetica-Bold | 13 pt | 14 pt space before |
+| Heading 4 | Helvetica-Bold | 11 pt | 14 pt space before |
+| Code blocks | Courier | 8 pt | Gray background |
+| Math blocks | Courier | 10 pt | Light gray background |
+| Footnotes | Helvetica | 8 pt | After divider line |
+| Code labels | Helvetica-Oblique | 8 pt | Muted gray |
+
+## Features
+
+### Headings H1–H4
+
+Headings render in Helvetica-Bold at sizes matching the document hierarchy. The renderer infers spacing from the heading level and ensures there is enough room on the current page before drawing — if not, a new page starts.
+
+```vell
+= Document Title
+== Section
+=== Subsection
+==== Paragraph Heading
+```
+
+### Styled Inline Text
+
+Paragraphs support the full range of inline styles. The renderer builds a list of styled text spans and merges consecutive runs with the same style for efficient output:
+
+| Style | Appearance |
+|---|---|
+| Bold | Bold weight |
+| Italic | Oblique/italic |
+| Bold + Italic | Bold oblique |
+| Monospace (`code`) | Fixed-width font |
+| Underline | Underlined text |
+| Strikethrough | Struck-through text |
+
+### Blockquotes
+
+Blockquotes render with a 2 pt vertical bar on the left edge and a 12 pt indent. Admonition types (`NOTE`, `TIP`, `WARNING`, `IMPORTANT`, `CAUTION`) print the type label in bold before the body.
+
+### Code Blocks
+
+Code blocks render with a gray (`#f5f5f5`) background rectangle, the language identifier printed in muted italic at the top, and the code content in a fixed-width font at 8 pt. The language tag (e.g., `typescript`, `python`) appears as a small muted label above the code.
+
+### Math Blocks
+
+Math blocks render with a light gray (`#fafafa`) background. Because the PDF renderer does not perform MathML conversion, math source is typeset in a fixed-width font as-is. For production-quality math rendering in PDF, consider pre-converting LaTeX to SVG and embedding the SVG, or using the HTML renderer with a print stylesheet.
+
+### Tables
+
+Tables render with manual cell drawing. The first row uses a `#f0f0f0` header background and Helvetica-Bold. Body rows use Helvetica with `#cccccc` cell borders and 0.5 pt stroke weight. The content width is divided equally across columns.
+
+```vell
+| Feature | Status |
+|---------|--------|
+| Parser  | Complete |
+| PDF renderer | Complete |
+```
+
+### Footnotes
+
+The renderer pre-scans the document for `FootnoteDefinition` nodes and collects inline `FootnoteRef` occurrences during paragraph rendering. After all block content, it draws a divider line and prints the footnote list in Helvetica 8 pt.
+
+### Auto-Numbered Equations and Theorems
+
+`@[Equation]` directives increment an equation counter per document. The equation number is printed right-aligned in parentheses, and the LaTeX source is rendered in Courier below it:
+
+```vell
+@[Equation](source="E = mc^2" label=e:mass-energy)
+```
+
+Theorem environments (`@[Theorem]`, `@[Lemma]`, `@[Corollary]`, `@[Definition]`, `@[Axiom]`, `@[Conjecture]`, `@[Proposition]`) are auto-numbered per type. `@[Proof]`, `@[Remark]`, `@[Example]`, and `@[Notation]` are unnumbered. All render the environment name (and number, if applicable) in Helvetica-Bold followed by the body content.
+
+### Cross-Reference Resolution
+
+`@[Ref](label=...)` directives resolve to the display text of the referenced equation or theorem. Resolved references render in blue (`#2b6cb0`) underlined text. Unresolved references render in red italic `[?label]`:
+
+```vell
+@[Equation](source="F = ma" label=newtons-second)
+
+Newton's second law, @[Ref](label=newtons-second), states that force equals mass times acceleration.
+```
+
+### Diagrams
+
+Diagram blocks render as labeled containers showing the diagram type and the raw source in Courier, with an optional caption below:
+
+```vell
+@[Diagram](type=mermaid caption="System architecture") {
+  graph TD
+    A[Client] --> B[API]
+    B --> C[Database]
+}
+```
+
+The PDF renderer does not execute Mermaid or Graphviz — it records the source as text. Use the HTML renderer if you need rendered diagram images.
+
+### Extension Fallback
+
+Unknown `@[org/Name]` extensions render as a muted italic label `[Extension: org/Name]` followed by any block body children. The renderer never crashes on an unsupported extension.
+
+## Serving a PDF Over HTTP
+
+You can stream the `Uint8Array` directly as an HTTP response in Node.js:
+
+```typescript
+import { parse } from '@solez-ai/vell';
+import { renderToPdfBuffer } from '@solez-ai/vell-renderer-pdf';
+import { readFileSync } from 'fs';
+import http from 'http';
+
+http.createServer((req, res) => {
+  const source = readFileSync('document.vl', 'utf8');
+  const result = parse(source);
+
+  if (result.errors.length > 0) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Parse errors: ' + result.errors.map(e => e.message).join(', '));
+    return;
+  }
+
+  const pdfBytes = renderToPdfBuffer(result.document);
+
+  res.writeHead(200, {
+    'Content-Type': 'application/pdf',
+    'Content-Length': pdfBytes.byteLength,
+    'Content-Disposition': 'attachment; filename="document.pdf"',
+  });
+
+  res.end(Buffer.from(pdfBytes));
+}).listen(3000);
+```
+
+## Metadata in the PDF
+
+Document metadata from the Vell `@[Meta]` directive is written to the PDF's Info dictionary:
+
+```vell
+@[Meta](title="Quarterly Report" author="Jane Smith")
+```
+
+This sets the `Title` and `Author` fields visible in PDF viewer properties dialogs and accessible to screen readers.
+
+<Warning>
+  The PDF renderer does not support the full LaTeX math rendering pipeline — math source is typeset as literal text in a fixed-width font. If your document contains complex equations that must render with proper mathematical notation, use the HTML renderer and print to PDF from the browser, or pre-convert equations to SVG images before rendering.
+</Warning>

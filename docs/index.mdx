@@ -1,0 +1,84 @@
+---
+title: "Vell: Readable Syntax, LaTeX Power, Full Toolchain"
+sidebarTitle: "Home"
+description: "Vell is a deterministic document markup language with reactive variables, math support, and a full toolchain — CLI, LSP, WASM, HTML/PDF renderers."
+---
+
+Vell is a next-generation document markup language designed for authors who want clean, readable source files without sacrificing the expressive power of LaTeX. Write `.vl` documents with a familiar Markdown-like syntax, then render them to polished HTML, PDF, or reveal.js slide decks — all from a single deterministic abstract syntax tree.
+
+<CardGroup cols={2}>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Learn what Vell is, why it exists, and how it compares to Markdown and LaTeX.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Go from zero to a rendered HTML document in under five minutes.
+  </Card>
+  <Card title="Language Reference" icon="code" href="/language/syntax">
+    Explore the full Vell syntax — headings, math, tables, variables, directives, and more.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/tooling/cli">
+    Parse, format, render, and validate your `.vl` files from the command line.
+  </Card>
+  <Card title="API Reference" icon="puzzle-piece" href="/api/vell-js">
+    Use the `@solez-ai/vell` WASM package in Node.js or the browser.
+  </Card>
+  <Card title="Extensions" icon="blocks" href="/extensions/overview">
+    Build and distribute custom directives using the `@[org/Name]` extension system.
+  </Card>
+</CardGroup>
+
+## What is Vell?
+
+Vell source files use the `.vl` extension and are plain UTF-8 text. The reference parser — written in Rust and compiled to WebAssembly — produces a **versioned, deterministic AST**: the same source always yields the same output, regardless of renderer version or environment. Variables, for-loops, and conditionals make documents reactive without requiring a separate templating engine.
+
+<CodeGroup>
+```vell document.vl
+@[Meta](title="My Document" author="You")
+
+= Hello, Vell!
+
+@var name = "World"
+
+Welcome to @{name}! Vell is simple, expressive, and powerful.
+
+== Math Support
+
+Inline: $E = mc^2$
+
+Block:
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+
+== Tables
+
+| Feature   | Description                         |
+|-----------|-------------------------------------|
+| Parser    | PEG grammar, linear-time O(n)       |
+| Formatter | Idempotent canonical formatting     |
+| LSP       | Diagnostics, completions, hover     |
+```
+</CodeGroup>
+
+## Key Features
+
+<CardGroup cols={3}>
+  <Card title="Deterministic AST" icon="binary">
+    A formal PEG grammar guarantees that every valid `.vl` file produces exactly one AST — no flavor-dependent surprises.
+  </Card>
+  <Card title="LaTeX Math" icon="function">
+    Write `$...$` for inline math and `$$...$$` for block equations. Math is rendered as native MathML in HTML output.
+  </Card>
+  <Card title="Reactive Variables" icon="bolt">
+    Declare variables with `@var`, interpolate them with `@{name}`, and iterate with `@for` and `@if` blocks.
+  </Card>
+  <Card title="Rich Directives" icon="wand-magic-sparkles">
+    Over 30 built-in directives — figures, theorems, equations, diagrams, charts, slides, and more.
+  </Card>
+  <Card title="Full Toolchain" icon="wrench">
+    CLI, idempotent formatter, LSP server with 20+ features, VS Code extension, and WASM bindings ship out of the box.
+  </Card>
+  <Card title="Multiple Output Formats" icon="file-export">
+    Render to HTML5, PDF, or a self-contained reveal.js slide deck — all from one source.
+  </Card>
+</CardGroup>

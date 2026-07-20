@@ -1,0 +1,161 @@
+---
+title: "Vell Extension System: Custom Directives and Plugins"
+sidebarTitle: "Overview"
+description: "Vell extensions use namespaced @[org/Name](props) syntax. The parser preserves unknown extensions; renderers handle them via registered adapters."
+---
+
+Vell's extension system lets you add custom directives to any document without forking the parser or modifying the language specification. Extensions follow the same `@[org/Name](props) { body }` syntax as built-in directives, but they carry a namespace prefix that signals to the parser that they belong to a third-party or domain-specific vocabulary. The parser preserves every extension it encounters as a first-class AST node — it never errors on an unknown extension — so your documents remain valid and portable even across renderer versions that haven't caught up with your latest plugin.
+
+## Extension Syntax
+
+An extension directive looks like this:
+
+```vell
+@[org/Name](prop1="value" prop2=42) {
+  Optional block body with *Vell* content.
+}
+```
+
+Breaking it down:
+
+- **`org/Name`** — The extension name. The `/` separator is mandatory and distinguishes extensions from built-in directives (which have no `/`). The part before `/` is the namespace; the part after is the name.
+- **`(prop1="value" prop2=42)`** — Optional property list. Supported value types are strings, numbers, booleans, null, and variable references (`@{varName}`).
+- **`{ ... }`** — Optional block body. The body is parsed as a full Vell document, so it can contain paragraphs, bold text, lists, nested directives, and more.
+
+### Minimal example
+
+```vell
+@[embed/YouTube](id="dQw4w9WgXcQ" title="Demo Video")
+```
+
+### Example with a body block
+
+```vell
+@[npm/callout](type=warning title="Before you continue") {
+  Make sure you have saved your work. This action **cannot** be undone.
+}
+```
+
+## Naming Conventions
+
+Extension names follow the pattern `namespace/Name`:
+
+| Namespace | Intended usage |
+|---|---|
+| `embed/` | Media embeds — YouTube, Vimeo, maps, iframes |
+| `npm/` | Open-source adapters published to the npm registry |
+| `gh/` | GitHub-hosted extensions |
+| `myorg/` | Private extensions scoped to your organization |
+
+<Tip>
+  Use PascalCase for the name portion (`embed/YouTube`, `myorg/Widget`) and lowercase for the namespace. Names without a `/` are reserved for Vell's built-in directives and will not be treated as extensions.
+</Tip>
+
+## How the Parser Handles Extensions
+
+The Vell parser is completely agnostic about extension names. When it encounters a directive with a `/` in the name, it emits an `Extension` AST node and moves on:
+
+```json
+{
+  "type": "Extension",
+  "name": "myorg/Widget",
+  "props": {
+    "data": "hello",
+    "count": 3
+  },
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [{ "type": "Text", "value": "Optional body content." }]
+    }
+  ],
+  "raw_source": "@[myorg/Widget](data=\"hello\" count=3) { ... }"
+}
+```
+
+The parser **never** returns an error for an unrecognized extension name. This means:
+
+- Documents with private extensions parse cleanly on any machine
+- Extensions added after a document was written don't break existing parsers
+- You can safely share Vell documents that contain extensions not everyone has installed
+
+## Renderers Opt In
+
+The parser's job ends with the `Extension` node. Deciding what to do with it is the renderer's responsibility. Renderers opt into extension support by registering adapters:
+
+```
+Extension node  →  Extension Registry  →  Adapter  →  Output
+                                       ↘
+                                         Fallback (if no adapter)
+```
+
+When the HTML renderer encounters an `Extension` node:
+
+1. It checks the extension registry for a registered adapter matching `node.name`.
+2. If an adapter is found, it calls `adapter.render(node, ctx)` and uses the returned HTML string.
+3. If no adapter is found, it renders a neutral labeled `<div>` wrapper and recursively renders any child content — never crashing, never silently dropping content.
+
+## The Extension Registry
+
+The `@solez-ai/vell-extensions` package provides a centralized registry:
+
+```typescript
+import { register, getExtension, getRegisteredExtensions, renderExtension } from '@solez-ai/vell-extensions';
+
+// Register your custom adapter
+register(myAdapter);
+
+// Check what's registered
+const names = getRegisteredExtensions();
+// → ['embed/YouTube', 'embed/Vimeo', 'npm/chart', ...]
+
+// Look up a specific adapter
+const adapter = getExtension('embed/YouTube');
+
+// Render an Extension node directly
+const html = renderExtension(extensionNode);
+```
+
+The built-in extensions in `@solez-ai/vell-extensions` are auto-registered when you import the package, so you don't need to call `register` for them.
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────┐
+│  Vell Source                                │
+│  @[myorg/Widget](data="hello") { body }     │
+└─────────────────┬───────────────────────────┘
+                  │ parsing (never errors)
+                  ▼
+┌─────────────────────────────────────────────┐
+│  AST Extension Node                         │
+│  { type: "Extension",                       │
+│    name: "myorg/Widget",                    │
+│    props: { data: "hello" },                │
+│    children: [...] }                        │
+└─────────────────┬───────────────────────────┘
+                  │ rendering
+                  ▼
+┌─────────────────────────────────────────────┐
+│  Extension Registry                         │
+│  (registered: YouTube, Chart, Widget, ...)  │
+└─────────────────┬───────────────────────────┘
+                  │ adapter lookup
+          ┌───────┴────────┐
+          ▼                ▼
+  ┌──────────────┐  ┌─────────────────────┐
+  │ Adapter found│  │ No adapter — render │
+  │ adapter.render│  │ fallback container  │
+  └──────────────┘  └─────────────────────┘
+```
+
+## What's Next
+
+<CardGroup cols={2}>
+  <Card title="Built-in Extensions" icon="puzzle-piece" href="/extensions/built-in">
+    YouTube, Vimeo, charts, Mermaid diagrams, callout boxes, and map embeds — all ready to use from `@solez-ai/vell-extensions`.
+  </Card>
+  <Card title="Authoring Extensions" icon="wrench" href="/extensions/authoring">
+    Build your own extension adapter in TypeScript, register it with the registry, and distribute it as an npm package.
+  </Card>
+</CardGroup>

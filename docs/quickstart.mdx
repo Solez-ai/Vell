@@ -1,0 +1,218 @@
+---
+title: "Vell Quickstart: Write and Render Your First Document"
+sidebarTitle: "Quickstart"
+description: "Install Vell, write your first .vl document, and render it to HTML in minutes. Covers both the Rust CLI and JavaScript/Node.js paths."
+---
+
+This guide takes you from a blank terminal to a rendered HTML document in under five minutes. You will install the Vell CLI, write a `.vl` source file that demonstrates variables, math, and a table, then format it to canonical style, validate it for errors, and render it to HTML. If you prefer JavaScript, a Node.js path is included at the end.
+
+<Steps>
+
+<Step title="Install the CLI">
+
+The Vell CLI is distributed as a Rust crate. Install it with Cargo — you will need [Rust stable](https://rustup.rs) (the latest stable edition) on your machine.
+
+```bash
+cargo install --path crates/vell-cli
+```
+
+Confirm the installation succeeded:
+
+```bash
+vell --version
+```
+
+You should see output like `vell 0.1.0`. The CLI provides four subcommands: `parse`, `fmt`, `render`, and `validate`.
+
+<Note>
+  The first `cargo install` may take a few minutes to compile dependencies. Subsequent installs are faster because Cargo caches compiled artifacts.
+</Note>
+
+</Step>
+
+<Step title="Create your first .vl file">
+
+Create a file named `document.vl` in your working directory and paste in the following content:
+
+```vell document.vl
+@[Meta](title="My First Document" author="You" date="2026-01-15" lang=en)
+
+= My First Vell Document
+
+@var name = "World"
+@var features = ["readable source", "deterministic output", "reactive variables"]
+
+Welcome to @{name}! Here are some of Vell's strengths:
+
+@for feature in @{features} {
+  - @{feature}
+}
+
+== Math Support
+
+Inline math works with dollar signs: $E = mc^2$
+
+Block equations use double dollar signs:
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+
+== Feature Table
+
+| Feature   | Description                         |
+|-----------|-------------------------------------|
+| Parser    | PEG grammar, linear-time O(n)       |
+| Formatter | Idempotent canonical formatting     |
+| LSP       | Diagnostics, completions, hover     |
+| WASM      | Browser and Node.js support         |
+
+== Code Example
+
+```rust
+fn greet(name: &str) -> String {
+    format!("Hello, {name}!")
+}
+```
+```
+
+This document demonstrates metadata, reactive variables, a for-loop, inline and block math, a pipe table, and a fenced code block.
+
+</Step>
+
+<Step title="Format your document">
+
+The Vell formatter rewrites your source file to canonical style — consistent heading markers, normalized list markers, no trailing whitespace, and a single blank line between top-level blocks. The formatter is **idempotent**: running it twice produces the same output as running it once.
+
+```bash
+# Print formatted output to stdout
+vell fmt document.vl
+
+# Check whether the file is already correctly formatted (useful in CI)
+vell fmt document.vl --check
+```
+
+The `--check` flag exits with code `0` if the file is already formatted and code `1` if it would change, without modifying the file.
+
+</Step>
+
+<Step title="Validate your document">
+
+Before rendering or sharing your document, check it for errors and warnings:
+
+```bash
+vell validate document.vl
+```
+
+If the document is valid, the command exits with code `0` and no output. If there are issues, diagnostics are printed to stderr and the command exits with a non-zero code. Diagnostics include parse errors, unterminated delimiters, invalid indentation, and warnings for undefined variable references.
+
+```bash
+# Example output for a malformed document
+error: unterminated bold delimiter at line 12, column 5
+warning: variable 'count' referenced before declaration
+```
+
+</Step>
+
+<Step title="Render to HTML">
+
+Render your document to an HTML file with a single command:
+
+```bash
+vell render html document.vl -o output.html
+```
+
+Open `output.html` in any browser. You will see a styled page with your headings, the expanded variable list, MathML-rendered equations, and a formatted table. To print to stdout instead of writing a file, omit the `-o` flag:
+
+```bash
+vell render html document.vl
+```
+
+You can also pipe from stdin, which is useful in scripts:
+
+```bash
+cat document.vl | vell render html > output.html
+```
+
+<Tip>
+  Vell can also produce print-optimized HTML and reveal.js slide decks. Run `vell render pdf document.vl -o output-print.html` or `vell render slides document.vl -o slides.html`. Use `@solez-ai/vell-renderer-pdf` when you need PDF bytes directly.
+</Tip>
+
+<Tip>
+  Setting `lang` on `@Meta` activates RTL detection and CJK-optimized typography — no extra configuration needed. See the [HTML renderer docs](/rendering/html#internationalization-i18n--accessibility) for details.
+</Tip>
+
+</Step>
+
+</Steps>
+
+## JavaScript / Node.js Path
+
+If you work in a JavaScript or TypeScript project, install the npm packages instead of the Rust CLI. The `@solez-ai/vell` package wraps the compiled WebAssembly parser, and `@solez-ai/vell-renderer-html` renders the AST to HTML5.
+
+<CodeGroup>
+```bash npm
+npm install @solez-ai/vell @solez-ai/vell-renderer-html
+```
+
+```bash pnpm
+pnpm add @solez-ai/vell @solez-ai/vell-renderer-html
+```
+
+```bash yarn
+yarn add @solez-ai/vell @solez-ai/vell-renderer-html
+```
+</CodeGroup>
+
+The `@solez-ai/vell` npm package ships a pre-compiled WASM binary, so you can import and initialize the parser directly:
+
+```typescript
+import { readFileSync } from "fs";
+import init, { parseOrThrow } from '@solez-ai/vell';
+import { render } from '@solez-ai/vell-renderer-html';
+
+await init();
+
+const source = readFileSync("document.vl", "utf8");
+const document = parseOrThrow(source);
+const html = render(document);
+```
+
+For custom WASM modules built from source, register them with `setWasmModule()`:
+
+```typescript
+import init, * as wasm from "../../target/vell-wasm-pkg/vell_wasm.js";
+import { parseOrThrow, setWasmModule } from "@solez-ai/vell";
+import { render } from "@solez-ai/vell-renderer-html";
+import { readFileSync, writeFileSync } from "fs";
+
+await init();
+setWasmModule(wasm);
+
+const source = readFileSync("document.vl", "utf8");
+const document = parseOrThrow(source);
+const html = render(document);
+
+writeFileSync("output.html", html);
+console.log("Rendered to output.html");
+
+// Build with `wasm-pack build crates/vell-wasm --target bundler`
+// For browser use, use `--target web` instead.
+```
+
+## What's Next
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed setup for all environments, including VS Code, PDF renderer, and WASM.
+  </Card>
+  <Card title="Language Reference" icon="book" href="/language/syntax">
+    Explore the full syntax: directives, math environments, theorems, diagrams, and more.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/tooling/cli">
+    Full documentation for every CLI subcommand and flag.
+  </Card>
+  <Card title="API Reference" icon="puzzle-piece" href="/api/vell-js">
+    Use the `@solez-ai/vell` WASM API in Node.js or the browser.
+  </Card>
+</CardGroup>

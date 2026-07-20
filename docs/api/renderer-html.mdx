@@ -1,0 +1,321 @@
+---
+title: "@solez-ai/vell-renderer-html: HTML5 Renderer API Reference"
+sidebarTitle: "renderer-html"
+description: "API reference for @solez-ai/vell-renderer-html: render() for static HTML5 pages, renderInteractive() for reactive output, and renderToFragment() for DOM use."
+---
+
+The `@solez-ai/vell-renderer-html` package walks a parsed Vell AST and produces HTML5 output. It covers the full Vell feature set: headings, paragraphs, tables, code blocks, inline math via MathML, footnotes, cross-references, figure directives, interactive form widgets, and more. Three functions cover the most common use cases — a static full-page string, an interactive full-page string with the reactive runtime embedded, and a browser `DocumentFragment` for direct DOM insertion.
+
+## Installation
+
+```bash
+npm install @solez-ai/vell-renderer-html @solez-ai/vell
+```
+
+## Quick start
+
+```typescript
+import init, * as wasm from '../../target/vell-wasm-pkg/vell_wasm.js';
+import { setWasmModule, parse } from '@solez-ai/vell';
+import { render, renderInteractive } from '@solez-ai/vell-renderer-html';
+
+await init();
+setWasmModule(wasm);
+
+const result = parse('= Hello\n\nWelcome to **Vell**.');
+const html = render(result.document!);
+// html is a complete <!doctype html> string
+```
+
+---
+
+## Functions
+
+### `render()`
+
+Renders a Vell AST document to a complete HTML5 document string, starting with `<!doctype html>`. All block and inline nodes are translated to semantic HTML5 elements. Math nodes are converted to inline MathML. Footnotes are collected during a pre-pass and appended at the end of the `<body>`.
+
+```typescript
+function render(doc: VellDocument, options?: RenderOptions): string
+```
+
+<ParamField body="doc" type="VellDocument" required>
+  The parsed Vell document AST, as returned by `parse()` or `parseOrThrow()`
+  from `@solez-ai/vell`.
+</ParamField>
+
+<ParamField body="options" type="RenderOptions">
+  Optional rendering configuration.
+  <Expandable title="RenderOptions fields">
+    <ParamField body="interactive" type="boolean" default="false">
+      When `true`, embeds the reactive runtime `<script>` in the document
+      `<head>`. This is equivalent to calling `renderInteractive()`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+**Returns:** `string` — a complete `<!doctype html>` HTML5 document.
+
+The output document structure is:
+
+```html
+<!doctype html>
+<html lang="{metadata.lang}" dir="{ltr|rtl}">
+  <head>
+    <meta charset="utf-8">
+    <title>{metadata.title}</title>
+    <!-- reactive runtime script (only when options.interactive = true) -->
+  </head>
+  <body>
+    <!-- rendered block nodes -->
+    <section class="footnotes">…</section> <!-- if footnotes exist -->
+  </body>
+</html>
+```
+
+### i18n & Accessibility
+
+The HTML renderer includes built-in support for internationalization and accessibility:
+
+- **Language & direction**: The `lang` attribute from document metadata is set on `<html>`, and `dir` is automatically set to `"rtl"` for Arabic, Hebrew, Persian, Urdu, and 16 other RTL scripts
+- **High-contrast CSS**: A `@media (prefers-contrast: high)` theme is embedded in the default stylesheet, switching to black-on-white text, 2px borders, and underlined links when the user enables high contrast mode
+- **CJK typography**: Optimized font-family stacks for Chinese (`zh`), Japanese (`ja`), and Korean (`ko`) are included, with adjusted line-height (1.9) and heading letter-spacing
+
+No configuration is needed — set `@Meta(lang=...)` in your Vell document and the renderer handles the rest.
+
+<CodeGroup>
+```typescript Static page
+import { render } from '@solez-ai/vell-renderer-html';
+
+const html = render(doc);
+// Serve html as text/html or write to a .html file
+```
+
+```typescript With options
+import { render } from '@solez-ai/vell-renderer-html';
+
+// Identical to renderInteractive(doc)
+const html = render(doc, { interactive: true });
+```
+</CodeGroup>
+
+---
+
+### `renderInteractive()`
+
+A convenience wrapper around `render()` that always embeds the reactive runtime script. Use this when your Vell document contains `@var` declarations, `@[Slider]`, `@[Input]`, `@[Checkbox]`, or `@[Select]` directives, or `@for`/`@if` blocks that should respond to user input.
+
+```typescript
+function renderInteractive(doc: VellDocument): string
+```
+
+<ParamField body="doc" type="VellDocument" required>
+  The parsed Vell document AST.
+</ParamField>
+
+**Returns:** `string` — a complete `<!doctype html>` document with the Vell reactive runtime inlined as a `<script defer>` tag in `<head>`.
+
+```typescript
+import { renderInteractive } from '@solez-ai/vell-renderer-html';
+
+const html = renderInteractive(doc);
+// Sliders, inputs, checkboxes, and selects will be functional
+// @for loops re-render when their iterable changes
+// @if blocks show/hide based on variable conditions
+```
+
+<Note>
+  The embedded runtime script is entirely self-contained — it has no external
+  dependencies and does not make any network requests. It initializes on
+  `DOMContentLoaded` and reads initial variable values from `data-vell-init`
+  and `data-vell-data` attributes placed by the renderer.
+</Note>
+
+---
+
+### `renderToFragment()`
+
+Renders a Vell document to a browser `DocumentFragment` for direct insertion into the DOM. Unlike `render()`, this function does not produce a wrapping `<html>/<head>/<body>` structure — just the rendered content nodes. This is useful for embedding Vell output inside an existing page.
+
+```typescript
+function renderToFragment(doc: VellDocument): DocumentFragment
+```
+
+<ParamField body="doc" type="VellDocument" required>
+  The parsed Vell document AST.
+</ParamField>
+
+**Returns:** `DocumentFragment` — a browser `DocumentFragment` containing the rendered nodes, ready to append to any DOM element.
+
+```typescript
+import { renderToFragment } from '@solez-ai/vell-renderer-html';
+
+const fragment = renderToFragment(doc);
+document.getElementById('content')!.appendChild(fragment);
+```
+
+<Warning>
+  `renderToFragment()` calls `document.createElement()` and is therefore
+  **browser-only**. It will throw a `ReferenceError` in Node.js or other
+  non-browser runtimes. Use `render()` when you need a string-based output
+  that works server-side.
+</Warning>
+
+---
+
+## HTML Output Reference
+
+The following table shows how each Vell AST node maps to HTML output.
+
+### Block nodes
+
+| AST node | HTML output |
+|---|---|
+| `Heading` (level 1–6) | `<h1>`–`<h6>` with `id` attribute |
+| `Paragraph` | `<p>` |
+| `Blockquote` | `<blockquote>` (or with `class="vell-admonition"` for admonitions) |
+| `CodeBlock` | `<pre><code class="language-{lang}">` |
+| `MathBlock` | `<math display="block">` with MathML |
+| `List` (unordered) | `<ul><li>` |
+| `List` (ordered) | `<ol start="{n}"><li>` |
+| `Table` | `<table><thead><tbody>` |
+| `HorizontalRule` | `<hr>` |
+| `DefinitionList` | `<dl><dt><dd>` |
+| `FootnoteDefinition` | Collected; rendered in `<section class="footnotes">` at end |
+| `VarDeclaration` | `<meta itemprop="{name}" content="{value}">` |
+| `ForLoop` | `<div class="vell-for" data-variable="…" data-iterable="…">` |
+| `IfBlock` | `<div class="vell-if" data-condition="…">` and optional `<div class="vell-else">` |
+
+### Inline nodes
+
+| AST node | HTML output |
+|---|---|
+| `Text` | Escaped text |
+| `Bold` | `<strong>` |
+| `Italic` | `<em>` |
+| `Underline` | `<u>` |
+| `Strikethrough` | `<del>` |
+| `Code` | `<code>` |
+| `Superscript` | `<sup>` |
+| `Subscript` | `<sub>` |
+| `Link` | `<a href="…">` (URL sanitized) |
+| `Image` | `<img src="…" alt="…">` (URL sanitized) |
+| `MathInline` | `<math display="inline">` with MathML |
+| `VarInterpolation` | `<span data-vell-var="{name}">` |
+| `FootnoteRef` | `<sup><a href="#fn-{marker}">` |
+| `HardBreak` | `<br>` |
+
+### Directive nodes
+
+| Directive | HTML output |
+|---|---|
+| `@[Figure]` | `<figure><img><figcaption>` |
+| `@[Slider]` | `<input type="range" data-bind="…">` |
+| `@[Input]` | `<input type="{type}" data-bind="…">` |
+| `@[Checkbox]` | `<label><input type="checkbox" data-bind="…">` |
+| `@[Select]` | `<select data-bind="…"><option>…` |
+| `@[Toc]` | `<nav class="vell-toc">` with links to all headings |
+| `@[Equation]` | Numbered equation table with MathML |
+| `@[Theorem]` / `@[Lemma]` / etc. | `<div class="vell-theorem vell-{type}">` with auto-number |
+| `@[Ref]` | `<a href="#eq-{label}" class="vell-ref">` or `<span class="unresolved-ref">` |
+| `@[Diagram]` | `<div class="vell-diagram" data-type="…">` with mermaid/dot/pre inner content |
+| `@[Chart]` | Inline SVG bar chart |
+| `@[Frame]` | `<iframe>` with `sandbox="allow-scripts"` |
+| `@[Book]`, `@[Part]`, `@[Chapter]`, and related sections | Semantic `.vell-book-section` containers |
+| `@[Index]` | Linked marker or generated alphabetized index |
+| `@[Glossary]` | `<dfn>` marker or generated definition list |
+| `@[PageRef]` | Resolved link fallback; physical page numbers depend on the print pipeline |
+| `@[On]` | Declarative event wrapper with `data-vell-on` and `data-vell-action` |
+| `@[Run]` | Sandboxed executable cell |
+| `@[Notebook]` | `.vell-notebook` section |
+
+---
+
+## Interactive Runtime
+
+When you call `renderInteractive()` (or `render(doc, { interactive: true })`), a self-contained JavaScript runtime is embedded in the `<head>` as a `<script defer>` tag. The runtime provides a reactive variable store with pub/sub, DOM bindings, and re-rendering for interactive constructs.
+
+<Tabs>
+  <Tab title="Variable store">
+    The runtime maintains a central `store` object mapping variable names to
+    values. Variables declared with `@var` in the Vell document are loaded
+    automatically from `<meta itemprop>` and `data-vell-init` attributes.
+
+    ```javascript
+    // The runtime exposes these (conceptually) for inter-widget coordination:
+    store['price']    // → current value of @var price
+    store['quantity'] // → current value of @var quantity
+    ```
+
+    When any variable changes, all subscribers are notified synchronously.
+  </Tab>
+  <Tab title="DOM bindings">
+    Form controls with a `data-bind` attribute are automatically two-way bound
+    to the variable store:
+
+    | Control | Bound event | Updates store with |
+    |---|---|---|
+    | `<input type="range">` | `input` | `parseFloat(input.value)` |
+    | `<input type="text/number">` | `input` | `input.value` (string) |
+    | `<input type="checkbox">` | `change` | `input.checked` (boolean) |
+    | `<select>` | `change` | `select.value` (string) |
+
+    All `<span data-vell-var="{name}">` elements are updated automatically
+    whenever the named variable changes.
+  </Tab>
+  <Tab title="@for / @if blocks">
+    `@for` loop containers (`.vell-for`) re-render their child items whenever
+    the bound iterable variable changes. The original child structure is used
+    as a template, with `@{variable}` placeholders replaced for each item.
+
+    `@if` blocks (`.vell-if`) toggle visibility based on a condition expression.
+    Conditions can reference variables using `@{varName}` syntax; the runtime
+    re-evaluates them whenever any referenced variable changes.
+
+    ```vell
+    @var count = 0
+
+    @[Slider](bind=count, min=0, max=10)
+
+    @if @{count} > 5
+      Count is greater than five!
+    @else
+      Count is five or below.
+    @end
+    ```
+  </Tab>
+  <Tab title="Events and cells">
+    `@[On]` binds a constrained variable action to a DOM event. `@[Run]` and
+    executable code fences create cells with a **Run** button and an isolated
+    output area. JavaScript cells execute in a sandboxed iframe.
+
+    `@[Chart](bind=data)` subscribes to reactive chart data and rebuilds the
+    chart whenever the bound variable changes.
+  </Tab>
+</Tabs>
+
+---
+
+## Security
+
+The HTML renderer applies the following safety measures to all user-supplied content from the AST:
+
+- **HTML escaping** — all text content is passed through an `escapeHtml()` function that escapes `&`, `<`, `>`, and `"`.
+- **URL sanitization** — all `href` and `src` values are validated. Only `http:`, `https:`, `mailto:`, and relative URLs are allowed. `javascript:` and `data:text/html` URLs are rejected and replaced with an empty string.
+- **No source-level raw HTML node** — ordinary text and directive content are escaped before HTML emission.
+- **Sandboxed executable cells** — `@[Run]` JavaScript executes inside an iframe with `sandbox="allow-scripts"`.
+
+<Warning>
+  The `renderToFragment()` function uses a `<template>` element's `innerHTML`
+  to create the fragment. The content inserted there is the output of the
+  renderer itself (already escaped), not raw user input — but you should still
+  serve rendered output with an appropriate `Content-Security-Policy` header
+  when hosting untrusted documents.
+</Warning>
+
+<Warning>
+  Interactive documents are not safe for arbitrary untrusted authors. Computed
+  variable expressions execute through `Function` in the parent page. Template
+  CSS is intentionally emitted as CSS, and executable cells intentionally run
+  document-authored JavaScript inside their sandbox.
+</Warning>

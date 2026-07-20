@@ -10,6 +10,7 @@ use crate::ast::{
 use crate::error::{ParseError, ParseErrorKind};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
+use unicode_normalization::UnicodeNormalization;
 
 /// Result that preserves warnings alongside the parsed document.
 #[derive(Clone, Debug, PartialEq)]
@@ -809,7 +810,7 @@ impl Parser {
                 Some("Use @var name = value.".to_string()),
             ));
         };
-        let name = body.get(..eq_index).unwrap_or_default().trim().to_string();
+        let name = canonical_ident(body.get(..eq_index).unwrap_or_default().trim());
         if !is_ident(&name) {
             return Err(self.error(
                 ParseErrorKind::UnexpectedToken,
@@ -858,11 +859,15 @@ impl Parser {
                 Some("Use @for item in @{items} { ... }.".to_string()),
             ));
         };
-        let variable = header
-            .get(5..in_index)
-            .unwrap_or_default()
-            .trim()
-            .to_string();
+        let variable = canonical_ident(header.get(5..in_index).unwrap_or_default().trim());
+        if !is_ident(&variable) {
+            return Err(self.error(
+                ParseErrorKind::UnexpectedToken,
+                Span::new(line.start, line.end),
+                "For-loop variable must be an identifier.",
+                Some("Use @for item in @{items} { ... }.".to_string()),
+            ));
+        }
         let iterable = header
             .get(in_index + 4..)
             .unwrap_or_default()
@@ -872,8 +877,31 @@ impl Parser {
             .trim_start_matches("@{")
             .trim_end_matches('}')
             .to_string();
+        let iterable = canonical_ident(&iterable);
+        if !is_ident(&iterable) {
+            return Err(self.error(
+                ParseErrorKind::UnexpectedToken,
+                Span::new(line.start, line.end),
+                "For-loop iterable must reference an identifier.",
+                Some("Use @for item in @{items} { ... }.".to_string()),
+            ));
+        }
+        if !self.variables.contains(&iterable) {
+            self.warnings.push(ParseError::new(
+                ParseErrorKind::UndefinedReference,
+                Span::new(line.start, line.end),
+                format!("Variable '{iterable}' is not declared before use."),
+                Some(
+                    "Declare it with @var before the loop, or provide it at runtime.".to_string(),
+                ),
+            ));
+        }
         self.index += 1;
+        let had_outer_variable = self.variables.insert(variable.clone());
         let (children, end) = self.parse_braced_children(line.start)?;
+        if !had_outer_variable {
+            self.variables.remove(&variable);
+        }
         Ok(Node::ForLoop {
             variable,
             iterable,
@@ -954,7 +982,7 @@ impl Parser {
                 end = line.end;
                 self.index += 1;
                 if depth == 0 {
-                    return Ok((parse_document(&body)?.children, end));
+                    return self.parse_nested_children(&body, end);
                 }
                 body.push_str(trimmed);
                 body.push('\n');
@@ -962,7 +990,7 @@ impl Parser {
             }
             if trimmed == "} else {" && depth == 1 {
                 end = line.end;
-                return Ok((parse_document(&body)?.children, end));
+                return self.parse_nested_children(&body, end);
             }
             if trimmed.ends_with('{') {
                 depth += 1;
@@ -978,6 +1006,19 @@ impl Parser {
             "Block body is missing a closing '}'.",
             Some("Add a closing brace on its own line.".to_string()),
         ))
+    }
+
+    fn parse_nested_children(
+        &mut self,
+        body: &str,
+        end: usize,
+    ) -> Result<(Vec<Node>, usize), ParseError> {
+        let mut nested = Parser::new(body);
+        nested.metadata = self.metadata.clone();
+        nested.variables = self.variables.clone();
+        let outcome = nested.parse_document()?;
+        self.warnings.extend(outcome.warnings);
+        Ok((outcome.document.children, end))
     }
 
     fn parse_directive(&mut self) -> Result<Node, ParseError> {
@@ -1381,7 +1422,7 @@ impl Parser {
             ));
         };
         let close = *pos + 2 + close_rel;
-        let name = text.get(*pos + 2..close).unwrap_or_default().to_string();
+        let name = canonical_ident(text.get(*pos + 2..close).unwrap_or_default().trim());
         if !self.variables.contains(&name) {
             self.warnings.push(ParseError::new(
                 ParseErrorKind::UndefinedReference,
@@ -1786,8 +1827,12 @@ fn process_line(line: &str, check_line_start: bool) -> (String, u32) {
                 return (buf, depth);
             }
         } else {
-            buf.push(bytes[i] as char);
-            i += 1;
+            let ch = line[i..]
+                .chars()
+                .next()
+                .expect("line index must remain on a UTF-8 boundary");
+            buf.push(ch);
+            i += ch.len_utf8();
         }
     }
 
@@ -1894,6 +1939,10 @@ fn is_ident(value: &str) -> bool {
         return false;
     };
     (first.is_alphabetic() || first == '_') && chars.all(|ch| ch.is_alphanumeric() || ch == '_')
+}
+
+fn canonical_ident(value: &str) -> String {
+    value.nfc().collect()
 }
 
 fn parse_json_value(raw: &str) -> Result<JsonValue, String> {
@@ -2070,8 +2119,21 @@ fn builtin_directive(name: &str) -> bool {
             | "Select"
             | "Checkbox"
             | "Data"
+            | "Button"
+            | "On"
+            | "Run"
+            | "Notebook"
             // Phase 12: Multi-Format Publishing
             | "Include"
+            | "Book"
+            | "Part"
+            | "Chapter"
+            | "Appendix"
+            | "Foreword"
+            | "Preface"
+            | "Index"
+            | "Glossary"
+            | "PageRef"
             // Phase 13: Package & Extension Ecosystem
             | "Template"
             // Phase 9: Bibliography
@@ -2101,7 +2163,7 @@ pub fn slugify_inline(nodes: &[InlineNode]) -> String {
     let raw = crate::ast::format_inline_nodes(nodes);
     let mut slug = String::new();
     let mut last_dash = false;
-    for ch in raw.chars() {
+    for ch in raw.nfc() {
         if ch.is_alphanumeric() {
             slug.push(ch.to_ascii_lowercase());
             last_dash = false;

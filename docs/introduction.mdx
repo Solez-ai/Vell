@@ -1,0 +1,93 @@
+---
+title: "What Is Vell? Readable Markup with LaTeX-Level Power"
+sidebarTitle: "Introduction"
+description: "Learn what Vell is, why it exists, and how it compares to Markdown and LaTeX: deterministic AST, reactive variables, math support, and a full toolchain."
+---
+
+Vell is a document markup language that lets you write expressive, publication-quality documents in plain text. You author `.vl` files that look as clean as Markdown, then the Vell toolchain parses them into a **versioned, deterministic abstract syntax tree (AST)** and renders that AST to HTML, PDF, or reveal.js slide decks. Because the grammar is formal and the AST is versioned, the same source file always produces the same output — no surprise rendering differences between machines or toolchain versions.
+
+## Why Vell Exists
+
+Markdown is easy to write but too limited for serious documents: no native math, no variables, no reliable tables, and no formal grammar. LaTeX is powerful but its source files are difficult to read and write without significant expertise. Vell bridges that gap. The table below shows how Vell compares to both tools across the features that matter most for technical and academic writing.
+
+| Feature                   | Markdown     | LaTeX            | Vell              |
+|---------------------------|:------------:|:----------------:|:-----------------:|
+| Readable source           | ✅           | ❌               | ✅                |
+| Deterministic output      | ❌           | ✅               | ✅                |
+| Extensible directives     | ❌           | ✅ (packages)    | ✅ (native)       |
+| Variables and reactivity  | ❌           | ❌               | ✅                |
+| Math support              | ❌           | ✅               | ✅ (MathML)       |
+| Tables                    | Basic        | Verbose          | ✅ (pipe + grid)  |
+| Idempotent formatter      | Inconsistent | Limited          | ✅                |
+| LSP support               | Basic        | Complex          | ✅                |
+| PDF output                | Via converters | Native         | ✅ (direct AST)   |
+
+## Core Concepts
+
+### The `.vl` File Format
+
+Every Vell document is a UTF-8 plain text file with the `.vl` extension. The file contains a sequence of **block elements** — headings, paragraphs, code blocks, math, tables, lists, and directives — separated by blank lines. Block elements can contain **inline elements** such as bold, italic, links, and inline math. This two-level structure mirrors HTML's block/inline model, making the mental mapping straightforward.
+
+### The Deterministic AST
+
+Vell's reference parser is written in Rust and uses a formal PEG grammar. The grammar guarantees that every valid `.vl` file produces **exactly one AST** in linear time — O(n) relative to source length. The AST is versioned (currently schema v1) so that tooling can remain forward-compatible as the language evolves. You can inspect the raw AST of any document at any time using `vell parse`.
+
+### Reactive Variables
+
+Unlike Markdown, Vell documents are interactive by design. Declare a variable with `@var`, reference it with `@{name}`, loop over an array with `@for`, and conditionally render content with `@if`. The HTML renderer emits `data-vell-var` attributes so that a JavaScript runtime can update the DOM reactively when variable values change.
+
+```vell
+@var author = "Samin"
+@var chapters = ["Introduction", "Methods", "Results"]
+
+Written by @{author}.
+
+@for chapter in @{chapters} {
+  - @{chapter}
+}
+```
+
+### Directives
+
+Directives are the primary extension point in Vell. They use an `@[Name](props)` syntax that is visually distinct from prose and can carry an optional block body:
+
+```vell
+@[Figure](src="chart.png" caption="Quarterly Data")
+
+@[Theorem](name="Pythagoras" label=thm:pyth) {
+  For any right triangle: $a^2 + b^2 = c^2$
+}
+```
+
+Vell ships with over 30 built-in directives covering figures, theorems, equations, diagrams, charts, slides, tables of contents, and interactive form elements. Custom directives follow the `@[org/Name]` namespaced extension pattern.
+
+## Feature Areas
+
+<CardGroup cols={3}>
+  <Card title="Language" icon="code">
+    PEG grammar, versioned AST, headings with `=`, rich inline markup (`*bold*`, `/italic/`, `_underline_`), pipe and grid tables, LaTeX math, footnotes, definition lists, and citations.
+  </Card>
+  <Card title="Tooling" icon="wrench">
+    Rust CLI (`vell parse`, `vell fmt`, `vell render`, `vell validate`), idempotent formatter, full-featured LSP server, VS Code extension, and WebAssembly bindings for the browser.
+  </Card>
+  <Card title="Packages" icon="package">
+    `vell-js` (WASM wrapper), `@solez-ai/vell-renderer-html`, `@solez-ai/vell-renderer-pdf`, `@solez-ai/vell-extensions` — all available on npm for use in Node.js or browser environments.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install Vell and render your first document in under five minutes.
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed setup for the CLI, npm packages, and VS Code extension.
+  </Card>
+  <Card title="Language Reference" icon="book" href="/language/syntax">
+    Deep-dive into every element of the Vell syntax.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/tooling/cli">
+    Full reference for `vell parse`, `vell fmt`, `vell render`, and `vell validate`.
+  </Card>
+</CardGroup>

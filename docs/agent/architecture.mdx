@@ -1,0 +1,210 @@
+---
+title: "Vell Architecture: Parser, AST, and Toolchain Design"
+sidebarTitle: "Architecture"
+description: "Deep-dive into Vell's architecture: the parser pipeline, AST contract, crate responsibilities, and the correct sequence for adding a language feature."
+---
+
+Vell is structured as a monorepo in which a single Rust parser is the sole source of truth for parsing, and all other tools — formatters, renderers, LSP servers, and editor extensions — consume the versioned AST that parser produces. This design enforces a clean boundary: parsing is a concern of `vell-core`, and everything downstream is a concern of the packages that depend on it. No package other than `vell-core` may re-implement parsing logic, and no renderer may operate on raw source text.
+
+## Pipeline Overview
+
+The full processing pipeline from source file to rendered output is:
+
+```
+.vl source file
+      │
+      ▼
+vell-core: Lexer → Parser → AST (Document)
+      │
+      ├─────────────────────────────────────┐
+      ▼                ▼          ▼         ▼
+ vell-wasm         vell-fmt   vell-lsp   vell-cli
+ (WASM binary)   (formatter) (editor)    (CLI)
+      │
+      ▼
+TypeScript Packages
+ vell-js (WASM wrapper)
+      │
+      ├────────────────────┐
+      ▼                    ▼
+ vell-renderer-html    vell-renderer-pdf
+ (HTML5 + MathML)      (direct PDF via pdfkit)
+```
+
+Every arrow crossing the `vell-core` boundary carries a `Document` AST — a versioned, deterministic JSON-serializable tree. There is no path by which a renderer, formatter, or editor receives raw source bytes and must parse them independently.
+
+## Crate and Package Responsibilities
+
+<Accordion title="vell-core — Reference parser and AST">
+**What it does:** Defines all AST node types in `ast.rs`, implements the lexer in `lexer.rs` and the PEG recursive-descent parser in `parser.rs`, exposes error types in `error.rs`, and provides bibliography management in `bibliography.rs`.
+
+**Dependencies:** Only `serde`, `serde_json`, and `thiserror`. No rendering, no I/O, no editor protocol.
+
+**What must never be added:** Any dependency on rendering crates, editor protocol types, file system access, or network I/O. This crate must compile to WASM cleanly with zero platform-specific code. Adding a runtime dependency beyond `serde` and `serde_json` requires explicit justification.
+</Accordion>
+
+<Accordion title="vell-fmt — Canonical formatter">
+**What it does:** Accepts a `Document` AST and produces normalized Vell source text. Idempotent: formatting an already-formatted document is a no-op.
+
+**Dependencies:** `vell-core` only.
+
+**What must never be added:** Any rendering logic (HTML generation, PDF output). The formatter's only job is to produce canonical `.vl` source from an AST. It must not depend on any renderer package.
+</Accordion>
+
+<Accordion title="vell-wasm — WebAssembly bindings">
+**What it does:** Exposes stable JavaScript entry points — `parse`, `parse_to_json`, `validate`, and `get_version` — via `wasm-bindgen`. The resulting `.wasm` binary is the stable public API that all JavaScript consumers depend on.
+
+**Dependencies:** `vell-core`, `wasm-bindgen`.
+
+**What must never be added:** Formatter or renderer logic. The WASM layer is intentionally thin — it serializes the `Document` AST to JSON and passes it across the WASM boundary. All further processing happens in the JavaScript layer.
+</Accordion>
+
+<Accordion title="vell-lsp — Language Server Protocol server">
+**What it does:** Runs as a standalone process that speaks the LSP protocol. On every `textDocument/didOpen` and `textDocument/didChange`, it re-parses the document via `vell-core` and emits diagnostics. Implements hover, completions, go-to-definition, references, rename, semantic tokens, folding ranges, code actions, code lenses, inlay hints, linked editing ranges, and format-on-type.
+
+**Dependencies:** `vell-core`, `vell-fmt`, `tower-lsp`, `tokio`.
+
+**What must never be added:** Renderer logic. The LSP server operates on the AST for editor features, but it never renders HTML or PDF. If you need to preview output in the editor, that is a separate extension concern.
+</Accordion>
+
+<Accordion title="packages/vell-js — TypeScript WASM wrapper">
+**What it does:** Loads the WASM binary, wraps the raw WASM API with TypeScript types, and exports `parse`, `parseOrThrow`, `validate`, `format`, and `getVersion`. Provides fully typed interfaces for every AST node type.
+
+**Dependencies:** The WASM binary from `vell-wasm`. No other runtime dependencies.
+
+**What must never be added:** Re-implementation of any parsing logic. If you need a parsing behavior that the WASM API does not expose, add it to `vell-wasm` and re-build the binary.
+</Accordion>
+
+<Accordion title="packages/vell-renderer-html — HTML5 renderer">
+**What it does:** Accepts a `VellDocument` JavaScript object (deserialized from WASM output) and produces an HTML string or a live DOM `DocumentFragment`. Handles all 35 block and inline node types, MathML conversion, URL sanitization, HTML escaping, footnote collection, and extension fallback rendering.
+
+**Dependencies:** `@solez-ai/vell`, `@solez-ai/vell-extensions` (optional, for extension adapters).
+
+**What must never be added:** Parsing logic. The renderer receives an already-parsed AST. It must never accept raw `.vl` source as input.
+</Accordion>
+
+<Accordion title="packages/vell-renderer-pdf — Direct PDF renderer">
+**What it does:** Produces PDF output directly from the AST using `pdfkit`. A4 page layout, built-in PDF fonts, automatic page breaks, and footnote rendering at the end of each page.
+
+**What must never be added:** An HTML-to-PDF pipeline. The PDF renderer is explicitly a direct AST-to-PDF renderer. Routing through an HTML renderer would bypass AST-level control over pagination, font selection, and PDF-specific features.
+</Accordion>
+
+<Accordion title="packages/vell-extensions — Extension registry">
+**What it does:** Provides the `ExtensionAdapter` interface, a central `register` / `renderExtension` API, and built-in adapters for YouTube, Vimeo, Chart, Mermaid, Callout, and Map extensions.
+
+**Dependencies:** None beyond TypeScript. It does not depend on any renderer — adapters are passed a rendering context (`escapeHtml`, `sanitizeUrl`) by the calling renderer.
+</Accordion>
+
+## The AST as the Stable API Contract
+
+The WASM API — and by extension the JSON AST it emits — is the only stable public API in the Vell ecosystem. Internal Rust types may change between versions; the JSON shape of the AST may not change without a version increment.
+
+### Document root
+
+Every parsed document is a `Document` object:
+
+```json
+{
+  "version": 1,
+  "children": [ /* Node[] */ ],
+  "metadata": {
+    "title": "My Document",
+    "author": "You",
+    "date": null,
+    "lang": "en",
+    "variables": {}
+  },
+  "span": { "start": 0, "end": 1024 }
+}
+```
+
+The `version` field is `1` for the current schema. When any breaking change is made to node structure, this value is incremented and the `AST_VERSION` constant in `crates/vell-core/src/ast.rs` is updated to match.
+
+### Node dispatch
+
+Every node has a `type` field that is the string discriminator for dispatch:
+
+```typescript
+function renderBlock(node: Node): string {
+  switch (node.type) {
+    case "Heading":      return renderHeading(node);
+    case "Paragraph":    return renderParagraph(node);
+    case "CodeBlock":    return renderCodeBlock(node);
+    case "Extension":    return renderExtensionFallback(node);
+    // ... all other known types ...
+    default:
+      // Forward-compatible fallback: render children if present
+      if (node.children) {
+        return node.children.map(renderBlock).join("");
+      }
+      return "";
+  }
+}
+```
+
+The `default` branch is not optional. Renderers that omit it will crash on documents containing future node types.
+
+### Extension nodes as the forward-compatibility escape hatch
+
+When the parser encounters a directive with a namespaced name (`namespace/Name`) or an unrecognized name, it preserves the node as an `Extension` rather than emitting a parse error:
+
+```json
+{
+  "type": "Extension",
+  "name": "myorg/Widget",
+  "props": { "data": 42 },
+  "children": [],
+  "raw_source": "@[myorg/Widget](data=42)",
+  "span": { "start": 120, "end": 144 }
+}
+```
+
+This means a document written for a future version of Vell can be processed by an older renderer without errors — the renderer simply applies its fallback strategy to any `Extension` node it does not recognize.
+
+### Span fields and source location
+
+Every node carries a `span` with `start` and `end` byte offsets into the original unmodified source text. These are used by the LSP server for diagnostics, hover ranges, and rename operations. Formatters that rewrite source text produce new spans after re-parsing.
+
+## Correct Sequence for Adding a Feature
+
+When adding a new language feature — a new node type, a new built-in directive, or a new inline syntax — the following sequence must be followed in order. Skipping steps creates inconsistency between the grammar specification, the parser implementation, and the tooling.
+
+<Steps>
+  <Step title="Update the grammar specification">
+    Edit `spec/grammar.peg` to define the new syntax. The PEG grammar is the normative specification; the Rust parser is derived from it. If the grammar is not updated first, there is no authoritative definition of what valid input looks like.
+  </Step>
+  <Step title="Update the AST schema">
+    Edit `spec/ast-schema.json` to add or modify the JSON Schema `$defs` entry for the new node type. If the change is breaking (field rename, field removal, type change), increment the schema version in both `ast-schema.json` and the `AST_VERSION` constant in `crates/vell-core/src/ast.rs`.
+  </Step>
+  <Step title="Implement parser support">
+    Add or modify the relevant parse functions in `crates/vell-core/src/parser.rs`. Add the new node variant to the `Node` or `InlineNode` enum in `crates/vell-core/src/ast.rs`. Implement `Display` for the new variant. Add the variant to `NodeKind` and its `From<Node>` implementation.
+  </Step>
+  <Step title="Add formatter output">
+    Add a branch to the `Display` implementation in `ast.rs` (which is what the formatter uses) or add explicit handling in `crates/vell-fmt/src/lib.rs`. Verify that formatting is idempotent: parse the formatter output and format it again; the result must be identical.
+  </Step>
+  <Step title="Update renderers">
+    Add handling for the new node type in `packages/vell-renderer-html/src/index.ts` and `packages/vell-renderer-pdf/src/index.ts`. Neither renderer may silently ignore the new type — add explicit rendering logic or an explicit fallback.
+  </Step>
+  <Step title="Add tests and fixtures">
+    Add at least one `.vl` fixture file and its corresponding expected `.json` AST output to `crates/vell-core/src/tests/fixtures/`. Add unit tests in `crates/vell-core/src/tests/parser_tests.rs` that verify the new node type parses correctly and that errors are returned correctly for malformed input.
+  </Step>
+  <Step title="Update documentation">
+    Update the relevant sections in `docs/language-reference.md` (syntax) and `docs/ast-reference.md` (AST node shape). If the feature involves a new directive, update `docs/extension-authoring.md` as well.
+  </Step>
+</Steps>
+
+## Common Pitfalls
+
+<Warning>
+The following mistakes are easy to make and have non-obvious consequences. Read this section before making any changes to the parser or renderers.
+</Warning>
+
+**Do not assume the lexer emits one token per character.** The lexer groups characters into meaningful token kinds. A `BacktickFence` token represents the entire ` ``` ` sequence. An `AtBracket` token represents `@[`. A `DoubleComma` token represents `,,`. Treating the token stream as a character stream will produce incorrect parse results.
+
+**Do not forget `Extension` node handling in renderers.** Every renderer must have explicit code for `Extension` nodes. The correct fallback is to render the extension's `children` recursively and optionally emit a labeled placeholder. A renderer that throws `Unknown node type: Extension` is non-conformant and will break on any document that uses custom directives.
+
+**Do not break formatter idempotency.** After making any change to `vell-fmt`, run the formatter on its own output and verify the result is identical. The test for this is: `format(format(source)) === format(source)`. Any change that violates this property is a regression.
+
+**Do not change node structure without incrementing the AST version.** Renaming a field, removing a field, or changing a field's type is a breaking change. Consumers that have cached AST JSON from a previous version will receive unexpected values without a version signal. The `version` field on the `Document` root is the mechanism for communicating this; use it.
+
+**Do not add parsing logic to packages other than `vell-core`.** If a renderer or LSP feature requires information that is not in the AST, the correct fix is to add that information to the AST (subject to the steps above), not to parse the source text again in the renderer.

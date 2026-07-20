@@ -1,0 +1,364 @@
+---
+title: "Authoring Vell Extensions: Custom Directives Guide"
+sidebarTitle: "Authoring Extensions"
+description: "Build custom Vell extensions using namespaced directives. Create TypeScript adapters, register them with the extension registry, and distribute via npm."
+---
+
+Building a custom Vell extension means writing a TypeScript adapter that takes an `Extension` AST node and returns rendered output. The process is straightforward: pick a namespace, define your props schema, implement a `render` function, register the adapter, and optionally add LSP metadata for editor completions. This guide walks you through every step.
+
+## Naming Your Extension
+
+Every extension name must contain a `/` separator: `namespace/Name`. The namespace identifies who owns the extension and avoids naming conflicts with built-in directives and other community extensions.
+
+```vell
+@[myorg/Widget](data="hello")     ✅ namespaced
+@[npm/chart](type=bar)             ✅ namespaced (community npm package)
+@[Widget](data="hello")            ❌ no namespace — treated as built-in directive
+```
+
+**Namespace recommendations:**
+
+| Namespace | Use when |
+|---|---|
+| `myorg/` | Internal extensions unique to your organization |
+| `npm/` | Open-source extensions published to npm |
+| `embed/` | Media embed adapters (video, maps, iframes) |
+| `gh/` | Extensions hosted on GitHub |
+
+Use PascalCase for the name after `/` (`myorg/Widget`, `myorg/DataTable`) and lowercase for the namespace.
+
+## Writing the Extension in Vell Source
+
+Once your adapter is registered, users write your extension just like any other Vell directive:
+
+```vell
+@[myorg/Widget](data="hello" count=3)
+```
+
+With an optional block body:
+
+```vell
+@[myorg/Widget](data="hello") {
+  This body content is parsed as Vell and available as `children` in the AST.
+  It can contain **bold**, _italic_, and even nested directives.
+}
+```
+
+Props support strings, numbers, booleans, null, and variable references:
+
+```vell
+@var dataset = "sales"
+
+@[myorg/Chart](type=bar source=@{dataset} interactive=true)
+```
+
+## The Extension AST Node
+
+When the Vell parser encounters your directive, it produces an `Extension` node:
+
+```json
+{
+  "type": "Extension",
+  "name": "myorg/Widget",
+  "props": {
+    "data": "hello",
+    "count": 3
+  },
+  "children": [
+    {
+      "type": "Paragraph",
+      "children": [
+        { "type": "Text", "value": "This body content is parsed as Vell…" }
+      ]
+    }
+  ],
+  "raw_source": "@[myorg/Widget](data=\"hello\" count=3) { … }",
+  "span": { "start": 0, "end": 52 }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Full extension name including namespace |
+| `props` | `Record<string, PropValue>` | Key-value properties from the directive |
+| `children` | `VellNode[]` | Parsed block body (empty array if no body was given) |
+| `raw_source` | `string` | Original source text — use for debugging only, may be omitted after serialization |
+| `span` | `{ start, end }` | Byte offsets in the original source |
+
+## Creating an Adapter
+
+An adapter is an object that implements the `ExtensionAdapter` interface from `@solez-ai/vell-extensions`:
+
+```typescript
+import { register, ExtensionAdapter, ExtensionContext, VellNode } from '@solez-ai/vell-extensions';
+
+const myAdapter: ExtensionAdapter = {
+  name: 'myorg/Widget',
+  description: 'A custom widget that displays data with an optional body',
+  schema: {
+    data: { type: 'string', required: true },
+    count: { type: 'number', default: 1 },
+  },
+  render(node: VellNode, ctx: ExtensionContext): string {
+    const data = String(node.props?.data ?? '');
+    const count = Number(node.props?.count ?? 1);
+
+    // Render any block body children by delegating back through the registry
+    const body = (node.children ?? [])
+      .map(child => {
+        if (child.type === 'Paragraph' && child.children) {
+          return `<p>${(child.children as VellNode[])
+            .map(inline => inline.type === 'Text' ? ctx.escapeHtml(String(inline.value ?? '')) : '')
+            .join('')}</p>`;
+        }
+        return '';
+      })
+      .join('\n');
+
+    return `<div class="my-widget" data-count="${count}">
+  <span class="widget-data">${ctx.escapeHtml(data)}</span>
+  ${body}
+</div>`;
+  },
+  fallback(node: VellNode, ctx: ExtensionContext): string {
+    const data = ctx.escapeHtml(String(node.props?.data ?? ''));
+    return `<div class="extension-fallback">[myorg/Widget: ${data}]</div>`;
+  },
+};
+
+register(myAdapter);
+```
+
+### The `ExtensionAdapter` Interface
+
+```typescript
+interface ExtensionAdapter {
+  /** The full extension name including namespace, e.g. "myorg/Widget". */
+  name: string;
+  /** Human-readable description shown in LSP hover and documentation. */
+  description: string;
+  /** JSON Schema-like property definitions for validation and LSP completions. */
+  schema: Record<string, {
+    type: string;          // "string" | "number" | "boolean"
+    required?: boolean;
+    optional?: boolean;
+    default?: PropValue;
+  }>;
+  /** Renders the extension node to an HTML string. */
+  render(node: VellNode, ctx: ExtensionContext): string;
+  /** Optional: fallback output for renderers that don't support this extension. */
+  fallback?(node: VellNode, ctx: ExtensionContext): string;
+}
+```
+
+### The `ExtensionContext` Interface
+
+The `ctx` argument provides safe utilities you should always use instead of rolling your own:
+
+```typescript
+interface ExtensionContext {
+  /** Escape HTML special characters. Use on all user-supplied strings. */
+  escapeHtml(value: string): string;
+  /** Sanitize a URL. Rejects javascript:, data:, vbscript:, and file: schemes. */
+  sanitizeUrl(value: string): string;
+}
+```
+
+<Warning>
+  Always pass user-supplied prop values and body text through `ctx.escapeHtml()` before inserting them into your HTML output. Never use raw prop values in attributes or text nodes — they can contain characters that break HTML or enable XSS attacks.
+</Warning>
+
+## A Complete Example
+
+Here's a full adapter for a `myorg/CodeSandbox` extension that embeds a CodeSandbox iframe:
+
+```typescript
+import { register, ExtensionAdapter, ExtensionContext, VellNode } from '@solez-ai/vell-extensions';
+
+const CodeSandbox: ExtensionAdapter = {
+  name: 'myorg/CodeSandbox',
+  description: 'Embed a CodeSandbox project by ID',
+  schema: {
+    id: { type: 'string', required: true },
+    title: { type: 'string', optional: true },
+    height: { type: 'number', default: 500 },
+    theme: { type: 'string', default: 'dark' },
+  },
+  render(node: VellNode, ctx: ExtensionContext): string {
+    const id = String(node.props?.id ?? '');
+    const title = node.props?.title ? ctx.escapeHtml(String(node.props.title)) : 'CodeSandbox';
+    const height = Number(node.props?.height ?? 500);
+    const theme = ctx.escapeHtml(String(node.props?.theme ?? 'dark'));
+
+    if (!id) {
+      return this.fallback!(node, ctx);
+    }
+
+    const src = ctx.sanitizeUrl(
+      `https://codesandbox.io/embed/${id}?theme=${theme}&fontsize=14&hidenavigation=1`
+    );
+
+    return `<div class="vell-extension" data-name="myorg/CodeSandbox">
+  <iframe
+    src="${src}"
+    title="${title}"
+    style="width:100%;height:${height}px;border:0;border-radius:4px;overflow:hidden;"
+    sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+    allowfullscreen
+  ></iframe>
+</div>`;
+  },
+  fallback(node: VellNode, ctx: ExtensionContext): string {
+    const id = ctx.escapeHtml(String(node.props?.id ?? ''));
+    const title = node.props?.title ? ctx.escapeHtml(String(node.props.title)) : id;
+    return `<a href="https://codesandbox.io/s/${id}" class="extension-fallback">View ${title} on CodeSandbox</a>`;
+  },
+};
+
+register(CodeSandbox);
+export { CodeSandbox };
+```
+
+Used in a Vell document:
+
+```vell
+@[myorg/CodeSandbox](id="amazing-react-demo-abc123" title="React Counter" height=400)
+```
+
+## LSP Integration
+
+Providing LSP metadata for your extension improves the editor experience for users — they get hover documentation and auto-completions when typing `@[myorg/`.
+
+### Hover documentation
+
+Register hover text in the LSP server's hover handler by keying on the extension name:
+
+```typescript
+const extensionDocs: Record<string, string> = {
+  'myorg/Widget': [
+    '**myorg/Widget**',
+    '',
+    'A custom widget that displays data.',
+    '',
+    '**Properties:**',
+    '- `data` (string, required): The data to display',
+    '- `count` (number, default: 1): Number of repetitions',
+  ].join('\n'),
+};
+```
+
+### Completions
+
+Add a completion item so `@[myorg/` triggers a suggestion:
+
+```typescript
+const completionItem = {
+  label: '@[myorg/Widget]',
+  detail: 'A custom widget',
+  kind: 'Keyword',
+  insertText: '@[myorg/Widget](data="${1:value}")',
+};
+```
+
+### Diagnostics
+
+Validate required props after parsing and push diagnostics for missing values:
+
+```typescript
+for (const node of doc.children) {
+  if (node.type === 'Extension' && node.name === 'myorg/Widget') {
+    if (!node.props?.data) {
+      diagnostics.push({
+        range: rangeFromSpan(source, node.span),
+        severity: 'error',
+        message: "myorg/Widget requires a 'data' property",
+      });
+    }
+  }
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always provide a fallback">
+    Implement the `fallback` method on every adapter. Renderers that don't support your extension will call `fallback` instead of `render`. A good fallback either links to external content or renders the block body as plain text.
+  </Step>
+  <Step title="Never crash on unknown props">
+    Treat every prop as optional in your render function. Use nullish coalescing (`??`) and defaults from your schema. Users may pass unexpected props, and your adapter should degrade gracefully.
+  </Step>
+  <Step title="Sanitize all user content">
+    Every prop value and every string extracted from `children` must pass through `ctx.escapeHtml()` before appearing in HTML output. For URL-valued props, use `ctx.sanitizeUrl()`.
+  </Step>
+  <Step title="Render children recursively">
+    If your extension has a body, render the `children` array rather than ignoring it. This makes your extension's fallback behavior useful (renderers that don't know about your extension will still show the body content) and lets users provide alt-text equivalents for PDF output.
+  </Step>
+</Steps>
+
+## Distributing Your Extension
+
+### Package structure
+
+```
+vell-ext-my-widget/
+├── package.json
+├── src/
+│   ├── index.ts          # Exports the adapter and calls register()
+│   └── adapter.ts        # The ExtensionAdapter implementation
+├── docs/
+│   └── README.md
+└── tests/
+    └── widget.test.ts
+```
+
+### npm naming convention
+
+Publish your extension as an npm package using the `vell-ext-` prefix:
+
+```
+vell-ext-codesandbox
+vell-ext-desmos-graph
+vell-ext-latex-diagram
+```
+
+### `package.json` essentials
+
+```json
+{
+  "name": "vell-ext-my-widget",
+  "version": "1.0.0",
+  "description": "myorg/Widget extension for Vell documents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "peerDependencies": {
+    "@solez-ai/vell-extensions": "^0.1.0",
+    "@solez-ai/vell-renderer-html": "^0.1.0"
+  },
+  "keywords": ["vell", "vell-extension", "widget"]
+}
+```
+
+### Registration at the application level
+
+Users of your published package register the adapter in their application entry point:
+
+```typescript
+import { register } from '@solez-ai/vell-extensions';
+import { MyWidget } from 'vell-ext-my-widget';
+
+register(MyWidget);
+```
+
+After that, any document parsed and rendered in the same process will automatically use your adapter for `@[myorg/Widget]` nodes.
+
+## Versioning and Compatibility
+
+The Vell AST guarantees that the `Extension` node type, `name`, `props`, and `children` fields will remain stable across AST versions. New fields may be added but existing ones will not be renamed or removed. This means:
+
+- Extensions you author today will continue to parse correctly in future Vell versions
+- You can safely update your adapter without touching your users' `.vl` documents
+- If you need to make breaking changes to your props schema, increment your package's major version and document the migration path
+
+<Tip>
+  If you need to completely redesign your extension's API, consider introducing a new name (e.g., `myorg/Widget-v2`) rather than breaking the existing one. This lets users migrate gradually without their existing documents breaking on the old adapter.
+</Tip>

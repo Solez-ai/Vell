@@ -45,6 +45,10 @@ const SPEC_EXAMPLES: &[(&str, &str)] = &[
         "06-full-document",
         include_str!("../../../../spec/examples/06-full-document.vl"),
     ),
+    (
+        "07-math-comprehensive",
+        include_str!("../../../../spec/examples/07-math-comprehensive.vl"),
+    ),
 ];
 
 #[test]
@@ -321,6 +325,39 @@ fn warns_undefined_variable() {
 fn parses_for_loop() {
     let doc = parse_document("@var items = [1, 2]\n@for item in @{items} {\n  Body.\n}\n").unwrap();
     assert!(matches!(doc.children[1], Node::ForLoop { .. }));
+}
+
+#[test]
+fn loop_variables_are_available_inside_the_loop_only() {
+    let result = crate::parse_document_with_warnings(
+        "@var items = [1]\n@for item in @{items} {\n  @{item}\n}\n@{item}\n",
+    )
+    .unwrap();
+    assert_eq!(result.warnings.len(), 1);
+    assert!(result.warnings[0].message.contains("item"));
+}
+
+#[test]
+fn loop_headers_require_valid_declared_iterables() {
+    let errors = crate::validate("@for item in @{missing} {\n  Body.\n}\n");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.kind == ParseErrorKind::UndefinedReference)
+    );
+    let errors = crate::validate("@for 1item in @{items} {\n  Body.\n}\n");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.kind == ParseErrorKind::UnexpectedToken)
+    );
+}
+
+#[test]
+fn identifiers_use_unicode_nfc() {
+    let result = crate::parse_document_with_warnings("@var café = \"ok\"\n@{café}\n").unwrap();
+    assert!(result.warnings.is_empty());
+    assert!(result.document.metadata.variables.contains_key("café"));
 }
 
 // ---------------------------------------------------------------------------
@@ -1060,6 +1097,28 @@ fn snapshots_match_all_fixtures() {
             serde_json::to_string_pretty(&expected_stripped).unwrap(),
         );
     }
+}
+
+#[test]
+fn comment_stripping_preserves_unicode() {
+    let source = "= 日本語\n\nمرحبا — Привет 😀 /* hidden */ café\n";
+    let document = parse_document(source).expect("unicode source should parse");
+    let paragraph = document
+        .children
+        .iter()
+        .find_map(|node| match node {
+            Node::Paragraph { children, .. } => Some(children),
+            _ => None,
+        })
+        .expect("paragraph should be present");
+    let text = paragraph
+        .iter()
+        .filter_map(|node| match node {
+            InlineNode::Text { value, .. } => Some(value.as_str()),
+            _ => None,
+        })
+        .collect::<String>();
+    assert_eq!(text, "مرحبا — Привет 😀  café");
 }
 
 // ---------------------------------------------------------------------------
